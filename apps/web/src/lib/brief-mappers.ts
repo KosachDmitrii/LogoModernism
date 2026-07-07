@@ -5,7 +5,7 @@ export function eraToInspiration(era: string): string {
     '1960s': 'olivetti',
     corporate_identity: 'ibm',
     'corporate identity': 'ibm',
-    international_style: 'swiss',
+    international_style: 'lufthansa',
     'international style': 'lufthansa',
     '1970s': 'braun',
     mid_century: 'olivetti',
@@ -13,6 +13,31 @@ export function eraToInspiration(era: string): string {
   };
   const key = era.toLowerCase().replace(/\s+/g, ' ').trim();
   return map[key] ?? map[key.replace(/ /g, '_')] ?? '';
+}
+
+/** Parse era label from Design Brief into API era value */
+export function parseEraFromBrief(era?: string): string | undefined {
+  if (!era?.trim()) return undefined;
+  const normalized = era.toLowerCase().replace(/\s+/g, '_').trim();
+  const valid = [
+    'swiss',
+    'bauhaus',
+    'international_style',
+    'corporate_identity',
+    '1960s',
+    '1970s',
+    'mid_century',
+  ];
+  if (valid.includes(normalized)) return normalized;
+  // fuzzy match
+  if (normalized.includes('bauhaus')) return 'bauhaus';
+  if (normalized.includes('1960')) return '1960s';
+  if (normalized.includes('1970')) return '1970s';
+  if (normalized.includes('corporate')) return 'corporate_identity';
+  if (normalized.includes('mid') && normalized.includes('century')) return 'mid_century';
+  if (normalized.includes('international')) return 'international_style';
+  if (normalized.includes('swiss')) return 'swiss';
+  return undefined;
 }
 
 export function complexityToMinimalism(complexity: string): number {
@@ -52,4 +77,19 @@ export function buildEffectiveIndustry(industry: string, extras: {
   }
 
   return parts.filter(Boolean).join(', ');
+}
+
+/** Best-effort label for which Design Brief source set the era */
+export function getEraSourceLabel(brief: {
+  sources: string[];
+  catalogReferenceIds?: string[];
+}): string {
+  if ((brief.catalogReferenceIds?.length ?? 0) > 0 && brief.sources.includes('Logo Catalog')) {
+    return 'Logo Catalog';
+  }
+  if (brief.sources.includes('Brand DNA')) return 'Brand DNA';
+  if (brief.sources.includes('Full Pipeline')) return 'Full Pipeline';
+  if (brief.sources.includes('Knowledge Graph')) return 'Knowledge Graph';
+  if (brief.sources.includes('Geometry')) return 'Geometry';
+  return brief.sources[0] ?? 'Design Brief';
 }

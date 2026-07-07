@@ -32,7 +32,31 @@ let PrinciplesService = class PrinciplesService {
         return knowledge_base_1.knowledgeGraph;
     }
     getReferences() {
-        return knowledge_base_1.logoReferences;
+        return (0, knowledge_base_1.getFullCatalog)();
+    }
+    getCatalogTaxonomy() {
+        return (0, knowledge_base_1.getCatalogTaxonomy)();
+    }
+    getCatalogStats() {
+        return (0, knowledge_base_1.getCatalogStats)();
+    }
+    getCatalogEntry(id) {
+        return (0, knowledge_base_1.getCatalogEntry)(id) ?? null;
+    }
+    getCaseStudies() {
+        return (0, knowledge_base_1.getCaseStudies)();
+    }
+    getDesignerProfiles() {
+        return (0, knowledge_base_1.getDesignerProfiles)();
+    }
+    searchCatalog(filters) {
+        return (0, knowledge_base_1.searchCatalog)({
+            ...filters,
+            chapter: filters.chapter,
+            era: filters.era,
+            entryKind: filters.entryKind,
+            markType: filters.markType,
+        });
     }
     getTemplates(tags) {
         if (!tags)

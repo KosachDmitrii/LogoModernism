@@ -30,6 +30,54 @@ export class PrinciplesController {
     return this.principlesService.getReferences();
   }
 
+  @Get('catalog/taxonomy')
+  catalogTaxonomy() {
+    return this.principlesService.getCatalogTaxonomy();
+  }
+
+  @Get('catalog/stats')
+  catalogStats() {
+    return this.principlesService.getCatalogStats();
+  }
+
+  @Get('catalog/case-studies')
+  caseStudies() {
+    return this.principlesService.getCaseStudies();
+  }
+
+  @Get('catalog/designers')
+  designerProfiles() {
+    return this.principlesService.getDesignerProfiles();
+  }
+
+  @Get('catalog/search')
+  catalogSearch(
+    @Query('q') query?: string,
+    @Query('chapter') chapter?: string,
+    @Query('section') section?: string,
+    @Query('era') era?: string,
+    @Query('industry') industry?: string,
+    @Query('designer') designer?: string,
+    @Query('entryKind') entryKind?: string,
+    @Query('markType') markType?: string,
+  ) {
+    return this.principlesService.searchCatalog({
+      query,
+      chapter,
+      section,
+      era,
+      industry,
+      designer,
+      entryKind,
+      markType,
+    });
+  }
+
+  @Get('catalog/:id')
+  catalogEntry(@Param('id') id: string) {
+    return this.principlesService.getCatalogEntry(id);
+  }
+
   @Get('templates')
   templates(@Query('tags') tags?: string) {
     return this.principlesService.getTemplates(tags);

@@ -1,9 +1,9 @@
 import { useAppStore } from '../store';
 import type { DesignBrief } from '../types';
+import { getEraSourceLabel } from '../lib/brief-mappers';
 
 const BRIEF_FIELDS: Array<{ key: keyof DesignBrief; label: string; rows?: number }> = [
   { key: 'personality', label: 'Personality' },
-  { key: 'era', label: 'Era' },
   { key: 'complexity', label: 'Complexity' },
   { key: 'primaryEmotion', label: 'Primary Emotion' },
   { key: 'narrative', label: 'Narrative', rows: 3 },
@@ -58,6 +58,14 @@ export function DesignBriefPanel() {
           Очистить
         </button>
       </div>
+
+      {designBrief.era.trim() && (
+        <p className="text-xs text-zinc-300">
+          <span className="text-zinc-500">Era:</span>{' '}
+          {designBrief.era}
+          <span className="text-zinc-500"> ({getEraSourceLabel(designBrief)})</span>
+        </p>
+      )}
 
       <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
         {BRIEF_FIELDS.map(({ key, label, rows }) => (

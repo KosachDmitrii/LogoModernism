@@ -1,4 +1,4 @@
-import { IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class GeneratePromptDto {
   @IsString()
@@ -28,6 +28,20 @@ export class GeneratePromptDto {
   @Min(1)
   @Max(10)
   minimalismLevel?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  analysisPrincipleIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  catalogReferenceIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  catalogNarrative?: string;
 }
 
 export class SearchPrinciplesDto {

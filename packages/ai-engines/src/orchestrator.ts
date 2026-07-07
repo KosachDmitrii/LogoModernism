@@ -79,12 +79,21 @@ export function runFullPipeline(input: FullPipelineInput): FullPipelineResult {
     construction,
   });
 
+  const analysisPrincipleIds = [
+    ...brandDNA.principleIds,
+    ...composition.recommendedLayout.principleIds,
+    typography.primaryRecommendation.principleId,
+    ...typography.alternatives.slice(0, 2).map((a) => a.principleId),
+  ].filter((id, i, arr) => arr.indexOf(id) === i);
+
   const promptRequest: PromptGenerationRequest = {
     industry: input.industry,
     companyName: input.companyName,
     variationCount: input.variationCount ?? 5,
-    preferredEra: input.preferredEra,
+    preferredEra: input.preferredEra ?? brandDNA.visualTraits.era,
     minimalismLevel: brandDNA.visualTraits.complexity === 'minimal' ? 9 : 7,
+    inspirationMode: input.inspirationMode as PromptGenerationRequest['inspirationMode'],
+    analysisPrincipleIds,
   };
 
   const prompts = runPromptPipeline(promptRequest);

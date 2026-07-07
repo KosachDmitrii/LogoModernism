@@ -103,6 +103,10 @@ export interface DesignBrief {
   knowledgeInsights: string;
   bestPromptHint: string;
   critiqueNote: string;
+  /** Principle IDs collected from Brand DNA / Pipeline / Knowledge Graph */
+  principleIds: string[];
+  /** Logo catalog reference IDs selected as inspiration */
+  catalogReferenceIds: string[];
   sources: string[];
 }
 
@@ -121,5 +125,7 @@ export const EMPTY_DESIGN_BRIEF: DesignBrief = {
   knowledgeInsights: '',
   bestPromptHint: '',
   critiqueNote: '',
+  principleIds: [],
+  catalogReferenceIds: [],
   sources: [],
 };

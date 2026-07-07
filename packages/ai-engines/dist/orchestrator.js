@@ -49,12 +49,20 @@ function runFullPipeline(input) {
         primitiveIds: topPrimitives,
         construction,
     });
+    const analysisPrincipleIds = [
+        ...brandDNA.principleIds,
+        ...composition.recommendedLayout.principleIds,
+        typography.primaryRecommendation.principleId,
+        ...typography.alternatives.slice(0, 2).map((a) => a.principleId),
+    ].filter((id, i, arr) => arr.indexOf(id) === i);
     const promptRequest = {
         industry: input.industry,
         companyName: input.companyName,
         variationCount: input.variationCount ?? 5,
-        preferredEra: input.preferredEra,
+        preferredEra: input.preferredEra ?? brandDNA.visualTraits.era,
         minimalismLevel: brandDNA.visualTraits.complexity === 'minimal' ? 9 : 7,
+        inspirationMode: input.inspirationMode,
+        analysisPrincipleIds,
     };
     const prompts = (0, prompt_engine_1.runPromptPipeline)(promptRequest);
     const critique = (0, logo_critic_engine_1.critiqueLogo)({ prompt: prompts.bestPrompt });

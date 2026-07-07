@@ -1,0 +1,23 @@
+{
+  "name": "@logo-platform/catalog-importer",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "extract:pages": "python3 ../../scripts/catalog-pipeline/extract_pages.py",
+    "analyze": "tsx src/cli/analyze-pages.ts",
+    "pipeline": "tsx src/cli/run-pipeline.ts",
+    "import:approved": "tsx src/cli/import-approved.ts"
+  },
+  "dependencies": {
+    "@logo-platform/knowledge-base": "*",
+    "@logo-platform/shared": "*",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

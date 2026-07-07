@@ -12,13 +12,14 @@ const prompts_module_1 = require("./prompts/prompts.module");
 const principles_module_1 = require("./principles/principles.module");
 const engines_module_1 = require("./engines/engines.module");
 const images_module_1 = require("./images/images.module");
+const catalog_import_module_1 = require("./catalog-import/catalog-import.module");
 const health_controller_1 = require("./health.controller");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [prompts_module_1.PromptsModule, principles_module_1.PrinciplesModule, engines_module_1.EnginesModule, images_module_1.ImagesModule],
+        imports: [prompts_module_1.PromptsModule, principles_module_1.PrinciplesModule, engines_module_1.EnginesModule, images_module_1.ImagesModule, catalog_import_module_1.CatalogImportModule],
         controllers: [health_controller_1.HealthController],
     })
 ], AppModule);

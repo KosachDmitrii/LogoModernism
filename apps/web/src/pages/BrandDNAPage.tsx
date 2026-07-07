@@ -4,6 +4,7 @@ import { Loader2, Dna } from 'lucide-react';
 import { analyzeBrandDNA } from '../api';
 import { useAppStore } from '../store';
 import { ApplyToPromptsButton } from '../components/ApplyToPromptsButton';
+import { IndustrySelect } from '../components/IndustrySelect';
 
 export function BrandDNAPage() {
   const applyBrandDNA = useAppStore((s) => s.applyBrandDNA);
@@ -32,12 +33,7 @@ export function BrandDNAPage() {
           placeholder="Company name"
           className="w-full px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:border-zinc-600"
         />
-        <input
-          value={industry}
-          onChange={(e) => setIndustry(e.target.value)}
-          placeholder="Industry (e.g. AI, Finance, Coffee)"
-          className="w-full px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:border-zinc-600"
-        />
+        <IndustrySelect value={industry} onChange={setIndustry} />
         <button
           type="button"
           disabled={!companyName || !industry || analysis.isPending}

@@ -1,2 +1,4 @@
 node_modules
 .env
+data/catalog-pipeline/pages/
+data/catalog-pipeline/samples/

@@ -5,6 +5,8 @@ import {
   Dna,
   Shapes,
   Network,
+  BookOpen,
+  ClipboardCheck,
   Workflow,
   MessageSquareWarning,
 } from 'lucide-react';
@@ -16,6 +18,8 @@ const NAV = [
   { to: '/brand-dna', label: 'Brand DNA', icon: Dna },
   { to: '/geometry', label: 'Geometry', icon: Shapes },
   { to: '/knowledge-graph', label: 'Knowledge Graph', icon: Network },
+  { to: '/logo-catalog', label: 'Logo Catalog', icon: BookOpen },
+  { to: '/catalog-review', label: 'Catalog Review', icon: ClipboardCheck },
   { to: '/pipeline', label: 'Full Pipeline', icon: Workflow },
   { to: '/critic', label: 'Logo Critic', icon: MessageSquareWarning },
 ];

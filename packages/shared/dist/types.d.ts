@@ -19,6 +19,9 @@ export interface KnowledgeGraphEdge {
     to: string;
     relation: 'works_with' | 'requires' | 'conflicts_with' | 'enhances';
 }
+export type CatalogChapter = 'geometric' | 'effect' | 'typographic';
+export type CatalogEntryKind = 'logo' | 'case_study' | 'designer_profile';
+export type CatalogMarkType = 'symbol' | 'wordmark' | 'lettermark' | 'combination' | 'emblem';
 export interface LogoReference {
     id: string;
     name: string;
@@ -42,6 +45,78 @@ export interface LogoReference {
     era: Era;
     keywords: string[];
     principleIds: string[];
+    /** Book taxonomy — Müller Logo Modernism */
+    catalogChapter?: CatalogChapter;
+    catalogSection?: string;
+    entryKind?: CatalogEntryKind;
+    markType?: CatalogMarkType;
+    /** Original analytical summary (not book text) */
+    significance?: string;
+    bookPageHint?: string;
+}
+export interface CatalogTaxonomySection {
+    id: string;
+    label: string;
+    chapter: CatalogChapter;
+    description: string;
+}
+export interface CatalogTaxonomyChapter {
+    id: CatalogChapter;
+    label: string;
+    description: string;
+    sections: CatalogTaxonomySection[];
+}
+export interface CatalogSearchFilters {
+    query?: string;
+    chapter?: CatalogChapter;
+    section?: string;
+    era?: Era;
+    industry?: string;
+    designer?: string;
+    entryKind?: CatalogEntryKind;
+    markType?: CatalogMarkType;
+    limit?: number;
+}
+export type CatalogCandidateStatus = 'pending' | 'approved' | 'rejected';
+/** Raw + normalized entry from PDF/Vision import pipeline */
+export interface CatalogCandidate {
+    id: string;
+    status: CatalogCandidateStatus;
+    sourcePage: number;
+    sourceIndex: number;
+    pageImagePath?: string;
+    name: string;
+    industry: string;
+    designer?: string;
+    year?: number;
+    country?: string;
+    catalogChapter?: CatalogChapter;
+    catalogSection?: string;
+    era?: Era;
+    markType?: CatalogMarkType;
+    entryKind?: CatalogEntryKind;
+    geometry: string[];
+    construction: string[];
+    composition: string[];
+    typography: string[];
+    keywords: string[];
+    principleIds: string[];
+    significance?: string;
+    minimalismLevel: number;
+    visualComplexity: 'minimal' | 'medium' | 'high';
+    colorCount: number;
+    confidence: number;
+    rawVision?: Record<string, unknown>;
+    reviewedAt?: string;
+    reviewNotes?: string;
+}
+export interface CatalogPipelineStats {
+    totalPages: number;
+    extractedPages: number;
+    totalCandidates: number;
+    pending: number;
+    approved: number;
+    rejected: number;
 }
 export interface LogoDNA {
     geometry: string[];
@@ -85,6 +160,12 @@ export interface PromptGenerationRequest {
     inspirationMode?: InspirationMode;
     preferredEra?: Era;
     minimalismLevel?: number;
+    /** Principle IDs from Brand DNA, Geometry, Pipeline, Knowledge Graph analysis */
+    analysisPrincipleIds?: string[];
+    /** Logo catalog reference IDs from Müller Logo Modernism */
+    catalogReferenceIds?: string[];
+    /** Optional narrative from Design Brief (e.g. catalog significance) */
+    catalogNarrative?: string;
 }
 export type InspirationMode = 'swiss' | 'bauhaus' | 'ibm' | 'nasa' | 'lufthansa' | 'braun' | 'cbs' | 'abc' | 'olivetti' | 'westinghouse';
 export interface Recommendation {

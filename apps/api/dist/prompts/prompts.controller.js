@@ -31,6 +31,9 @@ let PromptsController = class PromptsController {
             inspirationMode: dto.inspirationMode,
             preferredEra: dto.preferredEra,
             minimalismLevel: dto.minimalismLevel,
+            analysisPrincipleIds: dto.analysisPrincipleIds,
+            catalogReferenceIds: dto.catalogReferenceIds,
+            catalogNarrative: dto.catalogNarrative,
         };
         this.lastResult = this.promptsService.generate(request);
         return (0, prompt_response_1.slimPipelineResult)(this.lastResult);

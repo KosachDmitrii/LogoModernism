@@ -1,13 +1,45 @@
 import type { DesignRule, KnowledgeGraphEdge, LogoReference, PromptTemplate } from '@logo-platform/shared';
 import principlesData from './data/principles.json';
 import graphData from './data/knowledge-graph.json';
-import referencesData from './data/logo-references.json';
 import templatesData from './data/prompt-templates.json';
+import {
+  LOGO_CATALOG,
+  getCatalogTaxonomy,
+  getCatalogStats,
+  getCatalogEntry,
+  getCatalogByChapter,
+  getCatalogBySection,
+  getCaseStudies,
+  getDesignerProfiles,
+  searchCatalog,
+  matchCatalogToDescription,
+  getCatalogPrincipleIds,
+  CATALOG_TAXONOMY,
+  getFullCatalog,
+  buildCatalogPromptContext,
+} from './catalog';
 
 export const designPrinciples: DesignRule[] = principlesData as DesignRule[];
 export const knowledgeGraph: KnowledgeGraphEdge[] = graphData as KnowledgeGraphEdge[];
-export const logoReferences: LogoReference[] = referencesData as LogoReference[];
+export const logoReferences: LogoReference[] = getFullCatalog();
 export const promptTemplates: PromptTemplate[] = templatesData as PromptTemplate[];
+
+export {
+  LOGO_CATALOG,
+  CATALOG_TAXONOMY,
+  getCatalogTaxonomy,
+  getCatalogStats,
+  getCatalogEntry,
+  getCatalogByChapter,
+  getCatalogBySection,
+  getCaseStudies,
+  getDesignerProfiles,
+  searchCatalog,
+  matchCatalogToDescription,
+  getCatalogPrincipleIds,
+  getFullCatalog,
+  buildCatalogPromptContext,
+};
 
 export function getPrincipleById(id: string): DesignRule | undefined {
   return designPrinciples.find((p) => p.id === id);
@@ -91,4 +123,4 @@ export function searchPrinciples(filters: {
   return results;
 }
 
-export { principlesData, graphData, referencesData, templatesData };
+export { principlesData, graphData, templatesData };

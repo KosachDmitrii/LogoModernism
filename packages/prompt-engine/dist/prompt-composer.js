@@ -23,24 +23,48 @@ const CATEGORY_LABELS = {
     mark_type: 'Mark Type',
     rendering: 'Rendering',
 };
+const RICH_CATEGORIES = new Set([
+    'construction',
+    'composition',
+    'era',
+    'grid',
+    'typography',
+]);
+function ruleToFragment(rule) {
+    if (RICH_CATEGORIES.has(rule.category) && rule.description.length > 12) {
+        return `${rule.promptFragment}. ${rule.description}`;
+    }
+    return rule.promptFragment;
+}
 function composePrompt(input) {
     const fragments = [];
     fragments.push('Minimal geometric logo design');
     if (input.companyName) {
         fragments.push(`for "${input.companyName}"`);
     }
+    if (input.catalogInspiration?.length) {
+        fragments.push(input.catalogInspiration.join('. '));
+    }
     for (const category of design_rules_engine_1.CATEGORY_ORDER) {
         const rules = input.principles.filter((p) => p.category === category);
         if (rules.length === 0)
             continue;
         const label = CATEGORY_LABELS[category];
-        const categoryFragments = rules.map((r) => r.promptFragment);
+        const categoryFragments = rules.map(ruleToFragment);
         if (label && categoryFragments.length > 1) {
             fragments.push(`${label}: ${categoryFragments.join(', ')}`);
         }
         else {
             fragments.push(...categoryFragments);
         }
+    }
+    // Anti-patterns from selected principles
+    const antiPatterns = input.principles
+        .flatMap((p) => p.antiPatterns)
+        .filter(Boolean)
+        .slice(0, 4);
+    if (antiPatterns.length > 0) {
+        fragments.push(`Avoid: ${antiPatterns.join(', ')}`);
     }
     fragments.push('Premium professional branding');
     fragments.push('Timeless modernist aesthetic');

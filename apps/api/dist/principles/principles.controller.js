@@ -32,6 +32,33 @@ let PrinciplesController = class PrinciplesController {
     references() {
         return this.principlesService.getReferences();
     }
+    catalogTaxonomy() {
+        return this.principlesService.getCatalogTaxonomy();
+    }
+    catalogStats() {
+        return this.principlesService.getCatalogStats();
+    }
+    caseStudies() {
+        return this.principlesService.getCaseStudies();
+    }
+    designerProfiles() {
+        return this.principlesService.getDesignerProfiles();
+    }
+    catalogSearch(query, chapter, section, era, industry, designer, entryKind, markType) {
+        return this.principlesService.searchCatalog({
+            query,
+            chapter,
+            section,
+            era,
+            industry,
+            designer,
+            entryKind,
+            markType,
+        });
+    }
+    catalogEntry(id) {
+        return this.principlesService.getCatalogEntry(id);
+    }
     templates(tags) {
         return this.principlesService.getTemplates(tags);
     }
@@ -71,6 +98,51 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], PrinciplesController.prototype, "references", null);
+__decorate([
+    (0, common_1.Get)('catalog/taxonomy'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], PrinciplesController.prototype, "catalogTaxonomy", null);
+__decorate([
+    (0, common_1.Get)('catalog/stats'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], PrinciplesController.prototype, "catalogStats", null);
+__decorate([
+    (0, common_1.Get)('catalog/case-studies'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], PrinciplesController.prototype, "caseStudies", null);
+__decorate([
+    (0, common_1.Get)('catalog/designers'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], PrinciplesController.prototype, "designerProfiles", null);
+__decorate([
+    (0, common_1.Get)('catalog/search'),
+    __param(0, (0, common_1.Query)('q')),
+    __param(1, (0, common_1.Query)('chapter')),
+    __param(2, (0, common_1.Query)('section')),
+    __param(3, (0, common_1.Query)('era')),
+    __param(4, (0, common_1.Query)('industry')),
+    __param(5, (0, common_1.Query)('designer')),
+    __param(6, (0, common_1.Query)('entryKind')),
+    __param(7, (0, common_1.Query)('markType')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, String, String, String, String, String]),
+    __metadata("design:returntype", void 0)
+], PrinciplesController.prototype, "catalogSearch", null);
+__decorate([
+    (0, common_1.Get)('catalog/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], PrinciplesController.prototype, "catalogEntry", null);
 __decorate([
     (0, common_1.Get)('templates'),
     __param(0, (0, common_1.Query)('tags')),

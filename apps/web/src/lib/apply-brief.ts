@@ -3,6 +3,10 @@ import { complexityToMinimalism, eraToInspiration, joinTags } from './brief-mapp
 
 type BriefPatch = Partial<DesignBrief>;
 
+function mergePrincipleIds(current: string[], incoming: string[]): string[] {
+  return [...new Set([...current, ...incoming])].slice(0, 24);
+}
+
 function mergeBrief(current: DesignBrief, patch: BriefPatch, source: string): DesignBrief {
   const sources = current.sources.includes(source)
     ? current.sources
@@ -20,6 +24,7 @@ export function applyBrandDNAToBrief(
   result: {
     personality?: string;
     narrative?: string;
+    principleIds?: string[];
     visualTraits?: {
       era?: string;
       complexity?: string;
@@ -46,6 +51,7 @@ export function applyBrandDNAToBrief(
       composition: joinTags(result.visualTraits?.composition ?? []),
       typography: joinTags(result.visualTraits?.typography ?? []),
       constraints: joinTags(result.constraints ?? []),
+      principleIds: mergePrincipleIds(current.principleIds ?? [], result.principleIds ?? []),
     },
     'Brand DNA',
   );
@@ -61,17 +67,26 @@ export function applyGeometryToBrief(
   current: DesignBrief,
   result: {
     recommendations?: Array<{ name: string; score: number; reason: string }>;
+    selectedRecommendations?: Array<{ name: string; score?: number; reason: string }>;
     constructionGrid?: string;
   },
 ): DesignBrief {
-  const top = result.recommendations?.slice(0, 3) ?? [];
+  const selected = result.selectedRecommendations
+    ?? result.recommendations
+    ?? [];
+  if (selected.length === 0) return current;
+
   return mergeBrief(
     current,
     {
-      preferredShapes: joinTags(top.map((r) => r.name)),
-      geometry: joinTags(top.map((r) => r.name)),
+      preferredShapes: joinTags(selected.map((r) => r.name)),
+      geometry: joinTags(selected.map((r) => r.name)),
       construction: result.constructionGrid ?? current.construction,
-      narrative: top.map((r) => `${r.name} (${r.score}/10): ${r.reason}`).join('. '),
+      narrative: selected
+        .map((r) =>
+          r.score != null ? `${r.name} (${r.score}/10): ${r.reason}` : `${r.name}: ${r.reason}`,
+        )
+        .join('. '),
     },
     'Geometry',
   );
@@ -94,6 +109,10 @@ export function applyKnowledgeGraphToBrief(
     current,
     {
       knowledgeInsights: [...topClusters, ...worksWith].join('; '),
+      principleIds: mergePrincipleIds(
+        current.principleIds ?? [],
+        data.clusters?.flatMap((c) => c.nodeIds).slice(0, 12) ?? [],
+      ),
     },
     'Knowledge Graph',
   );
@@ -105,6 +124,7 @@ export function applyPipelineToBrief(
     brandDNA?: {
       personality?: string;
       narrative?: string;
+      principleIds?: string[];
       visualTraits?: {
         era?: string;
         complexity?: string;

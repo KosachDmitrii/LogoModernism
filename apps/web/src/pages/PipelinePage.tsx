@@ -4,6 +4,7 @@ import { Loader2, Workflow } from 'lucide-react';
 import { runFullPipeline } from '../api';
 import { useAppStore } from '../store';
 import { ApplyToPromptsButton } from '../components/ApplyToPromptsButton';
+import { IndustrySelect } from '../components/IndustrySelect';
 
 export function PipelinePage() {
   const applyPipeline = useAppStore((s) => s.applyPipeline);
@@ -25,12 +26,11 @@ export function PipelinePage() {
         <p className="text-sm text-zinc-500">Orchestrate all AI engines in sequence</p>
       </header>
 
-      <div className="flex gap-3 mb-8">
+      <div className="flex gap-3 mb-8 items-start">
         <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Company name"
           className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none" />
-        <input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Industry"
-          className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none" />
-        <button type="button" onClick={() => pipeline.mutate()} disabled={!companyName || !industry || pipeline.isPending}
+        <IndustrySelect value={industry} onChange={setIndustry} className="flex-1" />
+        <button type="button" onClick={() => pipeline.mutate()} disabled={!companyName || !industry.trim() || pipeline.isPending}
           className="px-5 py-2.5 rounded-xl bg-zinc-100 text-zinc-900 text-sm font-medium flex items-center gap-2">
           {pipeline.isPending && <Loader2 size={14} className="animate-spin" />}
           Run Pipeline

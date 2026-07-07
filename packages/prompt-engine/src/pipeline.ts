@@ -13,12 +13,19 @@ export interface PipelineResult {
 export function runPromptPipeline(request: PromptGenerationRequest): PipelineResult {
   const variationCount = Math.min(request.variationCount ?? 5, 100);
 
-  const baseSelection = selectDesignRules({
+  const sharedInput = {
     industry: request.industry,
     companyName: request.companyName,
     preferredEra: request.preferredEra,
     minimalismLevel: request.minimalismLevel ?? 8,
     inspirationMode: request.inspirationMode,
+    analysisPrincipleIds: request.analysisPrincipleIds,
+    catalogReferenceIds: request.catalogReferenceIds,
+    catalogNarrative: request.catalogNarrative,
+  };
+
+  const baseSelection = selectDesignRules({
+    ...sharedInput,
     variationSeed: 42,
   });
 
@@ -29,16 +36,13 @@ export function runPromptPipeline(request: PromptGenerationRequest): PipelineRes
       principles: baseSelection.principles,
       dna: baseSelection.dna,
       inspirationMode: request.inspirationMode,
+      catalogInspiration: baseSelection.catalogInspiration,
     },
     variationCount,
     (seed) =>
       selectDesignRules({
-        industry: request.industry,
-        companyName: request.companyName,
-        preferredEra: request.preferredEra,
-        minimalismLevel: request.minimalismLevel ?? 8,
-        inspirationMode: request.inspirationMode,
-        variationSeed: seed * 137,
+        ...sharedInput,
+        variationSeed: seed * 7919 + (request.analysisPrincipleIds?.length ?? 0) * 31 + (request.catalogReferenceIds?.length ?? 0) * 17,
       }),
   );
 

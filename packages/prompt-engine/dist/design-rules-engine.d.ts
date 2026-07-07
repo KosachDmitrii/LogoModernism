@@ -8,12 +8,18 @@ export interface RuleSelectionInput {
     minimalismLevel?: number;
     inspirationMode?: InspirationMode;
     variationSeed?: number;
+    /** Locked-in from Brand DNA / Pipeline / Knowledge Graph analysis */
+    analysisPrincipleIds?: string[];
+    /** Logo catalog reference IDs (Müller Logo Modernism) */
+    catalogReferenceIds?: string[];
+    catalogNarrative?: string;
 }
 export interface RuleSelectionResult {
     principles: DesignRule[];
     dna: LogoDNA;
     recommendations: Recommendation[];
     conflicts: string[][];
+    catalogInspiration?: string[];
 }
 export declare function selectDesignRules(input: RuleSelectionInput): RuleSelectionResult;
 export { INSPIRATION_MAP, CATEGORY_ORDER };

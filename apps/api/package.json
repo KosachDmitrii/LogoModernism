@@ -10,6 +10,7 @@
   "dependencies": {
     "@logo-platform/ai-engines": "*",
     "@logo-platform/image-generator": "*",
+    "@logo-platform/catalog-importer": "*",
     "@logo-platform/knowledge-base": "*",
     "@logo-platform/prompt-engine": "*",
     "@logo-platform/shared": "*",

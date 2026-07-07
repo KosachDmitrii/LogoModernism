@@ -11,11 +11,29 @@ import {
 
 const MAX_CACHED_IMAGES = 3;
 
+function clearPromptResults() {
+  return {
+    prompts: [] as ComposedPrompt[],
+    recommendations: [] as Recommendation[],
+    selectedPromptId: null as string | null,
+    generatedImages: {} as Record<string, GeneratedImage[]>,
+    generatingPromptId: null as string | null,
+  };
+}
+
+function catalogRefsEqual(a: string[] | undefined, b: string[] | undefined): boolean {
+  const left = [...(a ?? [])].sort();
+  const right = [...(b ?? [])].sort();
+  if (left.length !== right.length) return false;
+  return left.every((id, index) => id === right[index]);
+}
+
 interface AppState {
   industry: string;
   companyName: string;
   variationCount: number;
   inspirationMode: string;
+  preferredEra: string;
   minimalismLevel: number;
   designBrief: DesignBrief;
   prompts: ComposedPrompt[];
@@ -27,6 +45,7 @@ interface AppState {
   setCompanyName: (v: string) => void;
   setVariationCount: (v: number) => void;
   setInspirationMode: (v: string) => void;
+  setPreferredEra: (v: string) => void;
   setMinimalismLevel: (v: number) => void;
   updateDesignBrief: (patch: Partial<DesignBrief>) => void;
   clearDesignBrief: () => void;
@@ -67,6 +86,7 @@ export const useAppStore = create<AppState>()(
       companyName: '',
       variationCount: 10,
       inspirationMode: '',
+      preferredEra: '',
       minimalismLevel: 8,
       designBrief: { ...EMPTY_DESIGN_BRIEF },
       prompts: [],
@@ -74,16 +94,38 @@ export const useAppStore = create<AppState>()(
       selectedPromptId: null,
       generatedImages: {},
       generatingPromptId: null,
-      setIndustry: (industry) => set({ industry }),
-      setCompanyName: (companyName) => set({ companyName }),
+      setIndustry: (industry) =>
+        set((state) =>
+          state.industry === industry ? { industry } : { industry, ...clearPromptResults() },
+        ),
+      setCompanyName: (companyName) =>
+        set((state) =>
+          state.companyName === companyName
+            ? { companyName }
+            : { companyName, ...clearPromptResults() },
+        ),
       setVariationCount: (variationCount) => set({ variationCount }),
       setInspirationMode: (inspirationMode) => set({ inspirationMode }),
+      setPreferredEra: (preferredEra) =>
+        set((state) =>
+          state.preferredEra === preferredEra
+            ? { preferredEra }
+            : { preferredEra, ...clearPromptResults() },
+        ),
       setMinimalismLevel: (minimalismLevel) => set({ minimalismLevel }),
       updateDesignBrief: (patch) =>
-        set((state) => ({
-          designBrief: { ...state.designBrief, ...patch },
-        })),
-      clearDesignBrief: () => set({ designBrief: { ...EMPTY_DESIGN_BRIEF } }),
+        set((state) => {
+          const designBrief = { ...state.designBrief, ...patch };
+          const catalogChanged =
+            patch.catalogReferenceIds !== undefined &&
+            !catalogRefsEqual(patch.catalogReferenceIds, state.designBrief.catalogReferenceIds);
+          const eraChanged = patch.era !== undefined && patch.era !== state.designBrief.era;
+          return catalogChanged || eraChanged
+            ? { designBrief, ...clearPromptResults() }
+            : { designBrief };
+        }),
+      clearDesignBrief: () =>
+        set({ designBrief: { ...EMPTY_DESIGN_BRIEF }, ...clearPromptResults() }),
       applyBrandDNA: (companyName, industry, result) => {
         const { brief, inspirationMode, minimalismLevel } = applyBrandDNAToBrief(
           get().designBrief,
@@ -94,18 +136,22 @@ export const useAppStore = create<AppState>()(
           industry,
           designBrief: brief,
           ...(inspirationMode ? { inspirationMode } : {}),
+          ...(result.visualTraits?.era ? { preferredEra: result.visualTraits.era } : {}),
           minimalismLevel,
+          ...clearPromptResults(),
         });
       },
       applyGeometry: (industry, result) => {
         set({
           industry: industry || get().industry,
           designBrief: applyGeometryToBrief(get().designBrief, result),
+          ...clearPromptResults(),
         });
       },
       applyKnowledgeGraph: (result) => {
         set({
           designBrief: applyKnowledgeGraphToBrief(get().designBrief, result),
+          ...clearPromptResults(),
         });
       },
       applyPipeline: (companyName, industry, result) => {
@@ -118,7 +164,11 @@ export const useAppStore = create<AppState>()(
           industry,
           designBrief: brief,
           ...(inspirationMode ? { inspirationMode } : {}),
+          ...(result.brandDNA?.visualTraits?.era
+            ? { preferredEra: result.brandDNA.visualTraits.era }
+            : {}),
           minimalismLevel,
+          ...clearPromptResults(),
         });
       },
       setResults: (prompts, recommendations) =>
@@ -138,12 +188,23 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'logo-platform-session',
+      version: 1,
       storage: createJSONStorage(() => sessionStorage),
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<AppState>;
+        return {
+          ...current,
+          ...saved,
+          preferredEra: saved.preferredEra ?? '',
+          designBrief: { ...EMPTY_DESIGN_BRIEF, ...saved.designBrief },
+        };
+      },
       partialize: (state) => ({
         industry: state.industry,
         companyName: state.companyName,
         variationCount: state.variationCount,
         inspirationMode: state.inspirationMode,
+        preferredEra: state.preferredEra,
         minimalismLevel: state.minimalismLevel,
         designBrief: state.designBrief,
         prompts: state.prompts,

@@ -18,6 +18,9 @@ class GeneratePromptDto {
     inspirationMode;
     preferredEra;
     minimalismLevel;
+    analysisPrincipleIds;
+    catalogReferenceIds;
+    catalogNarrative;
 }
 exports.GeneratePromptDto = GeneratePromptDto;
 __decorate([
@@ -54,6 +57,23 @@ __decorate([
     (0, class_validator_1.Max)(10),
     __metadata("design:type", Number)
 ], GeneratePromptDto.prototype, "minimalismLevel", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], GeneratePromptDto.prototype, "analysisPrincipleIds", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], GeneratePromptDto.prototype, "catalogReferenceIds", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], GeneratePromptDto.prototype, "catalogNarrative", void 0);
 class SearchPrinciplesDto {
     query;
     category;

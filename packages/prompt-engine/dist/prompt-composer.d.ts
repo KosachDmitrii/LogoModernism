@@ -6,6 +6,8 @@ export interface ComposeInput {
     dna: LogoDNA;
     inspirationMode?: string;
     variationIndex?: number;
+    /** Fragments from Logo Catalog references */
+    catalogInspiration?: string[];
 }
 export declare function composePrompt(input: ComposeInput): ComposedPrompt;
 export declare function composePromptVariations(baseInput: Omit<ComposeInput, 'variationIndex'>, count: number, selectRules: (seed: number) => {

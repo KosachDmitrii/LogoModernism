@@ -9,12 +9,18 @@ const prompt_composer_1 = require("./prompt-composer");
 const prompt_evolution_1 = require("./prompt-evolution");
 function runPromptPipeline(request) {
     const variationCount = Math.min(request.variationCount ?? 5, 100);
-    const baseSelection = (0, design_rules_engine_1.selectDesignRules)({
+    const sharedInput = {
         industry: request.industry,
         companyName: request.companyName,
         preferredEra: request.preferredEra,
         minimalismLevel: request.minimalismLevel ?? 8,
         inspirationMode: request.inspirationMode,
+        analysisPrincipleIds: request.analysisPrincipleIds,
+        catalogReferenceIds: request.catalogReferenceIds,
+        catalogNarrative: request.catalogNarrative,
+    };
+    const baseSelection = (0, design_rules_engine_1.selectDesignRules)({
+        ...sharedInput,
         variationSeed: 42,
     });
     const prompts = (0, prompt_composer_1.composePromptVariations)({
@@ -23,13 +29,10 @@ function runPromptPipeline(request) {
         principles: baseSelection.principles,
         dna: baseSelection.dna,
         inspirationMode: request.inspirationMode,
+        catalogInspiration: baseSelection.catalogInspiration,
     }, variationCount, (seed) => (0, design_rules_engine_1.selectDesignRules)({
-        industry: request.industry,
-        companyName: request.companyName,
-        preferredEra: request.preferredEra,
-        minimalismLevel: request.minimalismLevel ?? 8,
-        inspirationMode: request.inspirationMode,
-        variationSeed: seed * 137,
+        ...sharedInput,
+        variationSeed: seed * 7919 + (request.analysisPrincipleIds?.length ?? 0) * 31 + (request.catalogReferenceIds?.length ?? 0) * 17,
     }));
     let bestPrompt = prompts[0];
     if (bestPrompt.scores.promptQuality < 7) {

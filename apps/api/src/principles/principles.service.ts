@@ -3,11 +3,17 @@ import type { DesignRuleCategory } from '@logo-platform/shared';
 import {
   designPrinciples,
   knowledgeGraph,
-  logoReferences,
   promptTemplates,
   searchPrinciples,
   getPrincipleById,
   getPrinciplesByCategory,
+  getCatalogTaxonomy,
+  getCatalogStats,
+  getCatalogEntry,
+  getCaseStudies,
+  getDesignerProfiles,
+  searchCatalog,
+  getFullCatalog,
 } from '@logo-platform/knowledge-base';
 
 @Injectable()
@@ -39,7 +45,46 @@ export class PrinciplesService {
   }
 
   getReferences() {
-    return logoReferences;
+    return getFullCatalog();
+  }
+
+  getCatalogTaxonomy() {
+    return getCatalogTaxonomy();
+  }
+
+  getCatalogStats() {
+    return getCatalogStats();
+  }
+
+  getCatalogEntry(id: string) {
+    return getCatalogEntry(id) ?? null;
+  }
+
+  getCaseStudies() {
+    return getCaseStudies();
+  }
+
+  getDesignerProfiles() {
+    return getDesignerProfiles();
+  }
+
+  searchCatalog(filters: {
+    query?: string;
+    chapter?: string;
+    section?: string;
+    era?: string;
+    industry?: string;
+    designer?: string;
+    entryKind?: string;
+    markType?: string;
+  }) {
+    return searchCatalog({
+      ...filters,
+      chapter: filters.chapter as never,
+      era: filters.era as never,
+      entryKind: filters.entryKind as never,
+      markType: filters.markType as never,
+    });
   }
 
   getTemplates(tags?: string) {

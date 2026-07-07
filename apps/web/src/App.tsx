@@ -7,6 +7,8 @@ import { GeometryPage } from './pages/GeometryPage';
 import { KnowledgeGraphPage } from './pages/KnowledgeGraphPage';
 import { PipelinePage } from './pages/PipelinePage';
 import { CriticPage } from './pages/CriticPage';
+import { LogoCatalogPage } from './pages/LogoCatalogPage';
+import { CatalogReviewPage } from './pages/CatalogReviewPage';
 
 export default function App() {
   return (
@@ -18,6 +20,8 @@ export default function App() {
           <Route path="brand-dna" element={<BrandDNAPage />} />
           <Route path="geometry" element={<GeometryPage />} />
           <Route path="knowledge-graph" element={<KnowledgeGraphPage />} />
+          <Route path="logo-catalog" element={<LogoCatalogPage />} />
+          <Route path="catalog-review" element={<CatalogReviewPage />} />
           <Route path="pipeline" element={<PipelinePage />} />
           <Route path="critic" element={<CriticPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

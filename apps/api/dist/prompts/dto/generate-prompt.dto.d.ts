@@ -5,6 +5,9 @@ export declare class GeneratePromptDto {
     inspirationMode?: string;
     preferredEra?: string;
     minimalismLevel?: number;
+    analysisPrincipleIds?: string[];
+    catalogReferenceIds?: string[];
+    catalogNarrative?: string;
 }
 export declare class SearchPrinciplesDto {
     query?: string;

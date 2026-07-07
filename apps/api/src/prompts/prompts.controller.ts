@@ -19,6 +19,9 @@ export class PromptsController {
       inspirationMode: dto.inspirationMode as PromptGenerationRequest['inspirationMode'],
       preferredEra: dto.preferredEra as PromptGenerationRequest['preferredEra'],
       minimalismLevel: dto.minimalismLevel,
+      analysisPrincipleIds: dto.analysisPrincipleIds,
+      catalogReferenceIds: dto.catalogReferenceIds,
+      catalogNarrative: dto.catalogNarrative,
     };
 
     this.lastResult = this.promptsService.generate(request);

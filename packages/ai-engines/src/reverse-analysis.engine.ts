@@ -1,4 +1,4 @@
-import { designPrinciples, logoReferences } from '@logo-platform/knowledge-base';
+import { designPrinciples, getFullCatalog, matchCatalogToDescription } from '@logo-platform/knowledge-base';
 import type { LogoDNA } from '@logo-platform/shared';
 
 export interface ReverseAnalysisInput {
@@ -34,10 +34,13 @@ export function reverseAnalyzeLogo(input: ReverseAnalysisInput): ReverseAnalysis
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, 15);
 
-  const matchedReferences = logoReferences
+  const catalog = getFullCatalog();
+  const matchedReferences = catalog
     .map((ref) => {
       let similarity = 0;
       if (input.observedStyle && ref.era.includes(input.observedStyle as never)) similarity += 0.3;
+      if (desc.includes(ref.name.toLowerCase())) similarity += 0.5;
+      if (ref.designer && desc.includes(ref.designer.toLowerCase())) similarity += 0.4;
       if (shapes.some((s) => ref.geometry.includes(s) || ref.shape.includes(s))) similarity += 0.4;
       const principleOverlap = ref.principleIds.filter((id) =>
         matchedPrinciples.some((p) => p.id === id),
@@ -46,20 +49,31 @@ export function reverseAnalyzeLogo(input: ReverseAnalysisInput): ReverseAnalysis
       return { id: ref.id, name: ref.name, similarity: Math.min(1, similarity) };
     })
     .filter((r) => r.similarity > 0)
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 5);
+    .sort((a, b) => b.similarity - a.similarity);
+
+  const catalogMatches = matchCatalogToDescription(desc, 5).map((ref) => ({
+    id: ref.id,
+    name: ref.name,
+    similarity: 0.6,
+  }));
+
+  const mergedRefs = [...matchedReferences];
+  for (const cm of catalogMatches) {
+    if (!mergedRefs.some((r) => r.id === cm.id)) mergedRefs.push(cm);
+  }
+  const topReferences = mergedRefs.sort((a, b) => b.similarity - a.similarity).slice(0, 8);
 
   const principleIds = matchedPrinciples.map((p) => p.id);
-  const topRef = matchedReferences[0];
+  const topRef = topReferences[0];
 
   const estimatedDNA: LogoDNA = {
     geometry: shapes.length ? shapes : ['circle'],
     construction: extractFromPrinciples(principleIds, 'construction'),
     balance: ['optical-balance'],
     complexity: input.observedColors && input.observedColors > 2 ? 'medium' : 'minimal',
-    era: (topRef ? logoReferences.find((r) => r.id === topRef.id)?.era : 'swiss') ?? 'swiss',
+    era: (topRef ? catalog.find((r) => r.id === topRef.id)?.era : 'swiss') ?? 'swiss',
     typography: extractFromPrinciples(principleIds, 'typography'),
-    recognition: matchedReferences.length > 0 ? 8 : 5,
+    recognition: topReferences.length > 0 ? 8 : 5,
     minimalism: input.observedColors === 1 ? 9 : input.observedColors === 2 ? 7 : 5,
     visualWeight: ['medium'],
     harmony: ['geometric'],
@@ -67,7 +81,7 @@ export function reverseAnalyzeLogo(input: ReverseAnalysisInput): ReverseAnalysis
 
   return {
     estimatedDNA,
-    matchedReferences,
+    matchedReferences: topReferences,
     matchedPrinciples,
     eraEstimate: estimatedDNA.era.replace(/_/g, ' '),
     complexityEstimate: estimatedDNA.complexity,

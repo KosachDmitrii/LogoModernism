@@ -22,11 +22,15 @@ const PERSONALITY_MAP = {
 };
 function analyzeBrandDNA(input) {
     const industry = input.industry.toLowerCase();
-    const industryKey = Object.keys(INDUSTRY_DNA).find((k) => industry.includes(k)) ?? 'tech';
-    const industryTraits = INDUSTRY_DNA[industryKey];
+    const industryKey = Object.keys(INDUSTRY_DNA).find((k) => industry.includes(k));
+    const industryTraits = industryKey ? INDUSTRY_DNA[industryKey] : undefined;
     const personality = input.personality ?? inferPersonality(industry);
-    const principles = (0, knowledge_base_1.searchPrinciples)({ industry, era: input.preferredEra ?? industryTraits?.era });
-    const principleIds = principles.slice(0, 12).map((p) => p.id);
+    const resolvedEra = input.preferredEra ?? industryTraits?.era ?? inferEraFromKnowledgeBase(industry);
+    const principles = (0, knowledge_base_1.searchPrinciples)({ industry, era: resolvedEra });
+    const principleIds = principles
+        .filter((p) => !p.id.startsWith('ent-'))
+        .slice(0, 16)
+        .map((p) => p.id);
     const visualTraits = {
         geometry: industryTraits?.geometry ?? ['circle', 'square'],
         construction: industryTraits?.construction ?? ['modular-grid'],
@@ -34,7 +38,7 @@ function analyzeBrandDNA(input) {
         typography: personality === 'luxurious' ? ['serif-contrast'] : ['sans-serif', 'geometric-sans'],
         color: personality === 'luxurious' ? ['monochrome', 'gold-accent'] : ['one-color', 'two-color'],
         complexity: industryTraits?.complexity ?? 'minimal',
-        era: input.preferredEra ?? industryTraits?.era ?? 'swiss',
+        era: resolvedEra,
     };
     const constraints = [
         'Flat vector output only',
@@ -70,6 +74,21 @@ function inferPersonality(industry) {
     if (i.includes('health') || i.includes('education'))
         return 'approachable';
     return 'bold';
+}
+function inferEraFromKnowledgeBase(industry) {
+    const matches = (0, knowledge_base_1.searchPrinciples)({ industry }).filter((p) => p.era?.length && !p.id.startsWith('ent-'));
+    if (matches.length > 0) {
+        const eraCounts = new Map();
+        for (const p of matches) {
+            for (const era of p.era ?? []) {
+                eraCounts.set(era, (eraCounts.get(era) ?? 0) + 1);
+            }
+        }
+        const sorted = [...eraCounts.entries()].sort((a, b) => b[1] - a[1]);
+        if (sorted[0])
+            return sorted[0][0];
+    }
+    return 'international_style';
 }
 function buildBrandNarrative(input, traits, personality) {
     return `${input.companyName} operates in ${input.industry} with a ${personality} brand personality. ` +

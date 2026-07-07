@@ -3,7 +3,9 @@ import {
   designPrinciples,
   getConflictingPrinciples,
   getPrincipleById,
+  getCompatiblePrinciples,
   searchPrinciples,
+  buildCatalogPromptContext,
 } from '@logo-platform/knowledge-base';
 
 const INSPIRATION_MAP: Record<InspirationMode, string[]> = {
@@ -15,7 +17,7 @@ const INSPIRATION_MAP: Record<InspirationMode, string[]> = {
   braun: ['insp-braun', 'cx-high-simplicity', 'render-timeless'],
   cbs: ['insp-cbs', 'mark-iconic-symbol', 'geo-circle'],
   abc: ['insp-abc', 'geo-circle', 'mark-iconic-symbol'],
-  olivetti: ['insp-olivetti', 'era-1960s', 'comp-playful'],
+  olivetti: ['insp-olivetti', 'era-1960s', 'comp-negative-space'],
   westinghouse: ['insp-westinghouse', 'geo-circle', 'mark-corporate-mark'],
 };
 
@@ -36,6 +38,9 @@ const CATEGORY_ORDER: DesignRule['category'][] = [
   'rendering',
 ];
 
+/** Curated modernist rules — excludes synthetic enterprise bulk (ent-*) */
+const CURATED_PRINCIPLES = designPrinciples.filter((p) => !p.id.startsWith('ent-'));
+
 export interface RuleSelectionInput {
   industry: string;
   companyName?: string;
@@ -43,6 +48,11 @@ export interface RuleSelectionInput {
   minimalismLevel?: number;
   inspirationMode?: InspirationMode;
   variationSeed?: number;
+  /** Locked-in from Brand DNA / Pipeline / Knowledge Graph analysis */
+  analysisPrincipleIds?: string[];
+  /** Logo catalog reference IDs (Müller Logo Modernism) */
+  catalogReferenceIds?: string[];
+  catalogNarrative?: string;
 }
 
 export interface RuleSelectionResult {
@@ -50,6 +60,7 @@ export interface RuleSelectionResult {
   dna: LogoDNA;
   recommendations: Recommendation[];
   conflicts: string[][];
+  catalogInspiration?: string[];
 }
 
 function seededRandom(seed: number): () => number {
@@ -60,20 +71,31 @@ function seededRandom(seed: number): () => number {
   };
 }
 
+function shufflePool<T>(pool: T[], rand: () => number): T[] {
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 function pickWeighted(rules: DesignRule[], rand: () => number, count: number): DesignRule[] {
-  const pool = [...rules];
+  const pool = shufflePool(rules, rand);
   const picked: DesignRule[] = [];
   while (picked.length < count && pool.length > 0) {
     const totalWeight = pool.reduce((sum, r) => sum + r.weight, 0);
     let roll = rand() * totalWeight;
+    let selectedIndex = pool.length - 1;
     for (let i = 0; i < pool.length; i++) {
       roll -= pool[i].weight;
       if (roll <= 0) {
-        picked.push(pool[i]);
-        pool.splice(i, 1);
+        selectedIndex = i;
         break;
       }
     }
+    picked.push(pool[selectedIndex]);
+    pool.splice(selectedIndex, 1);
   }
   return picked;
 }
@@ -83,18 +105,25 @@ function resolveIndustryRules(industry: string): DesignRule[] {
   const industryRules = searchPrinciples({ industry: normalized });
 
   if (industryRules.length > 0) {
-    return industryRules.filter((r) => r.category === 'industry').slice(0, 2);
+    return industryRules
+      .filter((r) => r.category === 'industry' && !r.id.startsWith('ent-'))
+      .slice(0, 2);
   }
 
-  const keywordRules = designPrinciples.filter(
+  const keywordRules = CURATED_PRINCIPLES.filter(
     (p) =>
-      p.tags.some((t) => normalized.includes(t) || t.includes(normalized)) ||
-      p.name.toLowerCase().includes(normalized),
+      p.category === 'industry' &&
+      (p.tags.some((t) => normalized.includes(t) || t.includes(normalized)) ||
+        p.name.toLowerCase().includes(normalized)),
   );
 
   if (keywordRules.length > 0) return keywordRules.slice(0, 2);
 
   return [getPrincipleById('ind-tech')!].filter(Boolean);
+}
+
+function eraPrincipleId(era: Era): string {
+  return `era-${era.replace(/_/g, '-')}`;
 }
 
 export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResult {
@@ -114,6 +143,28 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
     addRule(rule);
   }
 
+  // Analysis-driven principles (Brand DNA, Pipeline, Knowledge Graph, Logo Catalog)
+  const catalogContext = buildCatalogPromptContext(input.catalogReferenceIds ?? [], {
+    narrative: input.catalogNarrative,
+  });
+  const lockedPrincipleIds = [
+    ...(input.analysisPrincipleIds ?? []),
+    ...(catalogContext?.principleIds ?? []),
+  ];
+  if (lockedPrincipleIds.length) {
+    for (const id of lockedPrincipleIds) {
+      addRule(getPrincipleById(id));
+    }
+    // Expand via knowledge graph compatibility
+    for (const id of [...selectedIds]) {
+      for (const compatible of getCompatiblePrinciples(id).slice(0, 2)) {
+        if (compatible.category !== 'industry' && !compatible.id.startsWith('ent-')) {
+          addRule(compatible);
+        }
+      }
+    }
+  }
+
   if (input.inspirationMode) {
     for (const id of INSPIRATION_MAP[input.inspirationMode] ?? []) {
       addRule(getPrincipleById(id));
@@ -121,17 +172,18 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
   }
 
   if (input.preferredEra) {
-    const eraId = `era-${input.preferredEra.replace('_', '-')}`;
-    addRule(getPrincipleById(eraId));
+    addRule(getPrincipleById(eraPrincipleId(input.preferredEra)));
+  } else if (catalogContext?.eras.length === 1) {
+    addRule(getPrincipleById(eraPrincipleId(catalogContext.eras[0])));
   } else {
-    const eraRules = designPrinciples.filter((p) => p.category === 'era');
+    const eraRules = CURATED_PRINCIPLES.filter((p) => p.category === 'era' && p.era?.length);
     addRule(pickWeighted(eraRules, rand, 1)[0]);
   }
 
   for (const category of CATEGORY_ORDER) {
     if (['industry', 'era', 'inspiration'].includes(category)) continue;
 
-    const pool = designPrinciples.filter((p) => {
+    const pool = CURATED_PRINCIPLES.filter((p) => {
       if (p.category !== category) return false;
       if (selectedIds.has(p.id)) return false;
 
@@ -167,14 +219,24 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
     addRule(getPrincipleById('cx-high-simplicity'));
   }
 
-  const dna = buildLogoDNA(selected, input);
+  const dna = buildLogoDNA(selected, input, catalogContext);
   const recommendations = buildRecommendations(input.industry, selected);
   const conflicts = getConflictingPrinciples(selected.map((p) => p.id));
 
-  return { principles: selected, dna, recommendations, conflicts };
+  return {
+    principles: selected,
+    dna,
+    recommendations,
+    conflicts,
+    catalogInspiration: catalogContext?.inspirationFragments,
+  };
 }
 
-function buildLogoDNA(principles: DesignRule[], input: RuleSelectionInput): LogoDNA {
+function buildLogoDNA(
+  principles: DesignRule[],
+  input: RuleSelectionInput,
+  catalogContext?: ReturnType<typeof buildCatalogPromptContext>,
+): LogoDNA {
   const byCategory = (cat: DesignRule['category']) =>
     principles.filter((p) => p.category === cat).map((p) => p.name);
 
@@ -182,8 +244,12 @@ function buildLogoDNA(principles: DesignRule[], input: RuleSelectionInput): Logo
   const eraRule = principles.find((p) => p.category === 'era');
 
   return {
-    geometry: byCategory('geometry'),
-    construction: byCategory('construction'),
+    geometry: catalogContext?.geometry.length
+      ? catalogContext.geometry.map((g) => g.replace(/-/g, ' '))
+      : byCategory('geometry'),
+    construction: catalogContext?.construction.length
+      ? catalogContext.construction.map((c) => c.replace(/-/g, ' '))
+      : byCategory('construction'),
     balance: byCategory('balance'),
     complexity:
       complexityRule?.tags.includes('minimal') || complexityRule?.id.includes('minimal')
@@ -205,11 +271,11 @@ function buildRecommendations(industry: string, selected: DesignRule[]): Recomme
   const industryRules = resolveIndustryRules(industry);
 
   const suggestions = searchPrinciples({ industry })
-    .filter((p) => !selectedIds.has(p.id))
+    .filter((p) => !selectedIds.has(p.id) && !p.id.startsWith('ent-'))
     .slice(0, 5);
 
   if (suggestions.length === 0) {
-    const fallbacks = ['geo-circle', 'comp-negative-space', 'era-swiss', 'cx-minimal-complexity'];
+    const fallbacks = ['geo-circle', 'comp-negative-space', 'era-bauhaus', 'cx-minimal-complexity'];
     for (const id of fallbacks) {
       const rule = getPrincipleById(id);
       if (rule && !selectedIds.has(id)) {
