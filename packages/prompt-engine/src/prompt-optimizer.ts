@@ -19,13 +19,66 @@ const FILLER_PHRASES = [
   /\bamazing\b/gi,
 ];
 
-const STRENGTHENERS: [RegExp, string][] = [
-  [/flat vector/i, 'flat vector, no gradients, no shadows'],
-  [/negative space/i, 'clever meaningful negative space'],
-  [/symmetry/i, 'perfect optical symmetry'],
-  [/swiss/i, 'Swiss International Style'],
-  [/corporate/i, 'timeless corporate identity'],
+const STRENGTHENERS: { test: RegExp; phrase: string }[] = [
+  { test: /\bflat vector\b/i, phrase: 'no gradients, no shadows' },
+  { test: /\bnegative space\b/i, phrase: 'clever meaningful negative space' },
+  { test: /\bsymmetry\b/i, phrase: 'perfect optical symmetry' },
+  { test: /\bswiss\b/i, phrase: 'Swiss International Style' },
+  { test: /\bcorporate\b/i, phrase: 'timeless corporate identity' },
 ];
+
+const TOKEN_STOP_WORDS = new Set([
+  'built',
+  'from',
+  'with',
+  'that',
+  'this',
+  'only',
+  'pure',
+  'very',
+  'into',
+  'using',
+  'based',
+]);
+
+export function normalizeClauseKey(clause: string): string {
+  return clause
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function significantTokens(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/)
+      .filter((word) => word.length > 3 && !TOKEN_STOP_WORDS.has(word)),
+  );
+}
+
+export function clauseOverlaps(a: string, b: string): boolean {
+  const left = normalizeClauseKey(a);
+  const right = normalizeClauseKey(b);
+  if (!left || !right) return false;
+  if (left === right) return true;
+  if (left.length > 8 && right.length > 8 && (left.includes(right) || right.includes(left))) {
+    return true;
+  }
+
+  const tokensA = significantTokens(a);
+  const tokensB = significantTokens(b);
+  if (tokensA.size === 0 || tokensB.size === 0) return false;
+
+  let shared = 0;
+  for (const token of tokensA) {
+    if (tokensB.has(token)) shared++;
+  }
+
+  return shared / Math.min(tokensA.size, tokensB.size) >= 0.65;
+}
 
 export function optimizePrompt(text: string, principles: DesignRule[]): string {
   let result = text;
@@ -36,21 +89,41 @@ export function optimizePrompt(text: string, principles: DesignRule[]): string {
   result = strengthenPrompt(result);
   result = enforceRestrictions(result, principles);
   result = normalizePunctuation(result);
+  result = collapseRepeatedWords(result);
 
   return result;
 }
 
+function splitClauses(text: string): string[] {
+  return text
+    .split(/(?<=\.)\s+|,\s+/)
+    .map((clause) => clause.trim().replace(/\.+$/, ''))
+    .filter(Boolean);
+}
+
+function dedupeClauses(text: string): string {
+  const unique: string[] = [];
+
+  for (const clause of splitClauses(text)) {
+    if (unique.some((existing) => clauseOverlaps(existing, clause))) continue;
+    unique.push(clause);
+  }
+
+  return unique.join(', ');
+}
+
 function removeDuplicates(text: string): string {
-  const sentences = text.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
-  const seen = new Set<string>();
+  const sentences = text
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
   const unique: string[] = [];
 
   for (const sentence of sentences) {
-    const key = sentence.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(sentence);
-    }
+    const dedupedSentence = dedupeClauses(sentence);
+    if (!dedupedSentence) continue;
+    if (unique.some((existing) => clauseOverlaps(existing, dedupedSentence))) continue;
+    unique.push(dedupedSentence);
   }
 
   return unique.join('. ');
@@ -77,14 +150,31 @@ function removeFiller(text: string): string {
   return result;
 }
 
-function strengthenPrompt(text: string): string {
-  let result = text;
-  for (const [pattern, replacement] of STRENGTHENERS) {
-    if (pattern.test(result) && !result.includes(replacement)) {
-      result = result.replace(pattern, replacement);
-    }
+function conceptMostlyPresent(text: string, phrase: string): boolean {
+  const phraseTokens = significantTokens(phrase);
+  const textTokens = significantTokens(text);
+  if (phraseTokens.size === 0) return true;
+
+  let shared = 0;
+  for (const token of phraseTokens) {
+    if (textTokens.has(token)) shared++;
   }
-  return result;
+
+  return shared / phraseTokens.size >= 0.75;
+}
+
+function strengthenPrompt(text: string): string {
+  const additions: string[] = [];
+
+  for (const { test, phrase } of STRENGTHENERS) {
+    if (!test.test(text)) continue;
+    if (conceptMostlyPresent(text, phrase)) continue;
+    if (additions.some((existing) => clauseOverlaps(existing, phrase))) continue;
+    additions.push(phrase);
+  }
+
+  if (additions.length === 0) return text;
+  return `${text}, ${additions.join(', ')}`;
 }
 
 function enforceRestrictions(text: string, principles: DesignRule[]): string {
@@ -105,37 +195,63 @@ function enforceRestrictions(text: string, principles: DesignRule[]): string {
   }
 
   let result = text;
-  for (const r of restrictions) {
-    if (!result.toLowerCase().includes(r)) {
-      result += `. ${r.charAt(0).toUpperCase() + r.slice(1)}`;
+  for (const restriction of restrictions) {
+    if (!conceptMostlyPresent(result, restriction)) {
+      result += `, ${restriction}`;
     }
   }
   return result;
 }
 
 function normalizePunctuation(text: string): string {
-  return text
-    .replace(/\s+/g, ' ')
-    .replace(/\.+/g, '.')
-    .replace(/\.\s*$/, '')
-    .trim() + '.';
+  return (
+    text
+      .replace(/\s+/g, ' ')
+      .replace(/,\s*,+/g, ', ')
+      .replace(/:\s*,+/g, ': ')
+      .replace(/Avoid:\s*\./gi, '')
+      .replace(/Avoid:\s*$/gi, '')
+      .replace(/,\s*\./g, '.')
+      .replace(/\.+/g, '.')
+      .replace(/\s+,/g, ',')
+      .replace(/,\s*$/g, '')
+      .replace(/\.\s*$/, '')
+      .trim() + '.'
+  );
+}
+
+function collapseRepeatedWords(text: string): string {
+  let result = text;
+  let previous = '';
+
+  while (result !== previous) {
+    previous = result;
+    result = result.replace(/\b(\w+)(\s+\1\b)+/gi, '$1');
+  }
+
+  return result;
 }
 
 export function detectPromptIssues(text: string): string[] {
   const issues: string[] = [];
 
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  const seen = new Set<string>();
-  for (const s of sentences) {
-    const key = s.toLowerCase();
-    if (seen.has(key)) issues.push(`Duplicate: "${s}"`);
-    seen.add(key);
+  const clauses = splitClauses(text);
+  const seen: string[] = [];
+  for (const clause of clauses) {
+    if (seen.some((existing) => clauseOverlaps(existing, clause))) {
+      issues.push(`Duplicate: "${clause}"`);
+    }
+    seen.push(clause);
   }
 
   for (const [a, b] of CONTRADICTIONS) {
     if (a.test(text) && b.test(text)) {
       issues.push(`Contradiction between "${a.source}" and "${b.source}"`);
     }
+  }
+
+  if (/\b(\w+)\s+\1\b/i.test(text)) {
+    issues.push('Repeated adjacent words detected');
   }
 
   if (text.length > 500) issues.push('Prompt may be too long for image models');

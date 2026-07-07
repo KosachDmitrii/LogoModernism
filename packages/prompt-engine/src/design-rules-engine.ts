@@ -180,6 +180,15 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
     addRule(pickWeighted(eraRules, rand, 1)[0]);
   }
 
+  const hasCatalog = Boolean(catalogContext);
+  const catalogBackedCategories = new Set<DesignRule['category']>([
+    'geometry',
+    'construction',
+    'composition',
+    'typography',
+    'mark_type',
+  ]);
+
   for (const category of CATEGORY_ORDER) {
     if (['industry', 'era', 'inspiration'].includes(category)) continue;
 
@@ -200,8 +209,13 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
       return true;
     });
 
-    const count =
-      category === 'rendering' ? 3 : category === 'geometry' || category === 'construction' ? 2 : 1;
+    const count = hasCatalog && catalogBackedCategories.has(category)
+      ? 0
+      : category === 'rendering'
+        ? 3
+        : category === 'geometry' || category === 'construction'
+          ? 2
+          : 1;
 
     for (const rule of pickWeighted(pool, rand, count)) {
       addRule(rule);
