@@ -1,5 +1,5 @@
 import type { DesignBrief } from '../types';
-import { complexityToMinimalism, eraToInspiration, joinTags } from './brief-mappers';
+import { complexityToMinimalism, dedupeTags, eraToInspiration, isMultiWordCompanyName, joinTags } from './brief-mappers';
 
 type BriefPatch = Partial<DesignBrief>;
 
@@ -22,34 +22,69 @@ function mergeBrief(current: DesignBrief, patch: BriefPatch, source: string): De
 export function applyBrandDNAToBrief(
   current: DesignBrief,
   result: {
+    companyName?: string;
     personality?: string;
+    markType?: string;
+    typographyStyle?: string;
     narrative?: string;
     principleIds?: string[];
     visualTraits?: {
       era?: string;
       complexity?: string;
-      geometry?: string[];
-      construction?: string[];
-      composition?: string[];
       typography?: string[];
+      letterformStyle?: string[];
+      composition?: string[];
+    };
+    typography?: {
+      primaryRecommendation?: { name: string; characteristics?: string[] };
+      constructionRules?: string[];
+    };
+    letterDNA?: {
+      monogramOptions?: string[];
+      ligatureOpportunities?: string[];
+      recommendedWeight?: string;
     };
     psychologyProfile?: { primaryEmotion?: string };
     constraints?: string[];
   },
 ): { brief: DesignBrief; inspirationMode: string; minimalismLevel: number } {
   const era = result.visualTraits?.era?.replace(/_/g, ' ') ?? '';
+  const isWordmark = result.markType === 'wordmark';
+  const isLettermark = result.markType === 'lettermark';
+  const lettermarkUsesInitials =
+    isLettermark && result.companyName ? isMultiWordCompanyName(result.companyName) : false;
+
+  const typographyTags = dedupeTags([
+    ...(result.visualTraits?.typography ?? []),
+    result.typography?.primaryRecommendation?.name ?? '',
+    ...(result.visualTraits?.letterformStyle ?? []),
+    ...(lettermarkUsesInitials ? result.letterDNA?.monogramOptions?.slice(0, 2) ?? [] : []),
+    ...(lettermarkUsesInitials ? result.letterDNA?.ligatureOpportunities?.slice(0, 2) ?? [] : []),
+  ]);
+
+  const compositionTags = dedupeTags([
+    result.markType ? `${result.markType} mark` : '',
+    ...(result.visualTraits?.composition ?? []).filter(
+      (line) => !isWordmark || !/monogram/i.test(line),
+    ),
+    ...(result.typography?.constructionRules?.slice(0, 2) ?? []),
+  ]);
+
   const brief = mergeBrief(
     current,
     {
+      markType: result.markType ?? current.markType,
+      typographyStyle:
+        result.typographyStyle === 'constructed' || result.typographyStyle === 'standard'
+          ? result.typographyStyle
+          : current.typographyStyle,
       personality: result.personality ?? '',
       era,
       complexity: result.visualTraits?.complexity ?? '',
       primaryEmotion: result.psychologyProfile?.primaryEmotion ?? '',
       narrative: result.narrative ?? '',
-      geometry: joinTags(result.visualTraits?.geometry ?? []),
-      construction: joinTags(result.visualTraits?.construction ?? []),
-      composition: joinTags(result.visualTraits?.composition ?? []),
-      typography: joinTags(result.visualTraits?.typography ?? []),
+      typography: joinTags(typographyTags),
+      composition: joinTags(compositionTags),
       constraints: joinTags(result.constraints ?? []),
       principleIds: mergePrincipleIds(current.principleIds ?? [], result.principleIds ?? []),
     },
@@ -69,6 +104,7 @@ export function applyGeometryToBrief(
     recommendations?: Array<{ name: string; score: number; reason: string }>;
     selectedRecommendations?: Array<{ name: string; score?: number; reason: string }>;
     constructionGrid?: string;
+    symmetryType?: string;
   },
 ): DesignBrief {
   const selected = result.selectedRecommendations
@@ -76,12 +112,19 @@ export function applyGeometryToBrief(
     ?? [];
   if (selected.length === 0) return current;
 
+  const shapeNames = joinTags(selected.map((r) => r.name));
+
   return mergeBrief(
     current,
     {
-      preferredShapes: joinTags(selected.map((r) => r.name)),
-      geometry: joinTags(selected.map((r) => r.name)),
-      construction: result.constructionGrid ?? current.construction,
+      preferredShapes: shapeNames,
+      geometry: shapeNames,
+      construction: [
+        result.constructionGrid,
+        result.symmetryType ? `${result.symmetryType} symmetry` : '',
+      ]
+        .filter(Boolean)
+        .join(', '),
       narrative: selected
         .map((r) =>
           r.score != null ? `${r.name} (${r.score}/10): ${r.reason}` : `${r.name}: ${r.reason}`,
@@ -121,19 +164,7 @@ export function applyKnowledgeGraphToBrief(
 export function applyPipelineToBrief(
   current: DesignBrief,
   result: {
-    brandDNA?: {
-      personality?: string;
-      narrative?: string;
-      principleIds?: string[];
-      visualTraits?: {
-        era?: string;
-        complexity?: string;
-        geometry?: string[];
-        construction?: string[];
-      };
-      psychologyProfile?: { primaryEmotion?: string };
-      constraints?: string[];
-    };
+    brandDNA?: Parameters<typeof applyBrandDNAToBrief>[1];
     typography?: { primaryRecommendation?: { name: string } };
     composition?: { recommendedLayout?: { name: string } };
     prompts?: { bestPrompt?: { text: string } };
@@ -144,8 +175,12 @@ export function applyPipelineToBrief(
   const brief = mergeBrief(
     brand.brief,
     {
-      typography: result.typography?.primaryRecommendation?.name ?? '',
-      composition: result.composition?.recommendedLayout?.name ?? '',
+      typography: result.typography?.primaryRecommendation?.name
+        ? joinTags([brand.brief.typography, result.typography.primaryRecommendation.name])
+        : brand.brief.typography,
+      composition: result.composition?.recommendedLayout?.name
+        ? joinTags([brand.brief.composition, result.composition.recommendedLayout.name])
+        : brand.brief.composition,
       bestPromptHint: result.prompts?.bestPrompt?.text ?? '',
       critiqueNote: result.critique
         ? `${result.critique.overallScore}/10 — Grade ${result.critique.modernismGrade}`

@@ -18,6 +18,8 @@ function runPromptPipeline(request) {
         analysisPrincipleIds: request.analysisPrincipleIds,
         catalogReferenceIds: request.catalogReferenceIds,
         catalogNarrative: request.catalogNarrative,
+        markType: request.markType,
+        typographyStyle: request.typographyStyle,
     };
     const baseSelection = (0, design_rules_engine_1.selectDesignRules)({
         ...sharedInput,
@@ -30,6 +32,8 @@ function runPromptPipeline(request) {
         dna: baseSelection.dna,
         inspirationMode: request.inspirationMode,
         catalogInspiration: baseSelection.catalogInspiration,
+        markType: request.markType,
+        typographyStyle: request.typographyStyle,
     }, variationCount, (seed) => (0, design_rules_engine_1.selectDesignRules)({
         ...sharedInput,
         variationSeed: seed * 7919 + (request.analysisPrincipleIds?.length ?? 0) * 31 + (request.catalogReferenceIds?.length ?? 0) * 17,

@@ -28,6 +28,8 @@ export class ImagesService {
       provider: dto.provider,
       size: dto.size,
       count: 1,
+      markType: dto.markType,
+      typographyStyle: dto.typographyStyle,
     });
     return this.toPersistedResult(result);
   }

@@ -34,6 +34,8 @@ let PromptsController = class PromptsController {
             analysisPrincipleIds: dto.analysisPrincipleIds,
             catalogReferenceIds: dto.catalogReferenceIds,
             catalogNarrative: dto.catalogNarrative,
+            markType: dto.markType,
+            typographyStyle: dto.typographyStyle,
         };
         this.lastResult = this.promptsService.generate(request);
         return (0, prompt_response_1.slimPipelineResult)(this.lastResult);

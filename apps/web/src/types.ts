@@ -41,6 +41,8 @@ export interface ComposedPrompt {
     era: string;
     variationIndex?: number;
     inspirationMode?: string;
+    markType?: 'wordmark' | 'lettermark' | 'combination';
+    typographyStyle?: 'standard' | 'constructed';
   };
 }
 
@@ -94,6 +96,8 @@ export interface DesignBrief {
   complexity: string;
   primaryEmotion: string;
   narrative: string;
+  markType: '' | 'wordmark' | 'lettermark' | 'combination';
+  typographyStyle: '' | 'standard' | 'constructed';
   geometry: string;
   construction: string;
   composition: string;
@@ -116,6 +120,8 @@ export const EMPTY_DESIGN_BRIEF: DesignBrief = {
   complexity: '',
   primaryEmotion: '',
   narrative: '',
+  markType: '',
+  typographyStyle: '',
   geometry: '',
   construction: '',
   composition: '',

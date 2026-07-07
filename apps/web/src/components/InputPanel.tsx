@@ -5,7 +5,7 @@ import { generatePrompts, getRecommendations, getPrinciplesOverview, getImagePro
 import { useAppStore } from '../store';
 import { DesignBriefPanel } from './DesignBriefPanel';
 import { IndustrySelect } from './IndustrySelect';
-import { buildEffectiveIndustry, parseEraFromBrief } from '../lib/brief-mappers';
+import { buildEffectiveIndustry, parseEraFromBrief, parseMarkTypeFromBrief, parseTypographyStyleFromBrief } from '../lib/brief-mappers';
 
 const INSPIRATION_MODES = [
   { value: '', label: 'None' },
@@ -79,9 +79,14 @@ export function InputPanel() {
       const analysisPrincipleIds = principleIds.length > 0 ? principleIds : undefined;
       const catalogIds = designBrief.catalogReferenceIds ?? [];
       const catalogReferenceIds = catalogIds.length > 0 ? catalogIds : undefined;
+      const markType = parseMarkTypeFromBrief(designBrief);
+      const typographyStyle = parseTypographyStyleFromBrief(designBrief);
 
       return generatePrompts({
-        industry: buildEffectiveIndustry(industry, designBrief),
+        industry: buildEffectiveIndustry(industry, {
+          ...designBrief,
+          typographyStyle,
+        }),
         companyName: companyName || undefined,
         variationCount,
         inspirationMode: hasDesignBrief ? undefined : inspirationMode || undefined,
@@ -90,6 +95,8 @@ export function InputPanel() {
         analysisPrincipleIds,
         catalogReferenceIds,
         catalogNarrative: catalogReferenceIds ? designBrief.narrative || undefined : undefined,
+        markType,
+        typographyStyle,
       });
     },
     onSuccess: (data) => setResults(data.prompts, data.recommendations),
@@ -174,7 +181,7 @@ export function InputPanel() {
             onChange={(e) => setVariationCount(Number(e.target.value))}
             className="w-full px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:border-zinc-600"
           >
-            {[5, 10, 20, 50, 100].map((n) => (
+            {[3, 5, 10, 20, 50, 100].map((n) => (
               <option key={n} value={n}>
                 {n} prompts
               </option>

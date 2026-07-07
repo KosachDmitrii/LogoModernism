@@ -2,12 +2,16 @@ export type ImageProvider = 'openai' | 'mock';
 
 export type ImageSize = '1024x1024' | '1024x1792' | '1792x1024';
 
+import type { LogoMarkType, TypographyStyle } from './types';
+
 export interface ImageGenerationRequest {
   prompt: string;
   provider?: ImageProvider;
   size?: ImageSize;
   count?: number;
   companyName?: string;
+  markType?: LogoMarkType;
+  typographyStyle?: TypographyStyle;
 }
 
 export interface GeneratedImage {

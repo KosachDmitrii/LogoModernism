@@ -1,4 +1,6 @@
-import type { Era } from '@logo-platform/shared';
+import type { Era, TypographyStyle } from '@logo-platform/shared';
+import { analyzeLetterDNA } from './letter-dna.engine';
+import { analyzeTypography } from './typography-intelligence.engine';
 export interface BrandDNAInput {
     companyName: string;
     industry: string;
@@ -6,20 +8,25 @@ export interface BrandDNAInput {
     targetAudience?: string;
     personality?: 'bold' | 'refined' | 'playful' | 'technical' | 'luxurious' | 'approachable';
     preferredEra?: Era;
+    markType?: 'wordmark' | 'lettermark' | 'combination';
+    typographyStyle?: TypographyStyle;
 }
 export interface BrandDNAProfile {
     companyName: string;
     industry: string;
-    personality: BrandDNAInput['personality'];
+    personality: NonNullable<BrandDNAInput['personality']>;
+    markType: NonNullable<BrandDNAInput['markType']>;
+    typographyStyle: TypographyStyle;
     visualTraits: {
-        geometry: string[];
-        construction: string[];
-        composition: string[];
         typography: string[];
+        letterformStyle: string[];
+        composition: string[];
         color: string[];
         complexity: 'minimal' | 'medium' | 'high';
         era: Era;
     };
+    typography: ReturnType<typeof analyzeTypography>;
+    letterDNA: ReturnType<typeof analyzeLetterDNA>;
     psychologyProfile: {
         primaryEmotion: string;
         trustLevel: number;

@@ -4,6 +4,8 @@ export declare class BrandDNARequestDto {
     values?: string[];
     targetAudience?: string;
     personality?: 'bold' | 'refined' | 'playful' | 'technical' | 'luxurious' | 'approachable';
+    markType?: 'wordmark' | 'lettermark' | 'combination';
+    typographyStyle?: 'standard' | 'constructed';
 }
 export declare class LetterDNARequestDto {
     text: string;

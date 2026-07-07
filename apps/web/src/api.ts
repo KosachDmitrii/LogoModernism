@@ -12,6 +12,8 @@ export async function generatePrompts(body: {
   analysisPrincipleIds?: string[];
   catalogReferenceIds?: string[];
   catalogNarrative?: string;
+  markType?: 'wordmark' | 'lettermark' | 'combination';
+  typographyStyle?: 'standard' | 'constructed';
 }): Promise<GenerateResponse> {
   const res = await fetch(`${API_BASE}/prompts/generate`, {
     method: 'POST',
@@ -41,7 +43,12 @@ export async function getPrinciplesOverview(): Promise<{ total: number; categori
   return res.json();
 }
 
-export async function analyzeBrandDNA(body: { companyName: string; industry: string }) {
+export async function analyzeBrandDNA(body: {
+  companyName: string;
+  industry: string;
+  markType?: 'wordmark' | 'lettermark' | 'combination';
+  typographyStyle?: 'standard' | 'constructed';
+}) {
   const res = await fetch(`${API_BASE}/engines/brand-dna`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -206,6 +213,8 @@ export async function generateImageFromPrompt(body: {
   companyName?: string;
   industry?: string;
   provider?: 'openai' | 'mock';
+  markType?: 'wordmark' | 'lettermark' | 'combination';
+  typographyStyle?: 'standard' | 'constructed';
 }): Promise<import('./types').ImageGenerationResponse> {
   const res = await fetch(`${API_BASE}/images/generate-from-prompt`, {
     method: 'POST',

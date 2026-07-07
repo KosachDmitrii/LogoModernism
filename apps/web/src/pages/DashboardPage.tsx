@@ -5,8 +5,8 @@ import { getPrinciplesOverview, getKnowledgeGraphStats } from '../api';
 
 const ENGINES = [
   { to: '/prompts', icon: Sparkles, title: 'Prompt Composer', desc: 'Generate ranked logo prompts from design principles' },
-  { to: '/brand-dna', icon: Dna, title: 'Brand DNA', desc: 'Analyze brand personality and visual traits' },
-  { to: '/geometry', icon: Shapes, title: 'Geometry Intelligence', desc: 'Primitive library and construction systems' },
+  { to: '/brand-dna', icon: Dna, title: 'Brand DNA', desc: 'Typography, wordmarks, lettermarks — text-only logo direction' },
+  { to: '/geometry', icon: Shapes, title: 'Geometry Intelligence', desc: 'Shapes, primitives, grid construction — no typography' },
   { to: '/knowledge-graph', icon: Network, title: 'Knowledge Graph', desc: 'Explore principle compatibility network' },
   { to: '/pipeline', icon: Workflow, title: 'Full Pipeline', desc: 'Run all AI engines in orchestrated sequence' },
 ];

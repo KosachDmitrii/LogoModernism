@@ -1,4 +1,4 @@
-import type { DesignRule, Era, InspirationMode, LogoDNA, Recommendation } from '@logo-platform/shared';
+import type { DesignRule, Era, InspirationMode, LogoDNA, LogoMarkType, Recommendation, TypographyStyle } from '@logo-platform/shared';
 import {
   designPrinciples,
   getConflictingPrinciples,
@@ -7,6 +7,11 @@ import {
   searchPrinciples,
   buildCatalogPromptContext,
 } from '@logo-platform/knowledge-base';
+import {
+  filterPrincipleIdsForMarkType,
+  isPrincipleAllowedForMarkType,
+  shouldSkipCategoryForMarkType,
+} from './mark-type-filter';
 
 const INSPIRATION_MAP: Record<InspirationMode, string[]> = {
   swiss: ['era-swiss', 'typ-swiss-typography', 'con-equal-width-lines'],
@@ -53,6 +58,8 @@ export interface RuleSelectionInput {
   /** Logo catalog reference IDs (Müller Logo Modernism) */
   catalogReferenceIds?: string[];
   catalogNarrative?: string;
+  markType?: LogoMarkType;
+  typographyStyle?: TypographyStyle;
 }
 
 export interface RuleSelectionResult {
@@ -130,9 +137,11 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
   const rand = seededRandom(input.variationSeed ?? Date.now());
   const selected: DesignRule[] = [];
   const selectedIds = new Set<string>();
+  const markFilterOptions = { typographyStyle: input.typographyStyle };
 
   const addRule = (rule: DesignRule | undefined) => {
     if (!rule || selectedIds.has(rule.id)) return;
+    if (!isPrincipleAllowedForMarkType(rule, input.markType, markFilterOptions)) return;
     const conflicts = getConflictingPrinciples([...selectedIds, rule.id]);
     if (conflicts.length > 0) return;
     selected.push(rule);
@@ -146,11 +155,15 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
   // Analysis-driven principles (Brand DNA, Pipeline, Knowledge Graph, Logo Catalog)
   const catalogContext = buildCatalogPromptContext(input.catalogReferenceIds ?? [], {
     narrative: input.catalogNarrative,
+    typographyStyle: input.typographyStyle,
   });
-  const lockedPrincipleIds = [
-    ...(input.analysisPrincipleIds ?? []),
-    ...(catalogContext?.principleIds ?? []),
-  ];
+  const lockedPrincipleIds = filterPrincipleIdsForMarkType(
+    [
+      ...(input.analysisPrincipleIds ?? []),
+      ...(catalogContext?.principleIds ?? []),
+    ],
+    input.markType,
+  );
   if (lockedPrincipleIds.length) {
     for (const id of lockedPrincipleIds) {
       addRule(getPrincipleById(id));
@@ -191,6 +204,7 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
 
   for (const category of CATEGORY_ORDER) {
     if (['industry', 'era', 'inspiration'].includes(category)) continue;
+    if (shouldSkipCategoryForMarkType(category, input.markType, markFilterOptions)) continue;
 
     const pool = CURATED_PRINCIPLES.filter((p) => {
       if (p.category !== category) return false;
@@ -233,8 +247,18 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
     addRule(getPrincipleById('cx-high-simplicity'));
   }
 
+  if (input.markType === 'wordmark') {
+    addRule(getPrincipleById('typ-wordmark'));
+  }
+
+  if (input.typographyStyle === 'constructed') {
+    for (const id of ['con-modular-grid', 'con-grid-based', 'typ-custom-letterform', 'comp-stacked']) {
+      addRule(getPrincipleById(id));
+    }
+  }
+
   const dna = buildLogoDNA(selected, input, catalogContext);
-  const recommendations = buildRecommendations(input.industry, selected);
+  const recommendations = buildRecommendations(input.industry, selected, input.markType);
   const conflicts = getConflictingPrinciples(selected.map((p) => p.id));
 
   return {
@@ -257,13 +281,27 @@ function buildLogoDNA(
   const complexityRule = principles.find((p) => p.category === 'complexity');
   const eraRule = principles.find((p) => p.category === 'era');
 
+  const constructed = input.typographyStyle === 'constructed';
+  const typographicOnly =
+    input.markType === 'wordmark' || input.markType === 'lettermark';
+
   return {
-    geometry: catalogContext?.geometry.length
-      ? catalogContext.geometry.map((g) => g.replace(/-/g, ' '))
-      : byCategory('geometry'),
-    construction: catalogContext?.construction.length
-      ? catalogContext.construction.map((c) => c.replace(/-/g, ' '))
-      : byCategory('construction'),
+    geometry:
+      constructed
+        ? ['triangles', 'semicircles', 'rectangles']
+        : typographicOnly
+          ? []
+          : catalogContext?.geometry.length
+            ? catalogContext.geometry.map((g) => g.replace(/-/g, ' '))
+            : byCategory('geometry'),
+    construction:
+      constructed
+        ? ['modular grid', 'stacked letterforms', 'geometric primitives']
+        : typographicOnly
+          ? []
+          : catalogContext?.construction.length
+            ? catalogContext.construction.map((c) => c.replace(/-/g, ' '))
+            : byCategory('construction'),
     balance: byCategory('balance'),
     complexity:
       complexityRule?.tags.includes('minimal') || complexityRule?.id.includes('minimal')
@@ -280,19 +318,27 @@ function buildLogoDNA(
   };
 }
 
-function buildRecommendations(industry: string, selected: DesignRule[]): Recommendation[] {
+function buildRecommendations(
+  industry: string,
+  selected: DesignRule[],
+  markType?: LogoMarkType,
+): Recommendation[] {
   const selectedIds = new Set(selected.map((p) => p.id));
   const industryRules = resolveIndustryRules(industry);
 
   const suggestions = searchPrinciples({ industry })
     .filter((p) => !selectedIds.has(p.id) && !p.id.startsWith('ent-'))
+    .filter((p) => isPrincipleAllowedForMarkType(p, markType))
     .slice(0, 5);
 
   if (suggestions.length === 0) {
-    const fallbacks = ['geo-circle', 'comp-negative-space', 'era-bauhaus', 'cx-minimal-complexity'];
+    const fallbacks =
+      markType === 'wordmark' || selected.some((p) => p.category === 'typography')
+        ? ['typ-wordmark', 'typ-swiss-typography', 'era-bauhaus', 'cx-minimal-complexity']
+        : ['geo-circle', 'comp-negative-space', 'era-bauhaus', 'cx-minimal-complexity'];
     for (const id of fallbacks) {
       const rule = getPrincipleById(id);
-      if (rule && !selectedIds.has(id)) {
+      if (rule && !selectedIds.has(id) && isPrincipleAllowedForMarkType(rule, markType)) {
         suggestions.push(rule);
       }
     }

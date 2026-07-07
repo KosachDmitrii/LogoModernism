@@ -17,6 +17,8 @@ class BrandDNARequestDto {
     values;
     targetAudience;
     personality;
+    markType;
+    typographyStyle;
 }
 exports.BrandDNARequestDto = BrandDNARequestDto;
 __decorate([
@@ -43,6 +45,16 @@ __decorate([
     (0, class_validator_1.IsIn)(['bold', 'refined', 'playful', 'technical', 'luxurious', 'approachable']),
     __metadata("design:type", String)
 ], BrandDNARequestDto.prototype, "personality", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(['wordmark', 'lettermark', 'combination']),
+    __metadata("design:type", String)
+], BrandDNARequestDto.prototype, "markType", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(['standard', 'constructed']),
+    __metadata("design:type", String)
+], BrandDNARequestDto.prototype, "typographyStyle", void 0);
 class LetterDNARequestDto {
     text;
     style;

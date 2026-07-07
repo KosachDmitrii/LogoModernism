@@ -112,13 +112,21 @@ function referenceToFragments(ref: LogoReference): string[] {
 
 export function buildCatalogPromptContext(
   referenceIds: string[],
-  options?: { narrative?: string },
+  options?: { narrative?: string; typographyStyle?: 'standard' | 'constructed' },
 ): CatalogPromptContext | null {
   if (!referenceIds.length) return null;
 
   const references = referenceIds
     .map((id) => getCatalogEntry(id))
-    .filter((ref): ref is LogoReference => Boolean(ref));
+    .filter((ref): ref is LogoReference => Boolean(ref))
+    .filter((ref) => {
+      if (options?.typographyStyle !== 'constructed') return true;
+      if (ref.markType === 'symbol' || ref.markType === 'emblem') return false;
+      if (ref.catalogChapter === 'geometric' && ref.markType !== 'wordmark' && ref.markType !== 'lettermark') {
+        return false;
+      }
+      return true;
+    });
 
   if (!references.length) return null;
 
@@ -126,6 +134,12 @@ export function buildCatalogPromptContext(
 
   if (options?.narrative?.trim()) {
     inspirationFragments.push(`Design brief note: ${options.narrative.trim()}`);
+  }
+
+  if (options?.typographyStyle === 'constructed') {
+    inspirationFragments.push(
+      'Catalog lineage for constructive typography — geometric letterforms from primitives, not a separate pictorial symbol',
+    );
   }
 
   inspirationFragments.push(

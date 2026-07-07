@@ -1,4 +1,4 @@
-import type { DesignRule, Era, InspirationMode, LogoDNA, Recommendation } from '@logo-platform/shared';
+import type { DesignRule, Era, InspirationMode, LogoDNA, LogoMarkType, Recommendation, TypographyStyle } from '@logo-platform/shared';
 declare const INSPIRATION_MAP: Record<InspirationMode, string[]>;
 declare const CATEGORY_ORDER: DesignRule['category'][];
 export interface RuleSelectionInput {
@@ -13,6 +13,8 @@ export interface RuleSelectionInput {
     /** Logo catalog reference IDs (Müller Logo Modernism) */
     catalogReferenceIds?: string[];
     catalogNarrative?: string;
+    markType?: LogoMarkType;
+    typographyStyle?: TypographyStyle;
 }
 export interface RuleSelectionResult {
     principles: DesignRule[];

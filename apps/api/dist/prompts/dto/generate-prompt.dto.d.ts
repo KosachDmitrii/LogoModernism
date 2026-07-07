@@ -8,6 +8,8 @@ export declare class GeneratePromptDto {
     analysisPrincipleIds?: string[];
     catalogReferenceIds?: string[];
     catalogNarrative?: string;
+    markType?: 'wordmark' | 'lettermark' | 'combination';
+    typographyStyle?: 'standard' | 'constructed';
 }
 export declare class SearchPrinciplesDto {
     query?: string;

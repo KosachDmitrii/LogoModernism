@@ -42,6 +42,14 @@ export class GeneratePromptDto {
   @IsOptional()
   @IsString()
   catalogNarrative?: string;
+
+  @IsOptional()
+  @IsIn(['wordmark', 'lettermark', 'combination'])
+  markType?: 'wordmark' | 'lettermark' | 'combination';
+
+  @IsOptional()
+  @IsIn(['standard', 'constructed'])
+  typographyStyle?: 'standard' | 'constructed';
 }
 
 export class SearchPrinciplesDto {

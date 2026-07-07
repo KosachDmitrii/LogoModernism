@@ -11,5 +11,7 @@ export declare class GenerateFromComposedPromptDto {
     industry?: string;
     companyName?: string;
     provider?: ImageProvider;
+    markType?: 'wordmark' | 'lettermark' | 'combination';
+    typographyStyle?: 'standard' | 'constructed';
     size?: ImageSize;
 }

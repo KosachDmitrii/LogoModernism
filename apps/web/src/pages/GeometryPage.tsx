@@ -23,7 +23,7 @@ interface Primitive {
 
 export function GeometryPage() {
   const applyGeometry = useAppStore((s) => s.applyGeometry);
-  const [industry, setIndustry] = useState('Technology');
+  const [industry, setIndustry] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const { data: primitives } = useQuery({ queryKey: ['primitives'], queryFn: getPrimitives });
@@ -83,7 +83,9 @@ export function GeometryPage() {
     <div className="max-w-5xl mx-auto px-8 py-10">
       <header className="mb-8">
         <h1 className="text-2xl font-semibold mb-1">Geometry Intelligence</h1>
-        <p className="text-sm text-zinc-500">Primitive library and construction recommendations</p>
+        <p className="text-sm text-zinc-500">
+          Фигуры и конструкция — примитивы, сетка, симметрия. Типографику настраивай в Brand DNA.
+        </p>
       </header>
 
       <div className="flex gap-3 mb-8 items-start">

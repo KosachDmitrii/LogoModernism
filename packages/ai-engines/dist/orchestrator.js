@@ -18,15 +18,15 @@ function runFullPipeline(input) {
         industry: input.industry,
         preferredEra: input.preferredEra,
         personality: input.inspirationMode,
+        markType: mapMarkType(input.markType),
     });
     const letterDNA = (0, letter_dna_engine_1.analyzeLetterDNA)({ text: input.companyName, style: 'geometric' });
     const geometry = (0, geometry_intelligence_engine_1.analyzeGeometry)({
         industry: input.industry,
-        preferredShapes: brandDNA.visualTraits.geometry,
         complexity: brandDNA.visualTraits.complexity,
     });
     const shapePsychology = (0, shape_psychology_engine_1.analyzeShapePsychology)({
-        shapes: brandDNA.visualTraits.geometry,
+        shapes: geometry.recommendations.slice(0, 3).map((r) => r.name.toLowerCase()),
         industry: input.industry,
         brandPersonality: brandDNA.personality,
     });
@@ -36,9 +36,9 @@ function runFullPipeline(input) {
         markType: mapMarkType(input.markType),
     });
     const composition = (0, composition_ai_engine_1.analyzeComposition)({
-        markType: input.markType ?? 'combination',
+        markType: mapCompositionMarkType(input.markType ?? brandDNA.markType),
         industry: input.industry,
-        hasNegativeSpace: brandDNA.visualTraits.composition.includes('negative-space'),
+        hasNegativeSpace: letterDNA.counterSpaceStrategy.toLowerCase().includes('negative'),
     });
     const topPrimitives = geometry.recommendations.slice(0, 2).map((r) => r.primitiveId);
     const construction = (0, construction_solver_engine_1.solveConstruction)({
@@ -86,11 +86,20 @@ function runFullPipeline(input) {
 }
 function mapMarkType(markType) {
     if (!markType)
-        return 'combination';
+        return undefined;
     if (markType === 'symbol')
         return 'lettermark';
     if (markType === 'emblem')
         return 'combination';
+    return markType;
+}
+function mapCompositionMarkType(markType) {
+    if (!markType || markType === 'lettermark')
+        return 'wordmark';
+    if (markType === 'emblem')
+        return 'emblem';
+    if (markType === 'symbol')
+        return 'symbol';
     return markType;
 }
 //# sourceMappingURL=orchestrator.js.map

@@ -1,4 +1,4 @@
-import type { ComposedPrompt, DesignRule, LogoDNA } from '@logo-platform/shared';
+import type { ComposedPrompt, DesignRule, LogoDNA, LogoMarkType, TypographyStyle } from '@logo-platform/shared';
 export interface ComposeInput {
     industry: string;
     companyName?: string;
@@ -6,9 +6,12 @@ export interface ComposeInput {
     dna: LogoDNA;
     inspirationMode?: string;
     variationIndex?: number;
+    markType?: LogoMarkType;
+    typographyStyle?: TypographyStyle;
     /** Fragments from Logo Catalog references */
     catalogInspiration?: string[];
 }
+export declare function initialsFromName(name: string): string;
 export declare function composePrompt(input: ComposeInput): ComposedPrompt;
 export declare function composePromptVariations(baseInput: Omit<ComposeInput, 'variationIndex'>, count: number, selectRules: (seed: number) => {
     principles: DesignRule[];

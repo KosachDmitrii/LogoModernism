@@ -19,6 +19,14 @@ export class BrandDNARequestDto {
   @IsOptional()
   @IsIn(['bold', 'refined', 'playful', 'technical', 'luxurious', 'approachable'])
   personality?: 'bold' | 'refined' | 'playful' | 'technical' | 'luxurious' | 'approachable';
+
+  @IsOptional()
+  @IsIn(['wordmark', 'lettermark', 'combination'])
+  markType?: 'wordmark' | 'lettermark' | 'combination';
+
+  @IsOptional()
+  @IsIn(['standard', 'constructed'])
+  typographyStyle?: 'standard' | 'constructed';
 }
 
 export class LetterDNARequestDto {

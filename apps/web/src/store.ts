@@ -9,8 +9,6 @@ import {
   applyPipelineToBrief,
 } from './lib/apply-brief';
 
-const MAX_CACHED_IMAGES = 3;
-
 function clearPromptResults() {
   return {
     prompts: [] as ComposedPrompt[],
@@ -59,32 +57,12 @@ interface AppState {
   setGeneratedImages: (promptId: string, images: GeneratedImage[]) => void;
 }
 
-function trimImageCache(
-  cache: Record<string, GeneratedImage[]>,
-  promptId: string,
-  images: GeneratedImage[],
-): Record<string, GeneratedImage[]> {
-  const next = { ...cache, [promptId]: images };
-  const keys = Object.keys(next);
-
-  if (keys.length <= MAX_CACHED_IMAGES) {
-    return next;
-  }
-
-  const evict = keys.filter((key) => key !== promptId).slice(0, keys.length - MAX_CACHED_IMAGES);
-  for (const key of evict) {
-    delete next[key];
-  }
-
-  return next;
-}
-
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       industry: '',
       companyName: '',
-      variationCount: 10,
+      variationCount: 5,
       inspirationMode: '',
       preferredEra: '',
       minimalismLevel: 8,
@@ -183,7 +161,7 @@ export const useAppStore = create<AppState>()(
       setGenerating: (generatingPromptId) => set({ generatingPromptId }),
       setGeneratedImages: (promptId, images) =>
         set((state) => ({
-          generatedImages: trimImageCache(state.generatedImages, promptId, images),
+          generatedImages: { ...state.generatedImages, [promptId]: images },
         })),
     }),
     {

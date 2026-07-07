@@ -1,8 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import type { ComposedPrompt, DesignRule, LogoDNA, PromptScores } from '@logo-platform/shared';
+import type { ComposedPrompt, DesignRule, LogoDNA, LogoMarkType, PromptScores, TypographyStyle } from '@logo-platform/shared';
+import { isMultiWordCompanyName, lettermarkTextFromName } from '@logo-platform/shared';
 import { CATEGORY_ORDER } from './design-rules-engine';
 import { scorePrompt } from './prompt-scorer';
 import { clauseOverlaps, optimizePrompt } from './prompt-optimizer';
+import {
+  filterPrinciplesForMarkType,
+  shouldSkipCategoryForMarkType,
+} from './mark-type-filter';
 
 export interface ComposeInput {
   industry: string;
@@ -11,6 +16,8 @@ export interface ComposeInput {
   dna: LogoDNA;
   inspirationMode?: string;
   variationIndex?: number;
+  markType?: LogoMarkType;
+  typographyStyle?: TypographyStyle;
   /** Fragments from Logo Catalog references */
   catalogInspiration?: string[];
 }
@@ -56,6 +63,10 @@ const CATALOG_CATEGORY_MARKERS: Partial<Record<DesignRule['category'], string>> 
   mark_type: 'mark type:',
 };
 
+export function initialsFromName(name: string): string {
+  return lettermarkTextFromName(name);
+}
+
 function ruleToFragment(rule: DesignRule, compact = false): string {
   if (!compact && RICH_CATEGORIES.has(rule.category) && rule.description.length > 12) {
     return `${rule.promptFragment}. ${rule.description}`;
@@ -98,11 +109,37 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
   const fragments: string[] = [];
   const hasCatalog = Boolean(input.catalogInspiration?.length);
   const catalogText = (input.catalogInspiration ?? []).join(' ').toLowerCase();
+  const isWordmark = input.markType === 'wordmark';
+  const isLettermark = input.markType === 'lettermark';
+  const isConstructed = input.typographyStyle === 'constructed';
+  const markFilterOptions = { typographyStyle: input.typographyStyle };
+  const lettermarkText = input.companyName ? lettermarkTextFromName(input.companyName) : '';
+  const lettermarkUsesInitials = input.companyName ? isMultiWordCompanyName(input.companyName) : false;
+  const principles = filterPrinciplesForMarkType(input.principles, input.markType, markFilterOptions);
 
-  fragments.push('Minimal geometric logo design');
+  if (isConstructed) {
+    fragments.push('Modernist constructed typography logo design');
+    fragments.push(
+      'Geometric letterforms built from triangles, semicircles, and rectangles on a modular grid',
+    );
+  } else if (isWordmark) {
+    fragments.push('Modernist typographic wordmark logo design');
+  } else if (isLettermark) {
+    fragments.push('Modernist lettermark monogram logo design');
+  } else {
+    fragments.push('Minimal geometric logo design');
+  }
 
   if (input.companyName) {
-    fragments.push(`for "${input.companyName}"`);
+    if (isLettermark && lettermarkText) {
+      if (lettermarkUsesInitials) {
+        fragments.push(`monogram of the initials "${lettermarkText}" for brand "${input.companyName}"`);
+      } else {
+        fragments.push(`lettermark built from the full word "${lettermarkText}"`);
+      }
+    } else {
+      fragments.push(`for "${input.companyName}"`);
+    }
   }
 
   if (input.catalogInspiration?.length) {
@@ -110,20 +147,22 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
   }
 
   for (const category of CATEGORY_ORDER) {
+    if (shouldSkipCategoryForMarkType(category, input.markType, markFilterOptions)) continue;
+
     const marker = CATALOG_CATEGORY_MARKERS[category];
     if (hasCatalog && marker && catalogText.includes(marker)) {
       continue;
     }
 
     const rules = filterPrinciplesForCatalog(
-      input.principles.filter((p) => p.category === category),
+      principles.filter((p) => p.category === category),
       category,
       catalogText,
     );
     if (rules.length === 0) continue;
 
     const label = CATEGORY_LABELS[category];
-    const categoryFragments = rules.map((rule) => ruleToFragment(rule, hasCatalog));
+    const categoryFragments = rules.map((rule) => ruleToFragment(rule, hasCatalog || isWordmark || isLettermark));
     if (label && categoryFragments.length > 1) {
       fragments.push(`${label}: ${categoryFragments.join(', ')}`);
     } else {
@@ -133,11 +172,11 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
 
   const antiPatterns = [
     ...new Set(
-      input.principles
+      principles
         .flatMap((p) => p.antiPatterns)
         .map((pattern) => pattern?.trim())
         .filter((pattern): pattern is string => Boolean(pattern))
-        .filter((pattern) => !isRedundantAvoid(pattern, input.principles)),
+        .filter((pattern) => !isRedundantAvoid(pattern, principles)),
     ),
   ].slice(0, 4);
 
@@ -145,24 +184,52 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     fragments.push(`Avoid: ${antiPatterns.join(', ')}`);
   }
 
+  if (isConstructed) {
+    fragments.push('Dense stacked typographic block — letters are the entire logo');
+    fragments.push('Bold black constructive letterforms, not an off-the-shelf font');
+    fragments.push('No separate icon, roundel, emblem, or pictorial symbol');
+  } else if (isWordmark) {
+    fragments.push('Typography-only wordmark, company name spelled as the logo');
+    fragments.push('No separate icon, no symbol above text, no pictorial mark, no emblem');
+  }
+
+  if (isLettermark) {
+    if (lettermarkUsesInitials) {
+      fragments.push(
+        lettermarkText
+          ? `Monogram built only from the letters "${lettermarkText}" — do not spell the full company name`
+          : 'Monogram built only from the brand initials — do not spell the full company name',
+      );
+    } else {
+      fragments.push(
+        lettermarkText
+          ? `Lettermark built from the full word "${lettermarkText}" — do not abbreviate to initials`
+          : 'Lettermark built from the full company name — do not abbreviate to initials',
+      );
+    }
+    fragments.push('Letters are the entire logo. No separate icon, no pictorial symbol, no emblem, no badge, no industry imagery');
+  }
+
   fragments.push('Premium professional branding');
   fragments.push('Timeless modernist aesthetic');
 
   const rawText = fragments.join('. ').replace(/\.\s*\./g, '.');
-  const optimized = optimizePrompt(rawText, input.principles);
-  const scores = scorePrompt(optimized, input.principles, input.dna);
+  const optimized = optimizePrompt(rawText, principles);
+  const scores = scorePrompt(optimized, principles, input.dna);
 
   return {
     id: randomUUID(),
     text: optimized,
     industry: input.industry,
-    selectedPrinciples: input.principles,
+    selectedPrinciples: principles,
     scores,
     dna: input.dna,
     metadata: {
       era: input.dna.era,
       variationIndex: input.variationIndex,
       inspirationMode: input.inspirationMode,
+      markType: input.markType,
+      typographyStyle: input.typographyStyle,
     },
   };
 }

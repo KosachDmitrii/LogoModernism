@@ -27,6 +27,11 @@ export type Era =
   | '1970s'
   | 'mid_century';
 
+export type LogoMarkType = 'wordmark' | 'lettermark' | 'combination';
+
+/** Geometric letterforms built from primitives on a modular grid (Müller constructive typography) */
+export type TypographyStyle = 'standard' | 'constructed';
+
 export interface DesignRule {
   id: string;
   name: string;
@@ -190,6 +195,8 @@ export interface ComposedPrompt {
     era: Era;
     variationIndex?: number;
     inspirationMode?: string;
+    markType?: LogoMarkType;
+    typographyStyle?: TypographyStyle;
   };
 }
 
@@ -200,6 +207,10 @@ export interface PromptGenerationRequest {
   inspirationMode?: InspirationMode;
   preferredEra?: Era;
   minimalismLevel?: number;
+  /** Wordmark / lettermark / combination — from Brand DNA Design Brief */
+  markType?: LogoMarkType;
+  /** Constructed typography — letters as geometric primitives on a modular grid */
+  typographyStyle?: TypographyStyle;
   /** Principle IDs from Brand DNA, Geometry, Pipeline, Knowledge Graph analysis */
   analysisPrincipleIds?: string[];
   /** Logo catalog reference IDs from Müller Logo Modernism */

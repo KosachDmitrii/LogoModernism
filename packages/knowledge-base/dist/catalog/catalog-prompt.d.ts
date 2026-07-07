@@ -13,6 +13,7 @@ export interface CatalogPromptContext {
 }
 export declare function buildCatalogPromptContext(referenceIds: string[], options?: {
     narrative?: string;
+    typographyStyle?: 'standard' | 'constructed';
 }): CatalogPromptContext | null;
 export declare function getCatalogPrincipleIdsFromContext(referenceIds: string[]): string[];
 //# sourceMappingURL=catalog-prompt.d.ts.map

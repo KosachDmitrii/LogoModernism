@@ -22,6 +22,8 @@ export function runPromptPipeline(request: PromptGenerationRequest): PipelineRes
     analysisPrincipleIds: request.analysisPrincipleIds,
     catalogReferenceIds: request.catalogReferenceIds,
     catalogNarrative: request.catalogNarrative,
+    markType: request.markType,
+    typographyStyle: request.typographyStyle,
   };
 
   const baseSelection = selectDesignRules({
@@ -37,6 +39,8 @@ export function runPromptPipeline(request: PromptGenerationRequest): PipelineRes
       dna: baseSelection.dna,
       inspirationMode: request.inspirationMode,
       catalogInspiration: baseSelection.catalogInspiration,
+      markType: request.markType,
+      typographyStyle: request.typographyStyle,
     },
     variationCount,
     (seed) =>

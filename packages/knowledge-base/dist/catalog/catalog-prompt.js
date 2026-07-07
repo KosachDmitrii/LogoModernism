@@ -90,12 +90,25 @@ function buildCatalogPromptContext(referenceIds, options) {
         return null;
     const references = referenceIds
         .map((id) => (0, index_1.getCatalogEntry)(id))
-        .filter((ref) => Boolean(ref));
+        .filter((ref) => Boolean(ref))
+        .filter((ref) => {
+        if (options?.typographyStyle !== 'constructed')
+            return true;
+        if (ref.markType === 'symbol' || ref.markType === 'emblem')
+            return false;
+        if (ref.catalogChapter === 'geometric' && ref.markType !== 'wordmark' && ref.markType !== 'lettermark') {
+            return false;
+        }
+        return true;
+    });
     if (!references.length)
         return null;
     const inspirationFragments = references.flatMap(referenceToFragments);
     if (options?.narrative?.trim()) {
         inspirationFragments.push(`Design brief note: ${options.narrative.trim()}`);
+    }
+    if (options?.typographyStyle === 'constructed') {
+        inspirationFragments.push('Catalog lineage for constructive typography — geometric letterforms from primitives, not a separate pictorial symbol');
     }
     inspirationFragments.push('Create an original mark in this modernist lineage — inspired by structure and principles, not a copy of the reference');
     return {

@@ -21,6 +21,8 @@ class GeneratePromptDto {
     analysisPrincipleIds;
     catalogReferenceIds;
     catalogNarrative;
+    markType;
+    typographyStyle;
 }
 exports.GeneratePromptDto = GeneratePromptDto;
 __decorate([
@@ -74,6 +76,16 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], GeneratePromptDto.prototype, "catalogNarrative", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(['wordmark', 'lettermark', 'combination']),
+    __metadata("design:type", String)
+], GeneratePromptDto.prototype, "markType", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(['standard', 'constructed']),
+    __metadata("design:type", String)
+], GeneratePromptDto.prototype, "typographyStyle", void 0);
 class SearchPrinciplesDto {
     query;
     category;

@@ -50,6 +50,8 @@ class GenerateFromComposedPromptDto {
     industry;
     companyName;
     provider;
+    markType;
+    typographyStyle;
     size;
 }
 exports.GenerateFromComposedPromptDto = GenerateFromComposedPromptDto;
@@ -72,6 +74,16 @@ __decorate([
     (0, class_validator_1.IsIn)(['openai', 'mock']),
     __metadata("design:type", String)
 ], GenerateFromComposedPromptDto.prototype, "provider", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(['wordmark', 'lettermark', 'combination']),
+    __metadata("design:type", String)
+], GenerateFromComposedPromptDto.prototype, "markType", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(['standard', 'constructed']),
+    __metadata("design:type", String)
+], GenerateFromComposedPromptDto.prototype, "typographyStyle", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsIn)(['1024x1024', '1024x1792', '1792x1024']),

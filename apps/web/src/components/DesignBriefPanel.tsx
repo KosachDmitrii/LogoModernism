@@ -27,7 +27,7 @@ export function DesignBriefPanel() {
     return (
       <div className="p-4 rounded-xl border border-dashed border-zinc-800 text-center">
         <p className="text-xs text-zinc-500">
-          Запустите Brand DNA, Geometry или Full Pipeline и нажмите{' '}
+          Запустите Brand DNA (текст) или Geometry (фигуры) и нажмите{' '}
           <span className="text-zinc-400">Применить в Prompts</span>
         </p>
       </div>
@@ -64,6 +64,18 @@ export function DesignBriefPanel() {
           <span className="text-zinc-500">Era:</span>{' '}
           {designBrief.era}
           <span className="text-zinc-500"> ({getEraSourceLabel(designBrief)})</span>
+        </p>
+      )}
+
+      {designBrief.markType && (
+        <p className="text-xs text-zinc-300">
+          <span className="text-zinc-500">Mark type:</span> {designBrief.markType}
+        </p>
+      )}
+
+      {designBrief.typographyStyle && (
+        <p className="text-xs text-zinc-300">
+          <span className="text-zinc-500">Typography style:</span> {designBrief.typographyStyle}
         </p>
       )}
 

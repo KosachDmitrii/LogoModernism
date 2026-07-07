@@ -18,6 +18,7 @@ export function PromptCard({ prompt, selected, onSelect, rank }: PromptCardProps
   const [copied, setCopied] = useState(false);
   const companyName = useAppStore((s) => s.companyName);
   const industry = useAppStore((s) => s.industry);
+  const designBrief = useAppStore((s) => s.designBrief);
   const setGenerating = useAppStore((s) => s.setGenerating);
   const setGeneratedImages = useAppStore((s) => s.setGeneratedImages);
 
@@ -38,6 +39,14 @@ export function PromptCard({ prompt, selected, onSelect, rank }: PromptCardProps
         text: prompt.text,
         companyName: companyName || undefined,
         industry,
+        markType:
+          designBrief.markType ||
+          prompt.metadata?.markType ||
+          undefined,
+        typographyStyle:
+          designBrief.typographyStyle ||
+          prompt.metadata?.typographyStyle ||
+          undefined,
       });
       setGeneratedImages(prompt.id, result.images);
     } catch (err) {

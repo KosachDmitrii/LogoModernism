@@ -40,18 +40,18 @@ export function runFullPipeline(input: FullPipelineInput): FullPipelineResult {
     industry: input.industry,
     preferredEra: input.preferredEra,
     personality: input.inspirationMode,
+    markType: mapMarkType(input.markType),
   });
 
   const letterDNA = analyzeLetterDNA({ text: input.companyName, style: 'geometric' });
 
   const geometry = analyzeGeometry({
     industry: input.industry,
-    preferredShapes: brandDNA.visualTraits.geometry,
     complexity: brandDNA.visualTraits.complexity,
   });
 
   const shapePsychology = analyzeShapePsychology({
-    shapes: brandDNA.visualTraits.geometry,
+    shapes: geometry.recommendations.slice(0, 3).map((r) => r.name.toLowerCase()),
     industry: input.industry,
     brandPersonality: brandDNA.personality,
   });
@@ -63,9 +63,9 @@ export function runFullPipeline(input: FullPipelineInput): FullPipelineResult {
   });
 
   const composition = analyzeComposition({
-    markType: input.markType ?? 'combination',
+    markType: mapCompositionMarkType(input.markType ?? brandDNA.markType),
     industry: input.industry,
-    hasNegativeSpace: brandDNA.visualTraits.composition.includes('negative-space'),
+    hasNegativeSpace: letterDNA.counterSpaceStrategy.toLowerCase().includes('negative'),
   });
 
   const topPrimitives = geometry.recommendations.slice(0, 2).map((r) => r.primitiveId);
@@ -122,8 +122,17 @@ export function runFullPipeline(input: FullPipelineInput): FullPipelineResult {
 function mapMarkType(
   markType?: FullPipelineInput['markType'],
 ): 'wordmark' | 'lettermark' | 'combination' | undefined {
-  if (!markType) return 'combination';
+  if (!markType) return undefined;
   if (markType === 'symbol') return 'lettermark';
   if (markType === 'emblem') return 'combination';
+  return markType;
+}
+
+function mapCompositionMarkType(
+  markType?: FullPipelineInput['markType'] | 'wordmark' | 'lettermark' | 'combination',
+): 'symbol' | 'wordmark' | 'combination' | 'emblem' {
+  if (!markType || markType === 'lettermark') return 'wordmark';
+  if (markType === 'emblem') return 'emblem';
+  if (markType === 'symbol') return 'symbol';
   return markType;
 }
