@@ -1,0 +1,176 @@
+openapi: 3.1.0
+info:
+  title: AI BIOS Logo Platform API
+  version: 1.0.0
+  description: Enterprise API for modernist logo design intelligence
+
+servers:
+  - url: http://localhost:3001/api
+    description: Development
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+
+  /prompts/generate:
+    post:
+      summary: Generate ranked prompt variations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [industry]
+              properties:
+                industry: { type: string }
+                companyName: { type: string }
+                variationCount: { type: integer, minimum: 1, maximum: 100 }
+                inspirationMode: { type: string }
+                minimalismLevel: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        '200':
+          description: Generated prompts with recommendations
+
+  /prompts/recommend/{industry}:
+    get:
+      summary: Get principle recommendations for industry
+      parameters:
+        - name: industry
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Recommendations and suggested principles
+
+  /principles:
+    get:
+      summary: Knowledge base overview
+      responses:
+        '200':
+          description: Total count and categories
+
+  /principles/search:
+    get:
+      summary: Search design principles
+      parameters:
+        - name: query
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Matching principles
+
+  /principles/graph:
+    get:
+      summary: Knowledge graph edges
+      responses:
+        '200':
+          description: Graph edge list
+
+  /engines/brand-dna:
+    post:
+      summary: Analyze brand DNA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [companyName, industry]
+              properties:
+                companyName: { type: string }
+                industry: { type: string }
+                personality: { type: string, enum: [bold, refined, playful, technical, luxurious, approachable] }
+      responses:
+        '200':
+          description: Brand DNA profile
+
+  /engines/pipeline:
+    post:
+      summary: Run full AI pipeline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [companyName, industry]
+              properties:
+                companyName: { type: string }
+                industry: { type: string }
+                variationCount: { type: integer }
+                markType: { type: string, enum: [symbol, wordmark, combination, emblem] }
+      responses:
+        '200':
+          description: Full pipeline results
+
+  /engines/geometry:
+    post:
+      summary: Geometry intelligence analysis
+      responses:
+        '200':
+          description: Primitive recommendations
+
+  /engines/reverse-analysis:
+    post:
+      summary: Reverse logo analysis
+      responses:
+        '200':
+          description: Estimated DNA and references
+
+  /engines/knowledge-graph:
+    get:
+      summary: Full knowledge graph visualization
+      responses:
+        '200':
+          description: Nodes, edges, clusters, stats
+
+  /engines/primitives:
+    get:
+      summary: Geometry primitive library
+      responses:
+        '200':
+          description: SVG primitives with construction data
+
+  /images/providers:
+    get:
+      summary: Available image generation providers
+      responses:
+        '200':
+          description: Provider list with availability
+
+  /images/generate:
+    post:
+      summary: Generate logo image from text prompt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt: { type: string }
+                companyName: { type: string }
+                provider: { type: string, enum: [openai, mock] }
+                size: { type: string, enum: ['1024x1024', '1024x1792', '1792x1024'] }
+                count: { type: integer, minimum: 1, maximum: 4 }
+      responses:
+        '200':
+          description: Generated images
+
+  /images/generate-from-prompt:
+    post:
+      summary: Generate logo image from composed prompt
+      responses:
+        '200':
+          description: Generated images

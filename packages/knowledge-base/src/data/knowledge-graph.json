@@ -1,0 +1,872 @@
+[
+  {
+    "from": "geo-circle",
+    "to": "comp-negative-space",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-circle",
+    "to": "era-swiss",
+    "relation": "works_with"
+  },
+  {
+    "from": "era-swiss",
+    "to": "con-equal-width-lines",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-equal-width-lines",
+    "to": "era-corporate-identity",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-negative-space",
+    "to": "cx-minimal-complexity",
+    "relation": "enhances"
+  },
+  {
+    "from": "typ-monogram",
+    "to": "comp-negative-space",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-modular-grid",
+    "to": "comp-symmetry",
+    "relation": "works_with"
+  },
+  {
+    "from": "color-one-color",
+    "to": "render-flat-vector",
+    "relation": "requires"
+  },
+  {
+    "from": "color-no-gradient",
+    "to": "fx-gradient-avoid",
+    "relation": "enhances"
+  },
+  {
+    "from": "era-bauhaus",
+    "to": "typ-bauhaus-typography",
+    "relation": "requires"
+  },
+  {
+    "from": "era-swiss",
+    "to": "typ-swiss-typography",
+    "relation": "requires"
+  },
+  {
+    "from": "geo-angular",
+    "to": "era-bauhaus",
+    "relation": "works_with"
+  },
+  {
+    "from": "mark-abstract-symbol",
+    "to": "cx-minimal-complexity",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-dynamic-tension",
+    "to": "comp-symmetry",
+    "relation": "conflicts_with"
+  },
+  {
+    "from": "color-one-color",
+    "to": "color-two-color",
+    "relation": "conflicts_with"
+  },
+  {
+    "from": "cx-high-simplicity",
+    "to": "cx-dense",
+    "relation": "conflicts_with"
+  },
+  {
+    "from": "fx-gradient-avoid",
+    "to": "color-no-gradient",
+    "relation": "works_with"
+  },
+  {
+    "from": "bal-optical-balance",
+    "to": "con-golden-ratio",
+    "relation": "enhances"
+  },
+  {
+    "from": "ind-ai",
+    "to": "geo-hexagon",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-finance",
+    "to": "typ-all-caps",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-luxury",
+    "to": "typ-letter-spacing",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-coffee",
+    "to": "geo-organic-round",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-circle",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-circle",
+    "to": "comp-symmetry",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-square",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-square",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-square",
+    "to": "comp-symmetry",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-triangle",
+    "to": "bal-optical-balance",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-hexagon",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-hexagon",
+    "to": "mark-corporate-mark",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-pentagon",
+    "to": "con-golden-ratio",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-diamond",
+    "to": "comp-rotation",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-diamond",
+    "to": "comp-symmetry",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-ellipse",
+    "to": "bal-optical-balance",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-cross",
+    "to": "comp-symmetry",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-cross",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-star",
+    "to": "con-radial-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-star",
+    "to": "comp-rotation",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-organic-round",
+    "to": "comp-negative-space",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-linear",
+    "to": "con-parallel-lines",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-concentric",
+    "to": "con-radial-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-interlocking",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-interlocking",
+    "to": "comp-negative-space",
+    "relation": "works_with"
+  },
+  {
+    "from": "geo-fragmented",
+    "to": "cx-medium-complexity",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-grid-based",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-grid-based",
+    "to": "comp-symmetry",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-radial-grid",
+    "to": "geo-circle",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-radial-grid",
+    "to": "comp-rotation",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-golden-ratio",
+    "to": "bal-harmony",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-modular-grid",
+    "to": "mark-corporate-mark",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-concentric-circles",
+    "to": "geo-circle",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-concentric-circles",
+    "to": "con-radial-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-equal-width-lines",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-parallel-lines",
+    "to": "con-equal-width-lines",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-parallel-lines",
+    "to": "era-swiss",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-rounded-corners",
+    "to": "geo-square",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-45-degree",
+    "to": "geo-angular",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-isometric",
+    "to": "cx-medium-complexity",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-baseline-grid",
+    "to": "typ-wordmark",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-baseline-grid",
+    "to": "typ-swiss-typography",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-circle-in-square",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-circle-in-square",
+    "to": "era-bauhaus",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-square-in-circle",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-quarter-circle",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-continuous-line",
+    "to": "stroke-single-stroke",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-continuous-line",
+    "to": "com-extra-ultra-minimal",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-modular-repetition",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-optical-correction",
+    "to": "bal-optical-balance",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-stroke-to-fill",
+    "to": "con-equal-width-lines",
+    "relation": "works_with"
+  },
+  {
+    "from": "con-tangent-curves",
+    "to": "geo-circle",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-symmetry",
+    "to": "comp-mirror",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-symmetry",
+    "to": "comp-asymmetric-balance",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-negative-space",
+    "to": "com-extra-ultra-minimal",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-positive-space",
+    "to": "comp-solid-fill",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-reflection",
+    "to": "comp-symmetry",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-overlay",
+    "to": "color-two-color",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-duplication",
+    "to": "con-modular-repetition",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-outline",
+    "to": "stroke-single-stroke",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-figure-ground",
+    "to": "comp-negative-space",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-centralized",
+    "to": "comp-symmetry",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-centralized",
+    "to": "color-blue-corporate",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-asymmetric-balance",
+    "to": "bal-optical-balance",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-stacked",
+    "to": "typ-wordmark",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-nested",
+    "to": "geo-concentric",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-interwoven",
+    "to": "con-continuous-line",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-counter-change",
+    "to": "comp-negative-space",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-knockout",
+    "to": "typ-wordmark",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-knockout",
+    "to": "comp-negative-space",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-containment",
+    "to": "geo-circle",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-containment",
+    "to": "geo-square",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-dynamic-tension",
+    "to": "geo-angular",
+    "relation": "works_with"
+  },
+  {
+    "from": "comp-dynamic-tension",
+    "to": "cx-medium-complexity",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-swiss-typography",
+    "to": "typ-helvetica-style",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-helvetica-style",
+    "to": "color-blue-corporate",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-univers-style",
+    "to": "typ-swiss-typography",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-monogram",
+    "to": "typ-letter-combination",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-monogram",
+    "to": "com-extra-ultra-minimal",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-initials",
+    "to": "typ-monogram",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-sans-serif",
+    "to": "era-swiss",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-geometric-sans",
+    "to": "era-bauhaus",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-condensed",
+    "to": "color-blue-corporate",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-extended",
+    "to": "color-blue-corporate",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-all-caps",
+    "to": "color-blue-corporate",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-ligature",
+    "to": "typ-wordmark",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-letter-spacing",
+    "to": "era-swiss",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-tight-kerning",
+    "to": "ent-00265",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-baseline-alignment",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "typ-stacked-type",
+    "to": "typ-wordmark",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-continuous-line",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-continuous-line",
+    "to": "comp-outline",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-broken-line",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-broken-line",
+    "to": "comp-outline",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-single-stroke",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-dual-stroke",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-dual-stroke",
+    "to": "comp-outline",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-variable-stroke",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-variable-stroke",
+    "to": "comp-outline",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-hairline",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-hairline",
+    "to": "comp-outline",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-bold-stroke",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-bold-stroke",
+    "to": "comp-outline",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-rounded-cap",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-rounded-cap",
+    "to": "comp-outline",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-square-cap",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-square-cap",
+    "to": "comp-outline",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-miter-join",
+    "to": "geo-linear",
+    "relation": "works_with"
+  },
+  {
+    "from": "stroke-miter-join",
+    "to": "comp-outline",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-tech",
+    "to": "geo-circle",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-tech",
+    "to": "mark-abstract-symbol",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-tech",
+    "to": "era-swiss",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-finance",
+    "to": "geo-square",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-finance",
+    "to": "era-corporate-identity",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-medical",
+    "to": "geo-cross",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-medical",
+    "to": "color-blue-corporate",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-medical",
+    "to": "comp-symmetry",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-luxury",
+    "to": "color-one-color",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-luxury",
+    "to": "cx-high-simplicity",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-coffee",
+    "to": "comp-negative-space",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-coffee",
+    "to": "era-1960s",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-ai",
+    "to": "mark-abstract-symbol",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-ai",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-aviation",
+    "to": "geo-triangle",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-aviation",
+    "to": "comp-dynamic-tension",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-aviation",
+    "to": "era-international-style",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-media",
+    "to": "geo-circle",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-media",
+    "to": "mark-iconic-symbol",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-retail",
+    "to": "mark-combination-mark",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-retail",
+    "to": "typ-sans-serif",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-education",
+    "to": "comp-centralized",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-energy",
+    "to": "color-two-color",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-legal",
+    "to": "color-pure-black",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-legal",
+    "to": "comp-symmetry",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-food",
+    "to": "geo-organic-round",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-architecture",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-architecture",
+    "to": "geo-angular",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-architecture",
+    "to": "era-bauhaus",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-automotive",
+    "to": "comp-dynamic-tension",
+    "relation": "works_with"
+  },
+  {
+    "from": "ind-automotive",
+    "to": "geo-angular",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-8-unit",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-8-unit",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-12-column",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-12-column",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-square-module",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-square-module",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-circle-module",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-circle-module",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-hex-module",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-hex-module",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-baseline-8",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-baseline-8",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-margin-system",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-margin-system",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-padding-ratio",
+    "to": "con-grid-based",
+    "relation": "works_with"
+  },
+  {
+    "from": "grid-padding-ratio",
+    "to": "con-modular-grid",
+    "relation": "works_with"
+  }
+]

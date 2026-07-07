@@ -1,0 +1,91 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.composePrompt = composePrompt;
+exports.composePromptVariations = composePromptVariations;
+exports.buildPromptFromTemplate = buildPromptFromTemplate;
+const node_crypto_1 = require("node:crypto");
+const design_rules_engine_1 = require("./design-rules-engine");
+const prompt_scorer_1 = require("./prompt-scorer");
+const prompt_optimizer_1 = require("./prompt-optimizer");
+const CATEGORY_LABELS = {
+    industry: 'Industry',
+    geometry: 'Geometry',
+    construction: 'Construction',
+    composition: 'Composition',
+    grid: 'Grid',
+    typography: 'Typography',
+    stroke: 'Stroke',
+    balance: 'Balance',
+    complexity: 'Complexity',
+    era: 'Era',
+    color: 'Color',
+    effects: 'Effects',
+    mark_type: 'Mark Type',
+    rendering: 'Rendering',
+};
+function composePrompt(input) {
+    const fragments = [];
+    fragments.push('Minimal geometric logo design');
+    if (input.companyName) {
+        fragments.push(`for "${input.companyName}"`);
+    }
+    for (const category of design_rules_engine_1.CATEGORY_ORDER) {
+        const rules = input.principles.filter((p) => p.category === category);
+        if (rules.length === 0)
+            continue;
+        const label = CATEGORY_LABELS[category];
+        const categoryFragments = rules.map((r) => r.promptFragment);
+        if (label && categoryFragments.length > 1) {
+            fragments.push(`${label}: ${categoryFragments.join(', ')}`);
+        }
+        else {
+            fragments.push(...categoryFragments);
+        }
+    }
+    fragments.push('Premium professional branding');
+    fragments.push('Timeless modernist aesthetic');
+    const rawText = fragments.join('. ').replace(/\.\s*\./g, '.');
+    const optimized = (0, prompt_optimizer_1.optimizePrompt)(rawText, input.principles);
+    const scores = (0, prompt_scorer_1.scorePrompt)(optimized, input.principles, input.dna);
+    return {
+        id: (0, node_crypto_1.randomUUID)(),
+        text: optimized,
+        industry: input.industry,
+        selectedPrinciples: input.principles,
+        scores,
+        dna: input.dna,
+        metadata: {
+            era: input.dna.era,
+            variationIndex: input.variationIndex,
+            inspirationMode: input.inspirationMode,
+        },
+    };
+}
+function composePromptVariations(baseInput, count, selectRules) {
+    const prompts = [];
+    for (let i = 0; i < count; i++) {
+        const { principles, dna } = selectRules(i + 1);
+        prompts.push(composePrompt({
+            ...baseInput,
+            principles,
+            dna,
+            variationIndex: i + 1,
+        }));
+    }
+    return prompts.sort((a, b) => b.scores.promptQuality - a.scores.promptQuality);
+}
+function buildPromptFromTemplate(templateFragments, principles, industry, dna) {
+    const rawText = templateFragments.join('. ');
+    const optimized = (0, prompt_optimizer_1.optimizePrompt)(rawText, principles);
+    const scores = (0, prompt_scorer_1.scorePrompt)(optimized, principles, dna);
+    return {
+        id: (0, node_crypto_1.randomUUID)(),
+        text: optimized,
+        industry,
+        selectedPrinciples: principles,
+        scores,
+        dna,
+        metadata: { era: dna.era },
+    };
+}
+//# sourceMappingURL=prompt-composer.js.map

@@ -1,0 +1,229 @@
+import type { DesignRule, Era, InspirationMode, LogoDNA, Recommendation } from '@logo-platform/shared';
+import {
+  designPrinciples,
+  getConflictingPrinciples,
+  getPrincipleById,
+  searchPrinciples,
+} from '@logo-platform/knowledge-base';
+
+const INSPIRATION_MAP: Record<InspirationMode, string[]> = {
+  swiss: ['era-swiss', 'typ-swiss-typography', 'con-equal-width-lines'],
+  bauhaus: ['era-bauhaus', 'typ-bauhaus-typography', 'geo-angular'],
+  ibm: ['insp-ibm', 'con-grid-based', 'con-modular-grid'],
+  nasa: ['insp-nasa', 'mark-iconic-symbol', 'comp-overlay'],
+  lufthansa: ['insp-lufthansa', 'geo-circle', 'comp-negative-space'],
+  braun: ['insp-braun', 'cx-high-simplicity', 'render-timeless'],
+  cbs: ['insp-cbs', 'mark-iconic-symbol', 'geo-circle'],
+  abc: ['insp-abc', 'geo-circle', 'mark-iconic-symbol'],
+  olivetti: ['insp-olivetti', 'era-1960s', 'comp-playful'],
+  westinghouse: ['insp-westinghouse', 'geo-circle', 'mark-corporate-mark'],
+};
+
+const CATEGORY_ORDER: DesignRule['category'][] = [
+  'industry',
+  'geometry',
+  'construction',
+  'composition',
+  'grid',
+  'typography',
+  'stroke',
+  'balance',
+  'complexity',
+  'era',
+  'color',
+  'effects',
+  'mark_type',
+  'rendering',
+];
+
+export interface RuleSelectionInput {
+  industry: string;
+  companyName?: string;
+  preferredEra?: Era;
+  minimalismLevel?: number;
+  inspirationMode?: InspirationMode;
+  variationSeed?: number;
+}
+
+export interface RuleSelectionResult {
+  principles: DesignRule[];
+  dna: LogoDNA;
+  recommendations: Recommendation[];
+  conflicts: string[][];
+}
+
+function seededRandom(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+function pickWeighted(rules: DesignRule[], rand: () => number, count: number): DesignRule[] {
+  const pool = [...rules];
+  const picked: DesignRule[] = [];
+  while (picked.length < count && pool.length > 0) {
+    const totalWeight = pool.reduce((sum, r) => sum + r.weight, 0);
+    let roll = rand() * totalWeight;
+    for (let i = 0; i < pool.length; i++) {
+      roll -= pool[i].weight;
+      if (roll <= 0) {
+        picked.push(pool[i]);
+        pool.splice(i, 1);
+        break;
+      }
+    }
+  }
+  return picked;
+}
+
+function resolveIndustryRules(industry: string): DesignRule[] {
+  const normalized = industry.toLowerCase().trim();
+  const industryRules = searchPrinciples({ industry: normalized });
+
+  if (industryRules.length > 0) {
+    return industryRules.filter((r) => r.category === 'industry').slice(0, 2);
+  }
+
+  const keywordRules = designPrinciples.filter(
+    (p) =>
+      p.tags.some((t) => normalized.includes(t) || t.includes(normalized)) ||
+      p.name.toLowerCase().includes(normalized),
+  );
+
+  if (keywordRules.length > 0) return keywordRules.slice(0, 2);
+
+  return [getPrincipleById('ind-tech')!].filter(Boolean);
+}
+
+export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResult {
+  const rand = seededRandom(input.variationSeed ?? Date.now());
+  const selected: DesignRule[] = [];
+  const selectedIds = new Set<string>();
+
+  const addRule = (rule: DesignRule | undefined) => {
+    if (!rule || selectedIds.has(rule.id)) return;
+    const conflicts = getConflictingPrinciples([...selectedIds, rule.id]);
+    if (conflicts.length > 0) return;
+    selected.push(rule);
+    selectedIds.add(rule.id);
+  };
+
+  for (const rule of resolveIndustryRules(input.industry)) {
+    addRule(rule);
+  }
+
+  if (input.inspirationMode) {
+    for (const id of INSPIRATION_MAP[input.inspirationMode] ?? []) {
+      addRule(getPrincipleById(id));
+    }
+  }
+
+  if (input.preferredEra) {
+    const eraId = `era-${input.preferredEra.replace('_', '-')}`;
+    addRule(getPrincipleById(eraId));
+  } else {
+    const eraRules = designPrinciples.filter((p) => p.category === 'era');
+    addRule(pickWeighted(eraRules, rand, 1)[0]);
+  }
+
+  for (const category of CATEGORY_ORDER) {
+    if (['industry', 'era', 'inspiration'].includes(category)) continue;
+
+    const pool = designPrinciples.filter((p) => {
+      if (p.category !== category) return false;
+      if (selectedIds.has(p.id)) return false;
+
+      const compatibleWithSelected = selected.some(
+        (s) =>
+          s.compatibility.includes(p.id) ||
+          p.compatibility.includes(s.id) ||
+          s.compatibility.some((c) => p.tags.includes(c) || p.id.includes(c)),
+      );
+
+      if (selected.length > 3 && !compatibleWithSelected && category !== 'rendering') {
+        return rand() > 0.6;
+      }
+      return true;
+    });
+
+    const count =
+      category === 'rendering' ? 3 : category === 'geometry' || category === 'construction' ? 2 : 1;
+
+    for (const rule of pickWeighted(pool, rand, count)) {
+      addRule(rule);
+    }
+  }
+
+  const renderingDefaults = ['render-flat-vector', 'render-no-shadows', 'render-timeless', 'color-no-gradient'];
+  for (const id of renderingDefaults) {
+    addRule(getPrincipleById(id));
+  }
+
+  const minimalism = input.minimalismLevel ?? 8;
+  if (minimalism >= 7) {
+    addRule(getPrincipleById('cx-minimal-complexity'));
+    addRule(getPrincipleById('cx-high-simplicity'));
+  }
+
+  const dna = buildLogoDNA(selected, input);
+  const recommendations = buildRecommendations(input.industry, selected);
+  const conflicts = getConflictingPrinciples(selected.map((p) => p.id));
+
+  return { principles: selected, dna, recommendations, conflicts };
+}
+
+function buildLogoDNA(principles: DesignRule[], input: RuleSelectionInput): LogoDNA {
+  const byCategory = (cat: DesignRule['category']) =>
+    principles.filter((p) => p.category === cat).map((p) => p.name);
+
+  const complexityRule = principles.find((p) => p.category === 'complexity');
+  const eraRule = principles.find((p) => p.category === 'era');
+
+  return {
+    geometry: byCategory('geometry'),
+    construction: byCategory('construction'),
+    balance: byCategory('balance'),
+    complexity:
+      complexityRule?.tags.includes('minimal') || complexityRule?.id.includes('minimal')
+        ? 'minimal'
+        : complexityRule?.id.includes('medium')
+          ? 'medium'
+          : 'minimal',
+    era: (eraRule?.era?.[0] ?? input.preferredEra ?? 'swiss') as Era,
+    typography: byCategory('typography'),
+    recognition: 7 + Math.min(principles.filter((p) => p.category === 'mark_type').length, 2),
+    minimalism: input.minimalismLevel ?? 8,
+    visualWeight: byCategory('balance').length ? byCategory('balance') : ['Optical Balance'],
+    harmony: principles.filter((p) => p.tags.includes('harmony')).map((p) => p.name),
+  };
+}
+
+function buildRecommendations(industry: string, selected: DesignRule[]): Recommendation[] {
+  const selectedIds = new Set(selected.map((p) => p.id));
+  const industryRules = resolveIndustryRules(industry);
+
+  const suggestions = searchPrinciples({ industry })
+    .filter((p) => !selectedIds.has(p.id))
+    .slice(0, 5);
+
+  if (suggestions.length === 0) {
+    const fallbacks = ['geo-circle', 'comp-negative-space', 'era-swiss', 'cx-minimal-complexity'];
+    for (const id of fallbacks) {
+      const rule = getPrincipleById(id);
+      if (rule && !selectedIds.has(id)) {
+        suggestions.push(rule);
+      }
+    }
+  }
+
+  return suggestions.map((p, i) => ({
+    principleId: p.id,
+    name: p.name,
+    reason: `Recommended for ${industry} based on ${industryRules[0]?.name ?? 'modernist'} principles`,
+    confidence: 0.95 - i * 0.08,
+  }));
+}
+
+export { INSPIRATION_MAP, CATEGORY_ORDER };

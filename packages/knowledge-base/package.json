@@ -1,0 +1,19 @@
+{
+  "name": "@logo-platform/knowledge-base",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc && cp -r src/data dist/data",
+    "dev": "tsc --watch",
+    "seed": "tsx src/scripts/generate-principles.ts"
+  },
+  "dependencies": {
+    "@logo-platform/shared": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

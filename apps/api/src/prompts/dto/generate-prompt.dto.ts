@@ -1,0 +1,49 @@
+import { IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+
+export class GeneratePromptDto {
+  @IsString()
+  industry!: string;
+
+  @IsOptional()
+  @IsString()
+  companyName?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  variationCount?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['swiss', 'bauhaus', 'ibm', 'nasa', 'lufthansa', 'braun', 'cbs', 'abc', 'olivetti', 'westinghouse'])
+  inspirationMode?: string;
+
+  @IsOptional()
+  @IsString()
+  preferredEra?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(10)
+  minimalismLevel?: number;
+}
+
+export class SearchPrinciplesDto {
+  @IsOptional()
+  @IsString()
+  query?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  industry?: string;
+
+  @IsOptional()
+  @IsString()
+  era?: string;
+}

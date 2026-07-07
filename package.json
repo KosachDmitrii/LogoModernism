@@ -1,0 +1,25 @@
+{
+  "name": "logo-platform",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AI Logo Design Platform — modernist design principles engine",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w @logo-platform/api\" \"wait-on http://localhost:3001/api/health -t 60000 && npm run dev -w @logo-platform/web\"",
+    "build": "npm run build -w @logo-platform/shared && npm run build -w @logo-platform/knowledge-base && npm run build -w @logo-platform/prompt-engine && npm run build -w @logo-platform/ai-engines && npm run build -w @logo-platform/image-generator && npm run build -w @logo-platform/api && npm run build -w @logo-platform/web",
+    "db:generate": "npm run db:generate -w @logo-platform/database",
+    "dev:api": "npm run dev -w @logo-platform/api",
+    "dev:web": "npm run dev -w @logo-platform/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3",
+    "wait-on": "^9.0.10"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
