@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { AppModule } from './app.module';
 
 config({ path: resolve(process.cwd(), '../../.env') });
+config({ path: resolve(process.cwd(), '../.env') });
 config({ path: resolve(process.cwd(), '.env') });
 
 async function bootstrap() {

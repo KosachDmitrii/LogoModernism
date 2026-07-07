@@ -28,6 +28,9 @@ export class ImagesController {
       throw new NotFoundException('Image not found');
     }
     res.setHeader('Cache-Control', 'public, max-age=86400');
+    if (filename.endsWith('.svg') || filename.endsWith('.svg+xml')) {
+      res.type('image/svg+xml');
+    }
     return res.sendFile(filePath);
   }
 
