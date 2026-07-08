@@ -6,8 +6,6 @@ import {
   Globe,
   Loader2,
   Database,
-  ThumbsUp,
-  ThumbsDown,
   RefreshCw,
   FileText,
   Check,
@@ -20,8 +18,6 @@ import {
   getBrainHealth,
   getBrainStats,
   getBrainTasteProfile,
-  ingestBrainFeedback,
-  listBrainExperiences,
   listBrainPrinciples,
   listBrainResearchCandidates,
   previewBrainResearch,
@@ -48,18 +44,12 @@ export function DesignBrainPage() {
     queryKey: ['brain-principles'],
     queryFn: () => listBrainPrinciples(20),
   });
-  const { data: experiences } = useQuery({
-    queryKey: ['brain-experiences'],
-    queryFn: () => listBrainExperiences(12),
-  });
   const { data: pendingResearch, refetch: refetchPending } = useQuery({
     queryKey: ['brain-research-pending'],
     queryFn: () => listBrainResearchCandidates('pending'),
   });
 
   const [pdfTitle, setPdfTitle] = useState('');
-  const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackScore, setFeedbackScore] = useState(8);
   const [researchQuery, setResearchQuery] = useState('');
   const [manualUrl, setManualUrl] = useState('');
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -81,7 +71,6 @@ export function DesignBrainPage() {
     lastInvalidatedRef.current = latestFinishedAt;
     queryClient.invalidateQueries({ queryKey: ['brain-stats'] });
     queryClient.invalidateQueries({ queryKey: ['brain-principles'] });
-    queryClient.invalidateQueries({ queryKey: ['brain-experiences'] });
   }, [latestFinishedAt, queryClient]);
 
   const handlePdfUpload = async (file: File) => {
@@ -97,20 +86,6 @@ export function DesignBrainPage() {
       setPdfError(error instanceof Error ? error.message : String(error));
     }
   };
-
-  const feedback = useMutation({
-    mutationFn: () =>
-      ingestBrainFeedback({
-        signalType: feedbackScore >= 7 ? 'LIKE' : 'DISLIKE',
-        score: feedbackScore,
-        context: feedbackText,
-      }),
-    onSuccess: () => {
-      setFeedbackText('');
-      queryClient.invalidateQueries({ queryKey: ['brain-taste'] });
-      queryClient.invalidateQueries({ queryKey: ['brain-stats'] });
-    },
-  });
 
   const consolidate = useMutation({
     mutationFn: consolidateBrain,
@@ -149,7 +124,6 @@ export function DesignBrainPage() {
       queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
       queryClient.invalidateQueries({ queryKey: ['brain-stats'] });
       queryClient.invalidateQueries({ queryKey: ['brain-principles'] });
-      queryClient.invalidateQueries({ queryKey: ['brain-experiences'] });
     },
   });
 
@@ -222,19 +196,33 @@ export function DesignBrainPage() {
             <StatCard label="Pending review" value={pendingResearch?.length ?? '—'} />
           </div>
 
-          {stats?.bySourceType && (
-            <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
-              <p className="text-xs font-medium text-zinc-400 mb-3">Knowledge by source</p>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                {Object.entries(stats.bySourceType).map(([source, count]) => (
-                  <div key={source} className="text-center p-2 rounded-lg bg-zinc-950/60">
-                    <p className="text-lg font-semibold text-zinc-200">{count}</p>
-                    <p className="text-[10px] text-zinc-500">{source}</p>
-                  </div>
-                ))}
+          {stats?.bySourceType && (() => {
+            const activeSources = Object.entries(stats.bySourceType).filter(([, count]) => count > 0);
+            if (activeSources.length === 0) return null;
+            const gridCols =
+              activeSources.length >= 5
+                ? 'sm:grid-cols-5'
+                : activeSources.length === 4
+                  ? 'sm:grid-cols-4'
+                  : activeSources.length === 3
+                    ? 'sm:grid-cols-3'
+                    : activeSources.length === 2
+                      ? 'sm:grid-cols-2'
+                      : 'sm:grid-cols-1';
+            return (
+              <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
+                <p className="text-xs font-medium text-zinc-400 mb-3">Knowledge by source</p>
+                <div className={`grid gap-2 grid-cols-2 ${gridCols}`}>
+                  {activeSources.map(([source, count]) => (
+                    <div key={source} className="text-center p-2 rounded-lg bg-zinc-950/60">
+                      <p className="text-lg font-semibold text-zinc-200">{count}</p>
+                      <p className="text-[10px] text-zinc-500">{source}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {taste && (
             <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
@@ -271,20 +259,6 @@ export function DesignBrainPage() {
                       )}
                     </div>
                     <span className="text-violet-400 shrink-0">w={p.weight.toFixed(1)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {experiences && experiences.length > 0 && (
-            <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
-              <p className="text-xs font-medium text-zinc-400 mb-3">Recent learning events</p>
-              <div className="space-y-2">
-                {experiences.slice(0, 6).map((exp) => (
-                  <div key={exp.id} className="flex items-center justify-between gap-3 text-xs">
-                    <span className="text-zinc-300 truncate">{exp.title ?? 'Untitled'}</span>
-                    <span className="text-zinc-600 shrink-0">{exp.sourceType}</span>
                   </div>
                 ))}
               </div>
@@ -343,44 +317,6 @@ export function DesignBrainPage() {
               </p>
             )}
             {pdfError && <p className="text-xs text-red-400 mt-2">{pdfError}</p>}
-          </IngestSection>
-
-          <IngestSection
-            title="Taste feedback"
-            description="Teach the brain what you like and dislike"
-            icon={ThumbsUp}
-          >
-            <textarea
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-              placeholder="e.g. Love minimal geometric wordmarks, hate gradients and 3D effects"
-              rows={3}
-              className="w-full mb-3 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-sm resize-none"
-            />
-            <div className="flex items-center gap-4 mb-3">
-              <label className="text-xs text-zinc-500">Score: {feedbackScore}</label>
-              <input
-                type="range"
-                min={1}
-                max={10}
-                value={feedbackScore}
-                onChange={(e) => setFeedbackScore(Number(e.target.value))}
-                className="flex-1 accent-violet-500"
-              />
-              {feedbackScore >= 7 ? (
-                <ThumbsUp size={16} className="text-emerald-400" />
-              ) : (
-                <ThumbsDown size={16} className="text-red-400" />
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => feedback.mutate()}
-              disabled={!feedbackText.trim() || feedback.isPending}
-              className="px-4 py-2 rounded-lg bg-violet-900/50 text-violet-200 text-sm hover:bg-violet-900 disabled:opacity-50"
-            >
-              {feedback.isPending ? 'Saving…' : 'Submit feedback'}
-            </button>
           </IngestSection>
         </div>
       )}
