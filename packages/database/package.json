@@ -6,16 +6,20 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:generate": "tsx scripts/prisma-cli.ts generate",
+    "db:push": "tsx scripts/prisma-cli.ts db push",
+    "db:migrate": "tsx scripts/prisma-cli.ts migrate dev",
+    "db:studio": "tsx scripts/prisma-cli.ts studio",
+    "db:brain-setup": "tsx scripts/brain-setup.ts",
+    "db:supabase-check": "tsx scripts/supabase-check.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.3.0"
+    "@prisma/client": "^6.3.0",
+    "dotenv": "^16.4.7"
   },
   "devDependencies": {
     "prisma": "^6.3.0",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
 }

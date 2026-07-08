@@ -1,0 +1,135 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> logo-platform@1.0.0 catalog:analyze
+> npm run analyze -w @logo-platform/catalog-importer -- 29 119 --force
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> @logo-platform/catalog-importer@1.0.0 analyze
+> tsx src/cli/analyze-pages.ts 29 119 --force
+
+Analyzing 91 pages with Vision...
+  page 29: 7 logos
+  page 30: 5 logos
+  page 31: 5 logos
+  page 32: 5 logos
+  page 33: 5 logos
+  page 34: 5 logos
+  page 35: 5 logos
+  page 36: 5 logos
+  page 37: 8 logos
+  page 38: 5 logos
+  page 39: 5 logos
+  page 40: 4 logos
+  page 41: 7 logos
+  page 42: 5 logos
+  page 43: 5 logos
+  page 44: 5 logos
+  page 45: 5 logos
+  page 46: 4 logos
+  page 47: 2 logos
+  page 48: 5 logos
+  page 49: 8 logos
+  page 50: 5 logos
+  page 51: 5 logos
+  page 52: 6 logos
+  page 53: 0 logos
+  page 54: 0 logos
+  page 55: 5 logos
+  page 56: 7 logos
+  page 57: 4 logos
+  page 58: 5 logos
+  page 59: 4 logos
+  page 60: 6 logos
+  page 61: 4 logos
+  page 62: 5 logos
+  page 63: 6 logos
+  page 64: 5 logos
+  page 65: 4 logos
+  page 66: 4 logos
+  page 67: 5 logos
+  page 68: 4 logos
+  page 69: 3 logos
+  page 70: 4 logos
+  page 71: 5 logos
+  page 72: 5 logos
+  page 73: 4 logos
+  page 74: 0 logos
+  page 75: 5 logos
+  page 76: 5 logos
+  page 77: 4 logos
+  page 78: 5 logos
+  page 79: 5 logos
+  page 80: 5 logos
+  page 81: 4 logos
+  page 82: 5 logos
+  page 83: 4 logos
+  page 84: 5 logos
+  page 85: 3 logos
+  page 86: 3 logos
+  page 87: 5 logos
+  page 88: 13 logos
+  page 89: 5 logos
+  page 90: 4 logos
+  page 91: 14 logos
+  page 92: 8 logos
+  page 93: 0 logos
+  page 94: 3 logos
+  page 95: 6 logos
+  page 96: 5 logos
+  page 97: 7 logos
+  page 98: 7 logos
+  page 99: 7 logos
+  page 100: 4 logos
+  page 101: 6 logos
+  page 102: 5 logos
+  page 103: 3 logos
+  page 104: 10 logos
+  page 105: 3 logos
+  page 106: 5 logos
+  page 107: 5 logos
+  page 108: 6 logos
+  page 109: 8 logos
+  page 110: 6 logos
+  page 111: 4 logos
+  page 112: 4 logos
+  page 113: 4 logos
+  page 114: 5 logos
+  page 115: 6 logos
+  page 116: 4 logos
+  page 117: 4 logos
+  page 118: 5 logos
+  page 119: 7 logos
+Done. Total candidates: 836 (+456 new)
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> logo-platform@1.0.0 catalog:extract-logos
+> npm run extract-logos -w @logo-platform/catalog-importer
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> @logo-platform/catalog-importer@1.0.0 extract-logos
+> tsx src/cli/extract-logos.ts
+
+Cropped 460 logos → /Users/dmitriikosach/LogoModernism/data/catalog-pipeline/logos (skipped 0, missing bbox 376)
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> logo-platform@1.0.0 catalog:upload-logos
+> npm run upload-logos -w @logo-platform/catalog-importer
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> @logo-platform/catalog-importer@1.0.0 upload-logos
+> tsx src/cli/upload-logos.ts
+
+Error: Supabase upload failed for cand-p29-1-light-publicity: Bucket not found
+    at uploadCatalogLogo (/Users/dmitriikosach/LogoModernism/packages/catalog-importer/src/supabase-storage.ts:44:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async main (/Users/dmitriikosach/LogoModernism/packages/catalog-importer/src/cli/upload-logos.ts:43:17)
+npm error Lifecycle script `upload-logos` failed with error:
+npm error code 1
+npm error path /Users/dmitriikosach/LogoModernism/packages/catalog-importer
+npm error workspace @logo-platform/catalog-importer@1.0.0
+npm error location /Users/dmitriikosach/LogoModernism/packages/catalog-importer
+npm error command failed
+npm error command sh -c tsx src/cli/upload-logos.ts

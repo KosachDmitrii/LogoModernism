@@ -1,4 +1,7 @@
 import { PrismaClient } from '@prisma/client';
+import { resolveDatabaseUrl } from './load-env';
+
+resolveDatabaseUrl();
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
@@ -12,5 +15,17 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
 }
 
-export { PrismaClient };
-export type { User, Organization, Project, Brand, BrandDNA, Logo, LogoVersion, PromptRun } from '@prisma/client';
+export { PrismaClient, Prisma } from '@prisma/client';
+export type {
+  User,
+  Organization,
+  Project,
+  Brand,
+  BrandDNA,
+  Logo,
+  LogoVersion,
+  PromptRun,
+  BrainExperience,
+  BrainTasteSignal,
+  LearnedPrinciple,
+} from '@prisma/client';

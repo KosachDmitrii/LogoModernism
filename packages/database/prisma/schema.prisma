@@ -140,14 +140,71 @@ model PromptRun {
 model DesignPrinciple {
   id             String   @id
   name           String
-  category       String
   description    String
+  category       String
   promptFragment String
   weight         Float    @default(1)
   tags           String[]
   compatibility  String[]
   antiPatterns   String[]
   syncedAt       DateTime @default(now())
+}
+
+model BrainExperience {
+  id         String          @id @default(cuid())
+  sourceType BrainSourceType
+  title      String?
+  content    String          @db.Text
+  summary    String?         @db.Text
+  metadata   Json            @default("{}")
+  filePath   String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  tasteSignals BrainTasteSignal[]
+}
+
+model BrainTasteSignal {
+  id           String          @id @default(cuid())
+  experienceId String?
+  signalType   TasteSignalType
+  score        Float
+  context      String?         @db.Text
+  metadata     Json            @default("{}")
+  createdAt    DateTime        @default(now())
+
+  experience BrainExperience? @relation(fields: [experienceId], references: [id], onDelete: SetNull)
+}
+
+model LearnedPrinciple {
+  id             String   @id @default(cuid())
+  category       String
+  ruleText       String   @db.Text
+  promptFragment String
+  weight         Float    @default(1.0)
+  confidence     Float    @default(0.5)
+  sourceIds      String[] @default([])
+  antiPatterns   String[] @default([])
+  tags           String[] @default([])
+  citations      Json     @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+enum BrainSourceType {
+  PDF
+  IMAGE
+  FEEDBACK
+  CATALOG
+  TEXT
+}
+
+enum TasteSignalType {
+  LIKE
+  DISLIKE
+  APPROVE
+  REJECT
+  RATING
 }
 
 enum Plan {

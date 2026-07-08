@@ -1,0 +1,35 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> logo-platform@1.0.0 catalog:analyze
+> npm run analyze -w @logo-platform/catalog-importer -- 29 119 --force
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> @logo-platform/catalog-importer@1.0.0 analyze
+> tsx src/cli/analyze-pages.ts 29 119 --force
+
+Analyzing 91 pages with Vision...
+  page 29: 7 logos
+  page 30: 5 logos
+  page 31: 5 logos
+  page 32: 5 logos
+  page 33: 5 logos
+  page 34: 5 logos
+  page 35: 6 logos
+  page 36: 3 logos
+  page 37: 7 logos
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> logo-platform@1.0.0 catalog:analyze
+> npm run analyze -w @logo-platform/catalog-importer -- 38 119
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> @logo-platform/catalog-importer@1.0.0 analyze
+> tsx src/cli/analyze-pages.ts 38 119
+
+Analyzing 3 pages with Vision...
+  page 53: 0 logos
+  page 54: 0 logos
+  page 74: 0 logos
+Done. Total candidates: 617 (+0 new)

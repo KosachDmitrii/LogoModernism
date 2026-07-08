@@ -88,6 +88,8 @@ export interface LogoReference {
   /** Original analytical summary (not book text) */
   significance?: string;
   bookPageHint?: string;
+  /** Public URL of cropped logo image (Supabase Storage) */
+  logoImageUrl?: string;
 }
 
 export interface CatalogTaxonomySection {
@@ -118,6 +120,14 @@ export interface CatalogSearchFilters {
 
 export type CatalogCandidateStatus = 'pending' | 'approved' | 'rejected';
 
+export interface CatalogCropBox {
+  /** Normalized 0–1000 coordinates relative to page image */
+  xmin: number;
+  ymin: number;
+  xmax: number;
+  ymax: number;
+}
+
 /** Raw + normalized entry from PDF/Vision import pipeline */
 export interface CatalogCandidate {
   id: string;
@@ -125,6 +135,11 @@ export interface CatalogCandidate {
   sourcePage: number;
   sourceIndex: number;
   pageImagePath?: string;
+  /** Cropped logo PNG relative to PIPELINE_DIR, e.g. logos/cand-p29-0-name.png */
+  logoImagePath?: string;
+  /** Public Supabase Storage URL for cropped logo */
+  logoImageUrl?: string;
+  cropBox?: CatalogCropBox;
   name: string;
   industry: string;
   designer?: string;
@@ -197,6 +212,9 @@ export interface ComposedPrompt {
     inspirationMode?: string;
     markType?: LogoMarkType;
     typographyStyle?: TypographyStyle;
+    brainPowered?: boolean;
+    reasoning?: string;
+    confidence?: number;
   };
 }
 
@@ -217,6 +235,10 @@ export interface PromptGenerationRequest {
   catalogReferenceIds?: string[];
   /** Optional narrative from Design Brief (e.g. catalog significance) */
   catalogNarrative?: string;
+  /** Design brief context from client */
+  briefContext?: import('./brain-types').BriefContext;
+  /** Use Design Brain reasoning instead of rule-based pipeline */
+  useBrain?: boolean;
 }
 
 export type InspirationMode =

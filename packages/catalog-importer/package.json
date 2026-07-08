@@ -8,12 +8,15 @@
     "build": "tsc",
     "extract:pages": "python3 ../../scripts/catalog-pipeline/extract_pages.py",
     "analyze": "tsx src/cli/analyze-pages.ts",
+    "extract-logos": "tsx src/cli/extract-logos.ts",
+    "upload-logos": "tsx src/cli/upload-logos.ts",
     "pipeline": "tsx src/cli/run-pipeline.ts",
     "import:approved": "tsx src/cli/import-approved.ts"
   },
   "dependencies": {
     "@logo-platform/knowledge-base": "*",
     "@logo-platform/shared": "*",
+    "@supabase/supabase-js": "^2.49.1",
     "dotenv": "^16.4.7"
   },
   "devDependencies": {

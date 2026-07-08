@@ -31,6 +31,7 @@ export function candidateToLogoReference(c: CatalogCandidate): LogoReference {
     markType: c.markType,
     significance: c.significance,
     bookPageHint: `Page ${c.sourcePage}`,
+    logoImageUrl: c.logoImageUrl,
   };
 }
 

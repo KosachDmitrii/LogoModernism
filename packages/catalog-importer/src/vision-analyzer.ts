@@ -8,6 +8,7 @@ import {
 import {
   chapterFromSection,
   inferPrincipleIds,
+  normalizeCropBox,
   normalizeEra,
   normalizeMarkType,
   normalizeSection,
@@ -50,8 +51,11 @@ Return ONLY a JSON array. Each object:
   "visual_complexity": "minimal|medium|high",
   "color_count": 1,
   "significance": "One sentence original analysis of the design approach",
-  "keywords": ["tag1", "tag2"]
+  "keywords": ["tag1", "tag2"],
+  "logo_bbox": { "xmin": 120, "ymin": 340, "xmax": 280, "ymax": 480 }
 }
+
+logo_bbox: tight bounding box around the LOGO GRAPHIC ONLY (not captions/text), coordinates 0-1000 relative to full page image width/height.
 
 Use only these principle IDs when relevant: ${PRINCIPLE_LIST.join(', ')}
 Skip blank pages, pure text essays, and designer profile portraits without a trademark.
@@ -133,6 +137,7 @@ function visionEntryToCandidate(
     sourcePage: page,
     sourceIndex: index,
     pageImagePath,
+    cropBox: normalizeCropBox(entry.logo_bbox),
     name: entry.name.trim(),
     industry: (entry.industry ?? 'general').toLowerCase().trim(),
     designer: entry.designer?.trim(),
