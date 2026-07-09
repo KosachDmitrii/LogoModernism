@@ -18,6 +18,7 @@ import {
   BrainPdfIngestCheckDto,
   BrainResearchPreviewDto,
   BrainResearchRunDto,
+  BrainBriefInterviewDto,
 } from './dto/brain.dto';
 
 type UploadedFile = {
@@ -133,5 +134,10 @@ export class DesignBrainController {
   @Post('ingest/feedback')
   ingestFeedback(@Body() body: BrainFeedbackDto) {
     return this.service.ingestFeedback(body);
+  }
+
+  @Post('brief/interview')
+  briefInterview(@Body() body: BrainBriefInterviewDto) {
+    return this.service.runBriefInterview(body);
   }
 }

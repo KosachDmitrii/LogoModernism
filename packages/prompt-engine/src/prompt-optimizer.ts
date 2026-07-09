@@ -1,4 +1,8 @@
 import type { DesignRule, StyleOverrideOptions } from '@logo-platform/shared';
+import {
+  sanitizeLiteralIndustryLanguage,
+  ensureModernistFormLanguage,
+} from '@logo-platform/shared';
 
 const CONTRADICTIONS: [RegExp, RegExp][] = [
   [/single color/i, /two.?color/i],
@@ -188,6 +192,8 @@ export function optimizePrompt(
 ): string {
   let { body, avoidItems } = splitPromptSections(text);
 
+  body = sanitizeLiteralIndustryLanguage(body);
+  body = ensureModernistFormLanguage(body);
   body = applyStyleOverrides(body, options);
   avoidItems = filterAvoidItemsForStyleOverrides(avoidItems, options);
   body = removeDuplicates(body);

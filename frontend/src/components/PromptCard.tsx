@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import type { ComposedPrompt } from '../types';
 import { ScoreBar } from './ScoreBar';
 import { BriefCoverageMap } from './brief/BriefCoverageMap';
+import { BrainExplainability } from './prompts/BrainExplainability';
 import { useAppStore, useIsGenerating, usePromptImages } from '../store';
 import { generatePromptLogo, submitPromptFeedback } from '../api';
 import { parseLogoMarkType, parseTypographyStyle } from '../lib/brief-mappers';
@@ -195,6 +196,7 @@ export function PromptCard({
               compact
             />
           )}
+          <BrainExplainability prompt={prompt} />
           <div className="flex flex-wrap gap-1.5 pt-2">
             {prompt.selectedPrinciples.slice(0, 8).map((p) => (
               <span

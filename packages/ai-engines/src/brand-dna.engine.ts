@@ -201,7 +201,10 @@ export function analyzeBrandDNA(input: BrandDNAInput): BrandDNAProfile {
       constraints[1] = 'Symbol and typography share the same geometric system, stroke weight, and curve language';
       constraints.push('Custom modified letterforms — not generic stock sans-serif');
       constraints.push('Playful yet professional brand character with strong silhouette');
-      constraints.push('Subtle abstract industry cues through form language — avoid literal clipart icons');
+      constraints.push(
+        'Industry hint through abstract form language — round focal geometry, quarter-circle arcs, radial construction, interlaced weave',
+      );
+      constraints.push('Never literal oven, flame, pizza slice, food clipart, or utensil icons');
       constraints.push('Avoid generic circular bracket templates and disconnected floating symbols');
     }
   }

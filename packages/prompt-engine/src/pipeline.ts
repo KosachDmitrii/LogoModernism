@@ -26,6 +26,7 @@ export function runPromptPipeline(request: PromptGenerationRequest): PipelineRes
     catalogNarrative: request.catalogNarrative,
     markType: request.markType,
     typographyStyle: request.typographyStyle,
+    colorPalette: request.briefContext?.colorPalette,
   };
 
   const baseSelection = selectDesignRules({

@@ -14,6 +14,7 @@ import type {
   ImageGenerationResponse,
   ImageProviderInfo,
   GeneratedImage,
+  BriefInterviewResponse,
   ComposedPrompt,
 } from './types';
 
@@ -222,6 +223,20 @@ export async function generateImageFromPrompt(body: {
     body: JSON.stringify(body),
   });
   if (!res.ok) await parseApiError(res, 'Image generation failed');
+  return res.json();
+}
+
+export async function runBriefInterview(body: {
+  industry: string;
+  companyName?: string;
+  briefContext?: BriefContextPayload;
+}): Promise<BriefInterviewResponse> {
+  const res = await fetch(`${API_BASE}/brain/brief/interview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) await parseApiError(res, 'Brief interview failed');
   return res.json();
 }
 

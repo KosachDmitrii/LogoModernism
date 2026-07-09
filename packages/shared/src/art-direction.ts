@@ -1,9 +1,12 @@
 import type { LogoMarkType } from './types';
+import type { ClientVisualIntent } from './client-visual-intent';
+import { buildAbstractIndustryFragment } from './industry-form-language';
 
 export interface ArtDirectionInput {
   markType?: LogoMarkType;
   industry?: string;
   personality?: string;
+  clientIntent?: Pick<ClientVisualIntent, 'abstractionLevel' | 'desiredMotifs' | 'forbiddenMotifs'>;
 }
 
 export interface StylePreferenceInput {
@@ -101,9 +104,7 @@ export function buildArtDirectionFragments(input: ArtDirectionInput): string[] {
   }
 
   if (input.industry?.trim()) {
-    fragments.push(
-      `Subtle abstract cues for ${input.industry.trim()} — suggest category through form language, not literal clipart icons`,
-    );
+    fragments.push(buildAbstractIndustryFragment(input.industry.trim(), input.clientIntent));
   }
 
   fragments.push(
@@ -128,7 +129,7 @@ export function buildImageArtDirectionSuffix(input: ArtDirectionInput): string {
     'Avoid literal clipart icons and disconnected floating symbols.';
 
   if (input.industry?.trim()) {
-    suffix += ` Subtle abstract ${input.industry.trim()} cues through form language only.`;
+    suffix += ` ${buildAbstractIndustryFragment(input.industry.trim(), input.clientIntent)}.`;
   }
 
   return suffix;

@@ -5,6 +5,9 @@ import {
   normalizeBrandName,
   preparePromptBodyForClientNotes,
   resolveMarkTypeForBrand,
+  sanitizeLiteralIndustryLanguage,
+  ensureModernistFormLanguage,
+  polishLogoPrompt,
 } from '@logo-platform/shared';
 import { searchPrinciples } from '@logo-platform/knowledge-base';
 import { composePrompt, selectDesignRules, significantTokens } from '@logo-platform/prompt-engine';
@@ -14,6 +17,7 @@ export interface EnrichmentContext {
   companyName?: string;
   markType?: string;
   typographyStyle?: string;
+  colorPalette?: string;
 }
 
 export function buildBasePromptFromRules(request: BrainGenerateRequest): ComposedPrompt {
@@ -30,6 +34,7 @@ export function buildBasePromptFromRules(request: BrainGenerateRequest): Compose
     catalogNarrative: request.catalogNarrative,
     markType: request.markType,
     typographyStyle: request.typographyStyle,
+    colorPalette: request.briefContext?.colorPalette,
     variationSeed: 42,
   });
 
@@ -152,12 +157,20 @@ export function mergeEnrichedPrompt(
 
   enriched = ensureIndustryPresent(enriched, context.industry);
 
+  enriched = ensureModernistFormLanguage(sanitizeLiteralIndustryLanguage(enriched));
+
   if (!brandName) {
     enriched = stripTextualMarkLanguage(enriched);
     enriched = ensureSymbolOnlyDirectives(enriched);
   }
 
-  return enriched.replace(/\.\s*\./g, '.').trim();
+  return polishLogoPrompt(enriched, {
+    companyName: context.companyName,
+    markType: context.markType as import('@logo-platform/shared').LogoMarkType,
+    colorPalette: context.colorPalette,
+  })
+    .replace(/\.\s*\./g, '.')
+    .trim();
 }
 
 export function sanitizeDecision(

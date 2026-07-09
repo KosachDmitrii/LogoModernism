@@ -114,4 +114,22 @@ export class DesignBrainApiService {
   ingestFeedback(input: BrainFeedbackInput) {
     return designBrain.ingestFeedback(input);
   }
+
+  runBriefInterview(body: {
+    industry: string;
+    companyName?: string;
+    markType?: 'wordmark' | 'lettermark' | 'combination';
+    briefContext?: import('@logo-platform/shared').BriefContext;
+  }) {
+    const trimmed = body.industry?.trim();
+    if (!trimmed) {
+      throw new BadRequestException('industry is required');
+    }
+    return designBrain.interviewBrief({
+      industry: trimmed,
+      companyName: body.companyName?.trim(),
+      markType: body.markType,
+      briefContext: body.briefContext,
+    });
+  }
 }

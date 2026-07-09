@@ -87,6 +87,27 @@ export interface LearnedPrincipleRecord {
   updatedAt: string;
 }
 
+export interface BriefInterviewQuestion {
+  id: string;
+  prompt: string;
+  why: string;
+  field: keyof BriefContext | 'clientNotes';
+  options?: string[];
+}
+
+export interface BriefInterviewRequest {
+  industry: string;
+  companyName?: string;
+  briefContext?: BriefContext;
+}
+
+export interface BriefInterviewResponse {
+  questions: BriefInterviewQuestion[];
+  readinessScore: number;
+  summary: string;
+  clientIntent: import('./client-visual-intent').ClientVisualIntent;
+}
+
 export interface BriefContext {
   personality?: string;
   primaryEmotion?: string;

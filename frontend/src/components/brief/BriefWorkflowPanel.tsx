@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { useAppStore } from '../../store';
 import { getBriefReadiness } from '../../lib/brief-readiness';
 import { DesignBriefPanel } from '../DesignBriefPanel';
+import { BriefInterviewPanel } from './BriefInterviewPanel';
 import { BriefBuildPanel } from './BriefBuildPanel';
 import { BriefCoverageMap } from './BriefCoverageMap';
 import { BriefChecklist } from './BriefChecklist';
@@ -96,6 +97,8 @@ export function BriefWorkflowPanel({ onCompose, onBack, isComposing, canCompose 
           </div>
 
           <DesignBriefPanel />
+
+          <BriefInterviewPanel />
 
           <BriefCoverageMap designBrief={designBrief} />
 

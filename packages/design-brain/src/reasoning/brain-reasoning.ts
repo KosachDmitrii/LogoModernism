@@ -1,4 +1,5 @@
 import type { BriefContext, DesignDecision, DesignRule, TasteProfile } from '@logo-platform/shared';
+import type { ClientVisualIntent, DesignStrategy } from '@logo-platform/shared';
 import { buildCatalogPromptContext } from '@logo-platform/knowledge-base';
 import {
   exactBrandSpellingFragment,
@@ -29,6 +30,8 @@ export interface ReasoningContext {
   /** Rules-engine base prompt — Brain must enrich, not replace */
   basePromptText?: string;
   basePrinciples?: DesignRule[];
+  designStrategy?: DesignStrategy;
+  clientIntent?: ClientVisualIntent;
 }
 
 const SYSTEM_PROMPT = `You are the Brain — a self-learning logo design knowledge system.
@@ -56,12 +59,19 @@ Return ONLY JSON:
 
 Enrichment rules:
 - The BASE PROMPT is the foundation — keep every substantive directive from it
-- ADD industry-specific visual language (concrete symbols, forms, metaphors — not just the industry name)
+- ADD industry context ONLY through abstract form language — geometry, construction, silhouette, negative space
+- Translate industry into form vocabulary: round focal geometry, quarter-circle arcs, radial construction, interlaced weave, warm balanced silhouette
+- NEVER use literal industry objects in promptText unless client explicitly requests recognizable abstraction
+- Translate industry into form vocabulary appropriate to abstraction level from DESIGN STRATEGY
+- Only put client EXPLICIT prohibitions in antiPatterns — do not invent industry-specific negatives
 - ADD insights from retrieved experience, learned principles, and catalog references
 - promptText must be AT LEAST as long and detailed as the base prompt
 - NEVER replace the base prompt with a short generic template
+- For food, restaurant, retail, or hospitality brands: include International Typographic Style and Bauhaus geometric system language
 - Respect brief constraints and taste profile avoided patterns
-- If CLIENT NOTES are provided, use them for enrichment only — do NOT paste them verbatim in promptText (they are injected automatically as a Client preferences prefix)
+- If CLIENT NOTES are provided, use them for enrichment only — do NOT paste them verbatim in promptText and do NOT duplicate a Client preferences block (notes are appended automatically at the end)
+- Do NOT append long geometry laundry lists (circles, squares, triangles, hexagons, blobs together) — keep at most three geometry anchors: round focal geometry, quarter-circle arcs, interlaced weave
+- Do NOT add numeric digit marks, capsule pill forms, or primary color palettes when the brief implies monochrome or flat vector black-on-white
 - Use catalog references as inspiration, not copies
 - Prefer minimal, timeless, Swiss/modernist aesthetic
 - promptText must be ready for an image model
@@ -109,6 +119,34 @@ export async function reasonDesignDecision(context: ReasoningContext): Promise<D
     'Brief:',
     formatBrief(context.briefContext),
     '',
+    context.designStrategy
+      ? [
+          'DESIGN STRATEGY (follow this architecture):',
+          `Mark: ${context.designStrategy.markArchitecture}`,
+          `Symbol: ${context.designStrategy.symbolLogic}`,
+          `Typography: ${context.designStrategy.typographyLogic}`,
+          `Construction: ${context.designStrategy.constructionSystem}`,
+          `Color: ${context.designStrategy.colorSystem}`,
+          context.designStrategy.industryDirection,
+          context.designStrategy.avoidFragments.length
+            ? `Client forbids: ${context.designStrategy.avoidFragments.join(', ')}`
+            : '',
+          '',
+        ].join('\n')
+      : '',
+    context.clientIntent
+      ? [
+          'CLIENT VISUAL INTENT:',
+          `Abstraction: ${context.clientIntent.abstractionLevel}`,
+          context.clientIntent.desiredMotifs.length
+            ? `Desired motifs: ${context.clientIntent.desiredMotifs.join(', ')}`
+            : 'Desired motifs: infer from industry at appropriate abstraction',
+          context.clientIntent.forbiddenMotifs.length
+            ? `Forbidden: ${context.clientIntent.forbiddenMotifs.join(', ')}`
+            : 'Forbidden: none explicit — use modernist defaults only',
+          '',
+        ].join('\n')
+      : '',
     'Catalog inspiration:',
     catalog?.inspirationFragments.join('\n') || 'None selected',
     '',
@@ -176,6 +214,7 @@ function toEnrichmentContext(context: ReasoningContext): EnrichmentContext {
     companyName: context.companyName,
     markType: context.markType,
     typographyStyle: context.typographyStyle,
+    colorPalette: context.briefContext?.colorPalette,
   };
 }
 

@@ -21,4 +21,5 @@ export { getTrustedDomains } from './research/web-search';
 export { expandResearchQueries } from './research/query-expander';
 export { runBrainPromptPipeline, type BrainPipelineResult } from './reasoning/brain-prompt-pipeline';
 export { reasonDesignDecision } from './reasoning/brain-reasoning';
+export { runBriefInterview, buildBrainArchitecture } from './reasoning/brain-architecture';
 export { generateWithCritiqueLoop, storeGenerationExperience } from './generation/critique-loop';

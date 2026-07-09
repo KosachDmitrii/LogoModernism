@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   BrainExperienceRecord,
   BrainGenerateRequest,
+  BrainArchitecture,
   ComposedPrompt,
   DesignDecision,
   DesignRule,
@@ -14,7 +15,8 @@ import {
   appendArtDirectionFragments,
   appendStylePreferenceFragments,
   stylePreferenceOverrides,
-  prependClientNotes,
+  finalizeLogoPromptText,
+  buildClientAvoidFragments,
 } from '@logo-platform/shared';
 import { getPrincipleById, designPrinciples } from '@logo-platform/knowledge-base';
 import { appendAntiPatterns, optimizePrompt, scorePrompt } from '@logo-platform/prompt-engine';
@@ -28,6 +30,7 @@ import {
   buildVariationPrompt,
   mergePrincipleSets,
 } from './prompt-enrichment';
+import { buildBrainArchitecture, solveConstraints } from './brain-architecture';
 
 export interface BrainPipelineResult {
   prompts: ComposedPrompt[];
@@ -36,6 +39,7 @@ export interface BrainPipelineResult {
   decision: DesignDecision;
   retrievedExperiences: BrainExperienceRecord[];
   tasteProfile: TasteProfile;
+  brainArchitecture: BrainArchitecture;
   brainPowered: true;
 }
 
@@ -137,20 +141,28 @@ function decisionToComposedPrompt(
   decision: DesignDecision,
   request: BrainGenerateRequest,
   basePrompt: ComposedPrompt,
+  architecture: BrainArchitecture,
   variationIndex?: number,
 ): ComposedPrompt {
   const brainRules = decisionToRules(decision, request);
   const principles = mergePrincipleSets(basePrompt.selectedPrinciples, brainRules);
   const dna = decisionToDna(decision, request, basePrompt.dna);
 
-  const text = appendAntiPatterns(decision.promptText, decision.antiPatterns);
+  const clientAvoid = buildClientAvoidFragments(architecture.designStrategy.avoidFragments);
+  const text = appendAntiPatterns(decision.promptText, clientAvoid);
   const styled = appendStylePreferenceFragments(text, request.briefContext);
   const directed = appendArtDirectionFragments(styled, {
     markType: decision.markType,
     industry: request.industry,
+    clientIntent: architecture.clientIntent,
   });
   const optimized = optimizePrompt(directed, principles, stylePreferenceOverrides(request.briefContext));
-  const finalText = prependClientNotes(optimized, request.briefContext?.clientNotes);
+  const finalText = finalizeLogoPromptText(optimized, {
+    clientNotes: request.briefContext?.clientNotes,
+    companyName: request.companyName,
+    markType: decision.markType,
+    colorPalette: request.briefContext?.colorPalette,
+  });
   const scores = scorePrompt(finalText, principles, dna);
 
   return {
@@ -179,6 +191,7 @@ function decisionToComposedPrompt(
             clientNotes: request.briefContext.clientNotes,
           }
         : undefined,
+      brainArchitecture: architecture,
     },
   };
 }
@@ -208,6 +221,8 @@ export async function runBrainPromptPipeline(
     computeTasteProfile(prisma),
   ]);
 
+  const architecture = await buildBrainArchitecture(prisma, request, searchResult.results);
+
   const decision = await reasonDesignDecision({
     industry: request.industry,
     companyName: request.companyName,
@@ -228,16 +243,20 @@ export async function runBrainPromptPipeline(
     minimalismLevel: request.minimalismLevel,
     basePromptText: basePrompt.text,
     basePrinciples: basePrompt.selectedPrinciples,
+    designStrategy: architecture.designStrategy,
+    clientIntent: architecture.clientIntent,
   });
+
+  const constrainedDecision = solveConstraints(decision, architecture.designStrategy);
 
   const prompts: ComposedPrompt[] = [];
   for (let i = 0; i < variationCount; i++) {
     const variantDecision: DesignDecision = {
-      ...decision,
-      promptText: buildVariationPrompt(decision.promptText, decision.geometry, i),
-      confidence: Math.max(0.3, decision.confidence - i * 0.03),
+      ...constrainedDecision,
+      promptText: buildVariationPrompt(constrainedDecision.promptText, constrainedDecision.geometry, i),
+      confidence: Math.max(0.3, constrainedDecision.confidence - i * 0.03),
     };
-    prompts.push(decisionToComposedPrompt(variantDecision, request, basePrompt, i + 1));
+    prompts.push(decisionToComposedPrompt(variantDecision, request, basePrompt, architecture, i + 1));
   }
 
   prompts.sort((a, b) => b.scores.promptQuality - a.scores.promptQuality);
@@ -246,9 +265,10 @@ export async function runBrainPromptPipeline(
     prompts: prompts.slice(0, variationCount),
     bestPrompt: prompts[0]!,
     recommendations: buildRecommendations(learned),
-    decision,
+    decision: constrainedDecision,
     retrievedExperiences: searchResult.results,
     tasteProfile,
+    brainArchitecture: architecture,
     brainPowered: true,
   };
 }

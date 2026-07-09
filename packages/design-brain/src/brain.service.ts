@@ -39,6 +39,7 @@ import {
   runWebResearch,
 } from './research/research.service';
 import { runBrainPromptPipeline, type BrainPipelineResult } from './reasoning/brain-prompt-pipeline';
+import { runBriefInterview } from './reasoning/brain-architecture';
 import { generateWithCritiqueLoop } from './generation/critique-loop';
 
 export class DesignBrainService {
@@ -148,6 +149,16 @@ export class DesignBrainService {
   async generate(request: BrainGenerateRequest): Promise<BrainPipelineResult> {
     const client = await this.getClient();
     return runBrainPromptPipeline(client, request);
+  }
+
+  async interviewBrief(input: {
+    industry: string;
+    companyName?: string;
+    markType?: string;
+    briefContext?: BrainGenerateRequest['briefContext'];
+  }) {
+    const client = await this.getClient();
+    return runBriefInterview(client, input);
   }
 
   async generateWithCritique(request: BrainCritiqueGenerateRequest): Promise<BrainCritiqueGenerateResult> {

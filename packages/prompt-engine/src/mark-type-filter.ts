@@ -34,6 +34,13 @@ const SYMBOL_ONLY_BLOCKED_IDS = new Set([
 const SYMBOL_ONLY_FRAGMENT =
   /\b(lettermark|wordmark|monogram|bold initials|standalone initial|custom wordmark|typographic logotype)\b/i;
 
+const TEXTUAL_BRAND_MARK_TYPES = new Set<LogoMarkType>(['wordmark', 'lettermark', 'combination']);
+
+const BLOCKED_FOR_TEXTUAL_BRAND = new Set([
+  'mar-extra-numeric',
+  'geo-extra-capsule',
+]);
+
 const BLOCKED_IDS: Record<LogoMarkType, Set<string>> = {
   wordmark: new Set([
     'mark-symbol-only',
@@ -113,6 +120,15 @@ export function isPrincipleAllowedForMarkType(
   }
 
   if (BLOCKED_IDS[markType].has(rule.id)) {
+    return false;
+  }
+
+  if (
+    markType &&
+    TEXTUAL_BRAND_MARK_TYPES.has(markType) &&
+    hasExplicitBrandName(options?.companyName) &&
+    BLOCKED_FOR_TEXTUAL_BRAND.has(rule.id)
+  ) {
     return false;
   }
 

@@ -50,7 +50,71 @@ export interface ComposedPrompt {
     typographyStyle?: 'standard' | 'constructed';
     briefCoverage?: BriefFieldCoverage[];
     stylePreferences?: BriefContextPayload;
+    brainPowered?: boolean;
+    reasoning?: string;
+    confidence?: number;
+    brainArchitecture?: BrainArchitecture;
   };
+}
+
+export interface ClientVisualIntent {
+  businessEssence: string;
+  industryDomain: string;
+  desiredMotifs: string[];
+  forbiddenMotifs: string[];
+  abstractionLevel: 'abstract' | 'stylized' | 'recognizable';
+  personality: string[];
+  visualTone: string[];
+  explicitRequests: string[];
+  confidence: number;
+  source: string;
+}
+
+export interface DesignStrategy {
+  markArchitecture: string;
+  symbolLogic: string;
+  typographyLogic: string;
+  colorSystem: string;
+  constructionSystem: string;
+  suggestFragments: string[];
+  avoidFragments: string[];
+  industryDirection: string;
+  reasoning: string;
+  confidence: number;
+}
+
+export interface BrainArchitecture {
+  clientIntent: ClientVisualIntent;
+  designStrategy: DesignStrategy;
+  agentContributions: Array<{
+    role: string;
+    summary: string;
+    fragments: string[];
+  }>;
+  interviewQuestions: BriefInterviewQuestion[];
+  visualReferences: Array<{
+    id: string;
+    title?: string | null;
+    summary?: string | null;
+    similarity?: number;
+    imageUrl?: string;
+  }>;
+  projectMemorySummary?: string;
+}
+
+export interface BriefInterviewQuestion {
+  id: string;
+  prompt: string;
+  why: string;
+  field: string;
+  options?: string[];
+}
+
+export interface BriefInterviewResponse {
+  questions: BriefInterviewQuestion[];
+  readinessScore: number;
+  summary: string;
+  clientIntent: ClientVisualIntent;
 }
 
 export interface BriefFieldCoverage {

@@ -224,6 +224,7 @@ export interface ComposedPrompt {
     basePromptLength?: number;
     enrichedPromptLength?: number;
     stylePreferences?: import('./brain-types').BriefContext;
+    brainArchitecture?: import('./brain-architecture').BrainArchitecture;
   };
 }
 

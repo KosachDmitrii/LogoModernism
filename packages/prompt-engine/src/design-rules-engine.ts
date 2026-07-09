@@ -65,6 +65,7 @@ export interface RuleSelectionInput {
   catalogNarrative?: string;
   markType?: LogoMarkType;
   typographyStyle?: TypographyStyle;
+  colorPalette?: string;
 }
 
 export interface RuleSelectionResult {
@@ -73,6 +74,27 @@ export interface RuleSelectionResult {
   recommendations: Recommendation[];
   conflicts: string[][];
   catalogInspiration?: string[];
+}
+
+const MONOCHROME_PALETTES = new Set(['black_white', 'monochrome']);
+
+const BLOCKED_WHEN_MONOCHROME = new Set([
+  'col-extra-teal',
+  'fx-perspective',
+]);
+
+const ACCENT_COLOR_FRAGMENT = /\b(?:teal accent|corporate blue|red accent|warm palette|multi-?color|two-?color)\b/i;
+
+function isMonochromePalette(colorPalette?: string): boolean {
+  return Boolean(colorPalette && MONOCHROME_PALETTES.has(colorPalette));
+}
+
+function isBlockedForPalette(rule: DesignRule, colorPalette?: string): boolean {
+  if (!isMonochromePalette(colorPalette)) return false;
+  if (BLOCKED_WHEN_MONOCHROME.has(rule.id)) return true;
+  if (rule.category === 'color' && ACCENT_COLOR_FRAGMENT.test(rule.promptFragment)) return true;
+  if (rule.category === 'effects' && /perspective|pseudo/i.test(rule.promptFragment)) return true;
+  return false;
 }
 
 function seededRandom(seed: number): () => number {
@@ -149,6 +171,7 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
 
   const addRule = (rule: DesignRule | undefined) => {
     if (!rule || selectedIds.has(rule.id)) return;
+    if (isBlockedForPalette(rule, input.colorPalette)) return;
     if (!isPrincipleAllowedForMarkType(rule, markType, markFilterOptions)) return;
     const conflicts = getConflictingPrinciples([...selectedIds, rule.id]);
     if (conflicts.length > 0) return;
@@ -217,6 +240,7 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
     const pool = CURATED_PRINCIPLES.filter((p) => {
       if (p.category !== category) return false;
       if (selectedIds.has(p.id)) return false;
+      if (isBlockedForPalette(p, input.colorPalette)) return false;
 
       const compatibleWithSelected = selected.some(
         (s) =>
@@ -236,7 +260,9 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
       : category === 'rendering'
         ? 3
         : category === 'geometry' || category === 'construction'
-          ? 2
+          ? (input.minimalismLevel ?? 8) >= 8
+            ? 1
+            : 2
           : 1;
 
     for (const rule of pickWeighted(pool, rand, count)) {

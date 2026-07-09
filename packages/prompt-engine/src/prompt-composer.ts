@@ -13,7 +13,7 @@ import {
   buildArtDirectionFragments,
   isCombinationMark,
   stylePreferenceOverrides,
-  prependClientNotes,
+  finalizeLogoPromptText,
 } from '@logo-platform/shared';
 import { CATEGORY_ORDER } from './design-rules-engine';
 import { scorePrompt } from './prompt-scorer';
@@ -248,7 +248,12 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     input.briefContext,
   );
   const optimized = optimizePrompt(rawText, principles, stylePreferenceOverrides(input.briefContext));
-  const text = prependClientNotes(optimized, input.briefContext?.clientNotes);
+  const text = finalizeLogoPromptText(optimized, {
+    clientNotes: input.briefContext?.clientNotes,
+    companyName: brandName,
+    markType,
+    colorPalette: input.briefContext?.colorPalette,
+  });
   const scores = scorePrompt(text, principles, input.dna);
 
   return {

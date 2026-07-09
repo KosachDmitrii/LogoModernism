@@ -11,6 +11,9 @@ import {
   isCombinationMark,
   isDetailedLogoPrompt,
   stylePreferenceOverrides,
+  sanitizeLiteralIndustryLanguage,
+  ensureModernistFormLanguage,
+  polishLogoPrompt,
 } from '@logo-platform/shared';
 
 const ICON_SUFFIX =
@@ -28,6 +31,9 @@ const CONSTRUCTED_SUFFIX =
   'bold black letterforms on light background, letters are the entire logo, ' +
   'not an off-the-shelf font, no separate icon, no roundel, no emblem, no pictorial symbol, ' +
   'flat vector, clean white background, no gradients, no shadows, no photorealism, centered composition.';
+
+const ANTI_LITERAL_SUFFIX =
+  ' Industry cues through abstract form language only — no literal clipart, stock icons, or photoreal objects.';
 
 const WORDMARK_SUFFIX =
   ' Professional typographic wordmark logo, letters spelling the brand name are the entire logo, ' +
@@ -117,13 +123,13 @@ function renderSuffixForPrompt(
 
   if (detailed) {
     if (isCombinationMark(markType)) {
-      return `${compactSuffix}${buildImageArtDirectionSuffix({ markType })}`;
+      return `${compactSuffix}${buildImageArtDirectionSuffix({ markType })}${ANTI_LITERAL_SUFFIX}`;
     }
     return compactSuffix;
   }
 
   if (isCombinationMark(markType)) {
-    return `${compactSuffix}${buildImageArtDirectionSuffix({ markType })}`;
+    return `${compactSuffix}${buildImageArtDirectionSuffix({ markType })}${ANTI_LITERAL_SUFFIX}`;
   }
 
   return compactSuffix;
@@ -150,7 +156,7 @@ function applyImageStyleOverrides(text: string, request: ImageGenerationRequest)
 }
 
 export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
-  const base = request.prompt.trim();
+  const base = sanitizeLiteralIndustryLanguage(request.prompt.trim());
   const brandName = normalizeBrandName(request.companyName);
   const company = brandName ? ` for "${brandName}"` : '';
   const detectedMarkType = detectMarkType(request);
@@ -200,11 +206,22 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
   const suffix = renderSuffixForPrompt(base, markType, detailed, request);
 
   if (base.toLowerCase().includes('logo')) {
-    return applyImageStyleOverrides(withExactSpelling(`${base}${company}. ${suffix}`, brandName, markType), request);
+    return applyImageStyleOverrides(
+      polishLogoPrompt(
+        ensureModernistFormLanguage(withExactSpelling(`${base}${company}. ${suffix}`, brandName, markType)),
+        { companyName: brandName, markType, colorPalette: request.colorPalette, maxLength: 3600 },
+      ),
+      request,
+    );
   }
 
   return applyImageStyleOverrides(
-    withExactSpelling(`Minimal geometric logo${company}: ${base}. ${suffix}`, brandName, markType),
+    polishLogoPrompt(
+      ensureModernistFormLanguage(
+        withExactSpelling(`Minimal geometric logo${company}: ${base}. ${suffix}`, brandName, markType),
+      ),
+      { companyName: brandName, markType, colorPalette: request.colorPalette, maxLength: 3600 },
+    ),
     request,
   );
 }

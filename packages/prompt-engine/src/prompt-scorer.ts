@@ -1,5 +1,11 @@
 import type { DesignRule, LogoDNA, PromptScores } from '@logo-platform/shared';
-import { scoreCharacter, scoreCohesion, scoreIdentity } from '@logo-platform/shared';
+import {
+  scoreCharacter,
+  scoreCohesion,
+  scoreIdentity,
+  countLiteralIndustryTerms,
+  countAbstractFormTerms,
+} from '@logo-platform/shared';
 
 export function scorePrompt(text: string, principles: DesignRule[], dna: LogoDNA): PromptScores {
   const lower = text.toLowerCase();
@@ -54,6 +60,9 @@ export function scorePrompt(text: string, principles: DesignRule[], dna: LogoDNA
   const characterBoost = scoreCharacter(lower);
   const adjustedBrandRecognition = clamp((brandRecognitionScore + characterBoost) / 2);
 
+  const literalPenalty = countLiteralIndustryTerms(lower) * 1.2;
+  const abstractBoost = Math.min(3, countAbstractFormTerms(lower) * 0.6);
+
   const promptQuality = clamp(
     (modernismScore +
       swissScore +
@@ -63,7 +72,9 @@ export function scorePrompt(text: string, principles: DesignRule[], dna: LogoDNA
       scalabilityScore +
       adjustedBrandRecognition +
       cohesionScore +
-      identityScore) /
+      identityScore +
+      abstractBoost -
+      literalPenalty) /
       9,
   );
 

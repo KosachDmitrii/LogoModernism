@@ -125,3 +125,19 @@ export class BrainResearchRejectDto {
   @IsString()
   reason?: string;
 }
+
+export class BrainBriefInterviewDto {
+  @IsString()
+  industry!: string;
+
+  @IsOptional()
+  @IsString()
+  companyName?: string;
+
+  @IsOptional()
+  @IsIn(['wordmark', 'lettermark', 'combination'])
+  markType?: 'wordmark' | 'lettermark' | 'combination';
+
+  @IsOptional()
+  briefContext?: BriefContextDto;
+}
