@@ -211,6 +211,8 @@ export interface ComposedPrompt {
   scores: PromptScores;
   dna: LogoDNA;
   logos?: import('./image-types').GeneratedImage[];
+  saved?: boolean;
+  /** @deprecated use saved + logo feedback */
   feedback?: 'LIKE' | 'DISLIKE';
   metadata: {
     era: Era;

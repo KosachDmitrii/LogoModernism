@@ -24,3 +24,5 @@ ALTER TABLE "ComposedPromptRecord"
   FOREIGN KEY ("promptRunId") REFERENCES "PromptRun"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE "ComposedPromptRecord" ADD COLUMN IF NOT EXISTS "feedback" TEXT;
+ALTER TABLE "ComposedPromptRecord" ADD COLUMN IF NOT EXISTS "saved" BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS "ComposedPromptRecord_saved_idx" ON "ComposedPromptRecord"("saved");

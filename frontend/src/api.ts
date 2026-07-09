@@ -14,6 +14,7 @@ import type {
   ImageGenerationResponse,
   ImageProviderInfo,
   GeneratedImage,
+  LogoFeedback,
   BriefInterviewResponse,
   ComposedPrompt,
 } from './types';
@@ -176,15 +177,48 @@ export async function getImageProviders(): Promise<{ providers: ImageProviderInf
   return res.json();
 }
 
-export async function listSavedPrompts(
-  filter: 'all' | 'like' | 'dislike' = 'all',
-): Promise<{ prompts: ComposedPrompt[]; total: number }> {
-  const qs = filter !== 'all' ? `?filter=${encodeURIComponent(filter)}` : '';
-  const res = await fetch(`${API_BASE}/prompts/saved${qs}`);
+export async function listSavedPrompts(): Promise<{ prompts: ComposedPrompt[]; total: number }> {
+  const res = await fetch(`${API_BASE}/prompts/saved`);
   if (!res.ok) await parseApiError(res, 'Failed to load saved prompts');
   return res.json();
 }
 
+export async function togglePromptSave(
+  promptId: string,
+  saved: boolean,
+): Promise<{ promptId: string; saved: boolean }> {
+  const res = await fetch(`${API_BASE}/prompts/${encodeURIComponent(promptId)}/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ saved }),
+  });
+  if (!res.ok) await parseApiError(res, 'Save failed');
+  return res.json();
+}
+
+export async function submitLogoFeedback(
+  promptId: string,
+  logoId: string,
+  body: {
+    score: number;
+    emoji: string;
+    workedTags?: string[];
+    missedTags?: string[];
+  },
+): Promise<{ promptId: string; logoId: string; feedback?: LogoFeedback; logos: GeneratedImage[] }> {
+  const res = await fetch(
+    `${API_BASE}/prompts/${encodeURIComponent(promptId)}/logos/${encodeURIComponent(logoId)}/feedback`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) await parseApiError(res, 'Logo feedback failed');
+  return res.json();
+}
+
+/** @deprecated use togglePromptSave */
 export async function submitPromptFeedback(
   promptId: string,
   signalType: 'LIKE' | 'DISLIKE',

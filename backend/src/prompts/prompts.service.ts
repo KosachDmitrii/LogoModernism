@@ -57,6 +57,115 @@ export class PromptsService {
     return { result, promptsWithLogos };
   }
 
+  async togglePromptSave(promptId: string, saved: boolean) {
+    if (!process.env.DATABASE_URL) {
+      throw new BadRequestException('DATABASE_URL is required to save prompts');
+    }
+
+    const record = await this.promptRecords.getById(promptId);
+    const updated = await this.promptRecords.setSaved(promptId, saved);
+
+    if (saved) {
+      try {
+        await designBrain.ingestFeedback({
+          signalType: 'APPROVE',
+          score: 7,
+          context: [
+            'Prompt saved to favorites',
+            record.companyName ? `Company: ${record.companyName}` : '',
+            `Industry: ${record.industry}`,
+            `Prompt quality: ${(record.scores as { promptQuality?: number })?.promptQuality ?? 'unknown'}`,
+            `Prompt: ${record.text.slice(0, 600)}`,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          metadata: {
+            kind: 'prompt_saved',
+            promptId,
+            companyName: record.companyName,
+            industry: record.industry,
+          },
+        });
+      } catch (error) {
+        console.warn('Brain ingest failed for prompt save', promptId, error);
+      }
+    }
+
+    return { promptId, saved: updated.saved ?? saved };
+  }
+
+  async submitLogoFeedback(
+    promptId: string,
+    logoId: string,
+    body: {
+      score: number;
+      emoji: string;
+      workedTags?: string[];
+      missedTags?: string[];
+    },
+  ) {
+    if (!process.env.DATABASE_URL) {
+      throw new BadRequestException('DATABASE_URL is required to store logo feedback');
+    }
+
+    const record = await this.promptRecords.getById(promptId);
+    const logo = record.logos.find((item) => item.id === logoId);
+    if (!logo) {
+      throw new BadRequestException(`Logo not found: ${logoId}`);
+    }
+
+    const feedback = {
+      score: body.score,
+      emoji: body.emoji,
+      workedTags: body.workedTags,
+      missedTags: body.missedTags,
+      submittedAt: new Date().toISOString(),
+    };
+
+    const updated = await this.promptRecords.setLogoFeedback(promptId, logoId, feedback);
+
+    try {
+      await designBrain.ingestFeedback({
+        signalType: 'RATING',
+        score: body.score,
+        context: [
+          `Logo rating: ${body.score}/10 (${body.emoji})`,
+          record.companyName ? `Company: ${record.companyName}` : '',
+          `Industry: ${record.industry}`,
+          body.workedTags?.length ? `Worked: ${body.workedTags.join(', ')}` : '',
+          body.missedTags?.length ? `Missed: ${body.missedTags.join(', ')}` : '',
+          `Prompt: ${record.text.slice(0, 500)}`,
+          `Image: ${logo.url}`,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        metadata: {
+          kind: 'logo_feedback',
+          promptId,
+          logoId,
+          score: body.score,
+          emoji: body.emoji,
+          workedTags: body.workedTags,
+          missedTags: body.missedTags,
+          companyName: record.companyName,
+          industry: record.industry,
+          imageUrl: logo.url,
+        },
+      });
+    } catch (error) {
+      console.warn('Brain ingest failed for logo feedback', promptId, logoId, error);
+    }
+
+    const savedLogo = updated.logos.find((item) => item.id === logoId);
+    return {
+      promptId,
+      logoId,
+      feedback: savedLogo?.feedback,
+      logos: updated.logos,
+    };
+  }
+
+  /** @deprecated use togglePromptSave */
   async submitPromptFeedback(promptId: string, signalType: 'LIKE' | 'DISLIKE') {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store prompt feedback');
@@ -173,11 +282,11 @@ export class PromptsService {
     return this.promptRecords.getById(promptId);
   }
 
-  listSavedPrompts(filter: 'all' | 'like' | 'dislike' = 'all') {
+  listSavedPrompts() {
     if (!process.env.DATABASE_URL) {
       return { prompts: [], total: 0 };
     }
-    return this.promptRecords.listWithFeedback(filter).then((prompts) => ({
+    return this.promptRecords.listSaved().then((prompts) => ({
       prompts,
       total: prompts.length,
     }));

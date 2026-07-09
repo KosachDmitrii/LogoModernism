@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import type { BrainPipelineResult } from '@logo-platform/design-brain';
 import { PromptsService } from './prompts.service';
 import { GeneratePromptDto } from './dto/generate-prompt.dto';
 import { GeneratePromptLogoDto } from './dto/generate-prompt-logo.dto';
 import { PromptFeedbackDto } from './dto/prompt-feedback.dto';
+import { PromptSaveDto } from './dto/prompt-save.dto';
+import { LogoFeedbackDto } from './dto/logo-feedback.dto';
 import type { PromptGenerationRequest } from '@logo-platform/shared';
 import { normalizeBrandName } from '@logo-platform/shared';
 import { slimPipelineResult } from './prompt-response';
@@ -44,6 +46,7 @@ export class PromptsController {
         ...result.bestPrompt,
         logos: promptsWithLogos.find((p) => p.id === result.bestPrompt.id)?.logos ?? [],
         feedback: promptsWithLogos.find((p) => p.id === result.bestPrompt.id)?.feedback,
+        saved: promptsWithLogos.find((p) => p.id === result.bestPrompt.id)?.saved,
       },
     });
 
@@ -80,10 +83,22 @@ export class PromptsController {
   }
 
   @Get('saved')
-  listSaved(@Query('filter') filter?: string) {
-    const normalized =
-      filter === 'like' || filter === 'dislike' ? filter : ('all' as const);
-    return this.promptsService.listSavedPrompts(normalized);
+  listSaved() {
+    return this.promptsService.listSavedPrompts();
+  }
+
+  @Post(':id/save')
+  toggleSave(@Param('id') id: string, @Body() body: PromptSaveDto) {
+    return this.promptsService.togglePromptSave(id, body.saved);
+  }
+
+  @Post(':id/logos/:logoId/feedback')
+  submitLogoFeedback(
+    @Param('id') id: string,
+    @Param('logoId') logoId: string,
+    @Body() body: LogoFeedbackDto,
+  ) {
+    return this.promptsService.submitLogoFeedback(id, logoId, body);
   }
 
   @Get(':id')

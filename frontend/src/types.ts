@@ -39,8 +39,10 @@ export interface ComposedPrompt {
   scores: PromptScores;
   dna: LogoDNA;
   logos?: GeneratedImage[];
-  feedback?: 'LIKE' | 'DISLIKE';
+  saved?: boolean;
   savedAt?: string;
+  /** @deprecated use saved + logo feedback */
+  feedback?: 'LIKE' | 'DISLIKE';
   rank?: number;
   metadata: {
     era: string;
@@ -162,6 +164,14 @@ export interface RecommendResponse {
   dna: LogoDNA;
 }
 
+export interface LogoFeedback {
+  score: number;
+  emoji: string;
+  workedTags?: string[];
+  missedTags?: string[];
+  submittedAt: string;
+}
+
 export interface GeneratedImage {
   id: string;
   url: string;
@@ -172,6 +182,7 @@ export interface GeneratedImage {
   width: number;
   height: number;
   createdAt: string;
+  feedback?: LogoFeedback;
 }
 
 export interface ImageGenerationResponse {

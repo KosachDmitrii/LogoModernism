@@ -15,6 +15,14 @@ export interface ImageGenerationRequest extends StylePreferenceInput {
   typographyStyle?: TypographyStyle;
 }
 
+export interface LogoFeedback {
+  score: number;
+  emoji: string;
+  workedTags?: string[];
+  missedTags?: string[];
+  submittedAt: string;
+}
+
 export interface GeneratedImage {
   id: string;
   url: string;
@@ -25,7 +33,19 @@ export interface GeneratedImage {
   width: number;
   height: number;
   createdAt: string;
+  feedback?: LogoFeedback;
 }
+
+export const LOGO_RATING_EMOJIS = [
+  { emoji: '😍', score: 10, label: 'Excellent' },
+  { emoji: '🙂', score: 8, label: 'Good' },
+  { emoji: '😐', score: 6, label: 'OK' },
+  { emoji: '😕', score: 4, label: 'Weak' },
+  { emoji: '😞', score: 2, label: 'Poor' },
+] as const;
+
+export const LOGO_WORKED_TAGS = ['Geometry', 'Typography', 'Color'] as const;
+export const LOGO_MISSED_TAGS = ['Too literal', 'Too complex', 'Off-brand'] as const;
 
 export interface ImageGenerationResult {
   images: GeneratedImage[];

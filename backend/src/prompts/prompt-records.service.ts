@@ -1,24 +1,37 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@logo-platform/database';
-import type { ComposedPrompt, GeneratedImage, PromptGenerationRequest } from '@logo-platform/shared';
+import type { ComposedPrompt, GeneratedImage, LogoFeedback, PromptGenerationRequest } from '@logo-platform/shared';
 import { prisma } from '@logo-platform/database';
 
 export const MAX_LOGOS_PER_PROMPT = 3;
+/** @deprecated */
 export type PromptFeedback = 'LIKE' | 'DISLIKE';
 
 function parseFeedback(value: unknown): PromptFeedback | undefined {
   return value === 'LIKE' || value === 'DISLIKE' ? value : undefined;
 }
 
+function parseLogoFeedback(value: unknown): LogoFeedback | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const row = value as LogoFeedback;
+  if (typeof row.score !== 'number' || typeof row.emoji !== 'string') return undefined;
+  return row;
+}
+
 function parseLogos(value: unknown): GeneratedImage[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(
-    (item): item is GeneratedImage =>
-      typeof item === 'object' &&
-      item !== null &&
-      typeof (item as GeneratedImage).id === 'string' &&
-      typeof (item as GeneratedImage).url === 'string',
-  );
+  return value
+    .filter(
+      (item): item is GeneratedImage =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as GeneratedImage).id === 'string' &&
+        typeof (item as GeneratedImage).url === 'string',
+    )
+    .map((item) => ({
+      ...item,
+      feedback: parseLogoFeedback((item as GeneratedImage).feedback),
+    }));
 }
 
 @Injectable()
@@ -50,6 +63,7 @@ export class PromptRecordsService {
         selectedPrinciples: prompt.selectedPrinciples as object,
         rank: index + 1,
         logos: [],
+        saved: false,
       })),
       skipDuplicates: true,
     });
@@ -84,6 +98,42 @@ export class PromptRecordsService {
     return this.toClientRecord(updated);
   }
 
+  async setSaved(id: string, saved: boolean) {
+    const record = await prisma.composedPromptRecord.findUnique({ where: { id } });
+    if (!record) {
+      throw new NotFoundException(`Prompt not found: ${id}`);
+    }
+
+    const updated = await prisma.composedPromptRecord.update({
+      where: { id },
+      data: { saved },
+    });
+
+    return this.toClientRecord(updated);
+  }
+
+  async setLogoFeedback(id: string, logoId: string, feedback: LogoFeedback) {
+    const record = await prisma.composedPromptRecord.findUnique({ where: { id } });
+    if (!record) {
+      throw new NotFoundException(`Prompt not found: ${id}`);
+    }
+
+    const logos = parseLogos(record.logos);
+    const index = logos.findIndex((logo) => logo.id === logoId);
+    if (index === -1) {
+      throw new NotFoundException(`Logo not found: ${logoId}`);
+    }
+
+    logos[index] = { ...logos[index]!, feedback };
+    const updated = await prisma.composedPromptRecord.update({
+      where: { id },
+      data: { logos: logos as unknown as Prisma.InputJsonValue },
+    });
+
+    return this.toClientRecord(updated);
+  }
+
+  /** @deprecated use setSaved */
   async setFeedback(id: string, feedback: PromptFeedback) {
     const record = await prisma.composedPromptRecord.findUnique({ where: { id } });
     if (!record) {
@@ -100,25 +150,22 @@ export class PromptRecordsService {
 
   attachLogosToPrompts<T extends ComposedPrompt>(
     prompts: T[],
-  ): Array<T & { logos: GeneratedImage[]; feedback?: PromptFeedback }> {
-    return prompts.map((prompt) => ({ ...prompt, logos: [], feedback: undefined }));
+  ): Array<T & { logos: GeneratedImage[]; saved?: boolean }> {
+    return prompts.map((prompt) => ({ ...prompt, logos: [], saved: false }));
   }
 
   async attachStoredState<T extends ComposedPrompt>(
     prompts: T[],
-  ): Promise<Array<T & { logos: GeneratedImage[]; feedback?: PromptFeedback }>> {
+  ): Promise<Array<T & { logos: GeneratedImage[]; saved?: boolean }>> {
     if (!prompts.length) return [];
 
     const ids = prompts.map((p) => p.id);
     const rows = await prisma.composedPromptRecord.findMany({
       where: { id: { in: ids } },
-      select: { id: true, logos: true, feedback: true },
+      select: { id: true, logos: true, saved: true },
     });
     const stateMap = new Map(
-      rows.map((row) => [
-        row.id,
-        { logos: parseLogos(row.logos), feedback: parseFeedback(row.feedback) },
-      ]),
+      rows.map((row) => [row.id, { logos: parseLogos(row.logos), saved: row.saved }]),
     );
 
     return prompts.map((prompt) => {
@@ -126,7 +173,7 @@ export class PromptRecordsService {
       return {
         ...prompt,
         logos: stored?.logos ?? [],
-        feedback: stored?.feedback,
+        saved: stored?.saved ?? false,
       };
     });
   }
@@ -136,6 +183,20 @@ export class PromptRecordsService {
     return this.attachStoredState(prompts);
   }
 
+  async listSaved(limit = 200) {
+    const records = await prisma.composedPromptRecord.findMany({
+      where: { saved: true },
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+    });
+
+    return records.map((record) => ({
+      ...this.toClientRecord(record),
+      savedAt: record.updatedAt.toISOString(),
+    }));
+  }
+
+  /** @deprecated use listSaved */
   async listWithFeedback(filter: 'all' | 'like' | 'dislike' = 'all', limit = 200) {
     const feedbackFilter =
       filter === 'like'
@@ -168,6 +229,7 @@ export class PromptRecordsService {
     rank: number | null;
     logos: unknown;
     feedback: string | null;
+    saved?: boolean;
   }) {
     return {
       id: record.id,
@@ -180,6 +242,7 @@ export class PromptRecordsService {
       selectedPrinciples: record.selectedPrinciples,
       rank: record.rank,
       logos: parseLogos(record.logos),
+      saved: record.saved ?? false,
       feedback: parseFeedback(record.feedback),
     };
   }

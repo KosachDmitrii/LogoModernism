@@ -152,6 +152,7 @@ model ComposedPromptRecord {
   rank               Int?
   logos              Json     @default("[]")
   feedback           String?
+  saved              Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

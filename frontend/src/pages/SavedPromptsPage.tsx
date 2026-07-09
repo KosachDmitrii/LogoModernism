@@ -1,19 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Heart, Loader2, ThumbsDown, ThumbsUp } from 'lucide-react';
-import clsx from 'clsx';
+import { Heart, Loader2 } from 'lucide-react';
 import { listSavedPrompts } from '../api';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
 import { PromptCard } from '../components/PromptCard';
-
-type SavedFilter = 'all' | 'like' | 'dislike';
-
-const FILTERS: Array<{ id: SavedFilter; label: string; icon: typeof Heart }> = [
-  { id: 'all', label: 'All', icon: Heart },
-  { id: 'like', label: 'Liked', icon: ThumbsUp },
-  { id: 'dislike', label: 'Disliked', icon: ThumbsDown },
-];
 
 function formatSavedAt(value?: string) {
   if (!value) return '';
@@ -26,52 +17,21 @@ function formatSavedAt(value?: string) {
 }
 
 export function SavedPromptsPage() {
-  const [filter, setFilter] = useState<SavedFilter>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['saved-prompts', filter],
-    queryFn: () => listSavedPrompts(filter),
+    queryKey: ['saved-prompts'],
+    queryFn: () => listSavedPrompts(),
   });
 
   const prompts = data?.prompts ?? [];
-  const likedCount = prompts.filter((p) => p.feedback === 'LIKE').length;
-  const dislikedCount = prompts.filter((p) => p.feedback === 'DISLIKE').length;
 
   return (
     <PageContainer>
       <PageHeader
         page="saved"
-        subtitle="Prompts you liked or disliked — stored in the database and fed back into Brain."
+        subtitle="Prompts you saved with ♥ — logo ratings train Brain taste profile."
       />
-
-      <div className="flex flex-wrap gap-2 mb-6">
-        {FILTERS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => {
-              setFilter(id);
-              setSelectedId(null);
-            }}
-            className={clsx(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
-              filter === id
-                ? 'bg-violet-900/40 border-violet-700/50 text-violet-200'
-                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700',
-            )}
-          >
-            <Icon size={13} />
-            {label}
-            {id === 'like' && filter === 'all' && likedCount > 0 && (
-              <span className="text-[10px] text-zinc-500">({likedCount})</span>
-            )}
-            {id === 'dislike' && filter === 'all' && dislikedCount > 0 && (
-              <span className="text-[10px] text-zinc-500">({dislikedCount})</span>
-            )}
-          </button>
-        ))}
-      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 py-24 text-zinc-500">
@@ -91,14 +51,14 @@ export function SavedPromptsPage() {
           </div>
           <h2 className="text-lg font-medium text-zinc-300 mb-2">No saved prompts yet</h2>
           <p className="text-sm text-zinc-500 max-w-sm">
-            Go to Prompts, generate variations, and tap Like or Dislike on any card. They will
-            appear here.
+            On any prompt card, tap the heart next to Copy. Rate generated logos with stars to
+            teach Brain what works.
           </p>
         </div>
       ) : (
         <div className="space-y-4 max-w-2xl mx-auto w-full">
           <p className="text-sm text-zinc-400">
-            {data?.total ?? prompts.length} prompt{(data?.total ?? prompts.length) === 1 ? '' : 's'}
+            {data?.total ?? prompts.length} saved prompt{(data?.total ?? prompts.length) === 1 ? '' : 's'}
           </p>
           {prompts.map((prompt) => (
             <div key={prompt.id} className="space-y-1">

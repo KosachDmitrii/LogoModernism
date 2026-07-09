@@ -23,7 +23,7 @@ const STEP_META: Record<PromptWizardStep, { title: string; subtitle: string }> =
   },
   3: {
     title: 'Results',
-    subtitle: 'Review, copy, generate logos, and give feedback.',
+    subtitle: 'Review, copy, save favorites, and rate logo images.',
   },
 };
 

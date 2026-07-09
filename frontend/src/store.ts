@@ -78,7 +78,8 @@ interface AppState {
   stopGenerating: (promptId: string) => void;
   appendPromptLogo: (promptId: string, image: GeneratedImage) => void;
   setPromptLogos: (promptId: string, logos: GeneratedImage[]) => void;
-  setPromptFeedback: (promptId: string, feedback: 'LIKE' | 'DISLIKE') => void;
+  setPromptSaved: (promptId: string, saved: boolean) => void;
+  updatePromptLogoFeedback: (promptId: string, logoId: string, feedback: import('./types').LogoFeedback) => void;
   syncActiveProject: () => void;
   createProject: (name: string, industry: string, companyName?: string) => string;
   loadProject: (id: string) => void;
@@ -226,11 +227,25 @@ export const useAppStore = create<AppState>()(
         }));
         get().syncActiveProject();
       },
-      setPromptFeedback: (promptId, feedback) => {
+      setPromptSaved: (promptId, saved) => {
         set((state) => ({
           prompts: state.prompts.map((prompt) =>
-            prompt.id === promptId ? { ...prompt, feedback } : prompt,
+            prompt.id === promptId ? { ...prompt, saved } : prompt,
           ),
+        }));
+        get().syncActiveProject();
+      },
+      updatePromptLogoFeedback: (promptId, logoId, feedback) => {
+        set((state) => ({
+          prompts: state.prompts.map((prompt) => {
+            if (prompt.id !== promptId) return prompt;
+            return {
+              ...prompt,
+              logos: (prompt.logos ?? []).map((logo) =>
+                logo.id === logoId ? { ...logo, feedback } : logo,
+              ),
+            };
+          }),
         }));
         get().syncActiveProject();
       },
