@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsIn, Min, Max } from 'class-validator';
+import { IsArray, IsBoolean, IsString, IsOptional, IsNumber, IsIn, Min, Max } from 'class-validator';
 import type { ImageProvider, ImageSize } from '@logo-platform/shared';
 
 export class GenerateImageDto {
@@ -51,4 +51,17 @@ export class GenerateFromComposedPromptDto {
   @IsOptional()
   @IsIn(['1024x1024', '1024x1792', '1792x1024'])
   size?: ImageSize;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  colorSelections?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  allowShadows?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowPhotoreal?: boolean;
 }

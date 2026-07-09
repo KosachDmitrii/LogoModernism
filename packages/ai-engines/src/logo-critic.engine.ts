@@ -25,7 +25,7 @@ export function critiqueLogo(input: LogoCriticInput): ExtendedCriticResult {
   const trademarkRisk = assessTrademarkRisk(input);
   const industryFit = input.prompt ? estimateIndustryFit(input.prompt) : 6;
 
-  const improvementPlan = buildImprovementPlan(base);
+  const improvementPlan = buildImprovementPlan(base, input.prompt);
 
   return {
     ...base,
@@ -75,10 +75,27 @@ function estimateIndustryFit(prompt: ComposedPrompt): number {
   return Math.min(10, 5 + industryPrinciples.length * 1.5);
 }
 
-function buildImprovementPlan(critic: DesignCriticResult): ExtendedCriticResult['improvementPlan'] {
+function buildImprovementPlan(
+  critic: DesignCriticResult,
+  prompt?: ComposedPrompt,
+): ExtendedCriticResult['improvementPlan'] {
   const plan: ExtendedCriticResult['improvementPlan'] = [];
   let priority = 1;
 
+  if (prompt?.scores.cohesionScore !== undefined && prompt.scores.cohesionScore < 7) {
+    plan.push({
+      priority: priority++,
+      action: 'Unify symbol and wordmark into one geometric lockup',
+      impact: 'Improves brand cohesion and professional identity feel',
+    });
+  }
+  if (prompt?.scores.identityScore !== undefined && prompt.scores.identityScore < 7) {
+    plan.push({
+      priority: priority++,
+      action: 'Use custom modified letterforms instead of generic sans-serif',
+      impact: 'Increases distinctiveness and wordmark quality',
+    });
+  }
   if (critic.scalability < 7) {
     plan.push({ priority: priority++, action: 'Simplify to flat vector forms', impact: 'Improves favicon legibility' });
   }

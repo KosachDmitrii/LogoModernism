@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ComposedPrompt, DesignRule, LogoDNA, LogoMarkType, PromptScores, TypographyStyle } from '@logo-platform/shared';
 import {
+  appendStylePreferenceFragments,
   isMultiWordCompanyName,
   lettermarkTextFromName,
   exactBrandSpellingFragment,
@@ -9,6 +10,10 @@ import {
   resolveMarkTypeForBrand,
   resolveTypographyStyleForBrand,
   NO_BRAND_TEXT_FRAGMENT,
+  buildArtDirectionFragments,
+  isCombinationMark,
+  stylePreferenceOverrides,
+  prependClientNotes,
 } from '@logo-platform/shared';
 import { CATEGORY_ORDER } from './design-rules-engine';
 import { scorePrompt } from './prompt-scorer';
@@ -29,6 +34,8 @@ export interface ComposeInput {
   typographyStyle?: TypographyStyle;
   /** Fragments from Logo Catalog references */
   catalogInspiration?: string[];
+  /** Client-selected style preferences from Design Brief */
+  briefContext?: import('@logo-platform/shared').BriefContext;
 }
 
 const CATEGORY_LABELS: Partial<Record<DesignRule['category'], string>> = {
@@ -227,16 +234,26 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     fragments.push('Letters are the entire logo. No separate icon, no pictorial symbol, no emblem, no badge, no industry imagery');
   }
 
+  if (isCombinationMark(markType)) {
+    fragments.push(...buildArtDirectionFragments({ markType, industry: input.industry }));
+  } else if (isWordmark || isLettermark) {
+    fragments.push(...buildArtDirectionFragments({ markType }));
+  }
+
   fragments.push('Premium professional branding');
   fragments.push('Timeless modernist aesthetic');
 
-  const rawText = fragments.join('. ').replace(/\.\s*\./g, '.');
-  const optimized = optimizePrompt(rawText, principles);
-  const scores = scorePrompt(optimized, principles, input.dna);
+  const rawText = appendStylePreferenceFragments(
+    fragments.join('. ').replace(/\.\s*\./g, '.'),
+    input.briefContext,
+  );
+  const optimized = optimizePrompt(rawText, principles, stylePreferenceOverrides(input.briefContext));
+  const text = prependClientNotes(optimized, input.briefContext?.clientNotes);
+  const scores = scorePrompt(text, principles, input.dna);
 
   return {
     id: randomUUID(),
-    text: optimized,
+    text,
     industry: input.industry,
     selectedPrinciples: principles,
     scores,
@@ -247,6 +264,15 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
       inspirationMode: input.inspirationMode,
       markType,
       typographyStyle,
+      stylePreferences: input.briefContext
+        ? {
+            colorPalette: input.briefContext.colorPalette,
+            colorSelections: input.briefContext.colorSelections,
+            allowShadows: input.briefContext.allowShadows,
+            allowPhotoreal: input.briefContext.allowPhotoreal,
+            clientNotes: input.briefContext.clientNotes,
+          }
+        : undefined,
     },
   };
 }

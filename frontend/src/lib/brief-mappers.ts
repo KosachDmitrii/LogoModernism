@@ -197,6 +197,10 @@ export function designBriefToBriefContext(brief: {
   construction?: string;
   preferredShapes?: string;
   colorPalette?: string;
+  colorSelections?: string[];
+  allowShadows?: boolean;
+  allowPhotoreal?: boolean;
+  clientNotes?: string;
 }): BriefContextPayload | undefined {
   const ctx: BriefContextPayload = {};
   const set = (key: keyof BriefContextPayload, value?: string) => {
@@ -217,6 +221,16 @@ export function designBriefToBriefContext(brief: {
   if (brief.colorPalette && brief.colorPalette !== '' && brief.colorPalette !== 'auto') {
     ctx.colorPalette = brief.colorPalette as BriefContextPayload['colorPalette'];
   }
+  if (brief.colorSelections?.length) {
+    ctx.colorSelections = brief.colorSelections;
+  }
+  if (brief.allowShadows) {
+    ctx.allowShadows = true;
+  }
+  if (brief.allowPhotoreal) {
+    ctx.allowPhotoreal = true;
+  }
+  set('clientNotes', brief.clientNotes);
 
   return Object.keys(ctx).length > 0 ? ctx : undefined;
 }

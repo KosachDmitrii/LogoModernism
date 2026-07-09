@@ -95,6 +95,15 @@ export async function generateWithCritiqueLoop(
         metadata: {
           principleIds: lastPipeline.bestPrompt.selectedPrinciples.map((p) => p.id),
           markType: lastPipeline.decision.markType,
+          stylePreferences: request.briefContext
+            ? {
+                colorPalette: request.briefContext.colorPalette,
+                colorSelections: request.briefContext.colorSelections,
+                allowShadows: request.briefContext.allowShadows,
+                allowPhotoreal: request.briefContext.allowPhotoreal,
+                clientNotes: request.briefContext.clientNotes,
+              }
+            : undefined,
         },
       });
 
@@ -106,6 +115,10 @@ export async function generateWithCritiqueLoop(
           provider: request.imageProvider,
           markType: lastPipeline.decision.markType,
           typographyStyle: lastPipeline.decision.typographyStyle,
+          colorPalette: request.briefContext?.colorPalette,
+          colorSelections: request.briefContext?.colorSelections,
+          allowShadows: request.briefContext?.allowShadows,
+          allowPhotoreal: request.briefContext?.allowPhotoreal,
           count: 1,
         });
       }
@@ -136,6 +149,15 @@ export async function generateWithCritiqueLoop(
     metadata: {
       principleIds: lastPipeline.bestPrompt.selectedPrinciples.map((p) => p.id),
       markType: lastPipeline.decision.markType,
+      stylePreferences: request.briefContext
+        ? {
+            colorPalette: request.briefContext.colorPalette,
+            colorSelections: request.briefContext.colorSelections,
+            allowShadows: request.briefContext.allowShadows,
+            allowPhotoreal: request.briefContext.allowPhotoreal,
+            clientNotes: request.briefContext.clientNotes,
+          }
+        : undefined,
     },
   });
 
@@ -147,6 +169,10 @@ export async function generateWithCritiqueLoop(
       provider: request.imageProvider,
       markType: lastPipeline.decision.markType,
       typographyStyle: lastPipeline.decision.typographyStyle,
+      colorPalette: request.briefContext?.colorPalette,
+      colorSelections: request.briefContext?.colorSelections,
+      allowShadows: request.briefContext?.allowShadows,
+      allowPhotoreal: request.briefContext?.allowPhotoreal,
       count: 1,
     });
   }

@@ -3,8 +3,9 @@ export type ImageProvider = 'openai' | 'mock';
 export type ImageSize = '1024x1024' | '1024x1792' | '1792x1024';
 
 import type { LogoMarkType, TypographyStyle } from './types';
+import type { StylePreferenceInput } from './art-direction';
 
-export interface ImageGenerationRequest {
+export interface ImageGenerationRequest extends StylePreferenceInput {
   prompt: string;
   provider?: ImageProvider;
   size?: ImageSize;

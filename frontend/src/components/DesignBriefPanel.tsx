@@ -8,12 +8,18 @@ const COLOR_OPTIONS: Array<{ value: DesignBrief['colorPalette']; label: string }
   { value: 'black_white', label: 'Black & white only' },
   { value: 'monochrome', label: 'Monochrome' },
   { value: 'two_color', label: 'Two-color max' },
+  { value: 'multi_color', label: 'Multi-color controlled' },
   { value: 'corporate_blue', label: 'Corporate blue' },
   { value: 'red_accent', label: 'Red accent' },
   { value: 'limited', label: 'Limited palette' },
+  { value: 'custom', label: 'Custom selected colors' },
 ];
 
-const BRIEF_FIELDS: Array<{ key: keyof DesignBrief; label: string; rows?: number }> = [
+type TextBriefField = {
+  [K in keyof DesignBrief]: DesignBrief[K] extends string ? K : never;
+}[keyof DesignBrief];
+
+const BRIEF_FIELDS: Array<{ key: TextBriefField; label: string; rows?: number }> = [
   { key: 'personality', label: 'Personality' },
   { key: 'complexity', label: 'Complexity' },
   { key: 'primaryEmotion', label: 'Primary Emotion' },
@@ -24,6 +30,7 @@ const BRIEF_FIELDS: Array<{ key: keyof DesignBrief; label: string; rows?: number
   { key: 'composition', label: 'Composition' },
   { key: 'typography', label: 'Typography' },
   { key: 'constraints', label: 'Constraints' },
+  { key: 'clientNotes', label: 'Client preferences / details', rows: 3 },
   { key: 'bestPromptHint', label: 'Best Prompt Hint', rows: 3 },
   { key: 'critiqueNote', label: 'Critique' },
 ];
@@ -108,6 +115,25 @@ export function DesignBriefPanel() {
           ))}
         </select>
       </div>
+
+      {(designBrief.colorSelections.length > 0 || designBrief.allowShadows || designBrief.allowPhotoreal) && (
+        <div className="space-y-1">
+          {designBrief.colorSelections.length > 0 && (
+            <p className="text-xs text-zinc-300">
+              <span className="text-zinc-500">Selected colors:</span>{' '}
+              {designBrief.colorSelections.join(', ')}
+            </p>
+          )}
+          {(designBrief.allowShadows || designBrief.allowPhotoreal) && (
+            <p className="text-xs text-zinc-300">
+              <span className="text-zinc-500">Effects allowed:</span>{' '}
+              {[designBrief.allowShadows ? 'shadows' : '', designBrief.allowPhotoreal ? 'photoreal' : '']
+                .filter(Boolean)
+                .join(', ')}
+            </p>
+          )}
+        </div>
+      )}
 
       {(designBrief.catalogReferenceIds?.length ?? 0) > 0 && (
         <p className="text-xs text-zinc-300">

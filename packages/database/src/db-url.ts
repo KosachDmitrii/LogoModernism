@@ -14,7 +14,9 @@ export function enhanceDatabaseUrl(url: string): string {
     if (!params.has('pool_timeout')) {
       params.set('pool_timeout', '30');
     }
-    if (parsed.hostname.includes('pooler.supabase.com') && !params.has('pgbouncer')) {
+    const usesTransactionPooler =
+      parsed.hostname.includes('pooler.supabase.com') && parsed.port === '6543';
+    if (usesTransactionPooler && !params.has('pgbouncer')) {
       params.set('pgbouncer', 'true');
     }
 

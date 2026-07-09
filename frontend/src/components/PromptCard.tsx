@@ -159,7 +159,9 @@ export function PromptCard({
         </div>
       )}
 
-      <p className="font-mono text-sm leading-relaxed text-zinc-300 mb-4">{prompt.text}</p>
+      <p className="font-mono text-sm leading-relaxed text-zinc-300 mb-4 whitespace-pre-wrap break-words">
+        {prompt.text}
+      </p>
 
       <button
         type="button"

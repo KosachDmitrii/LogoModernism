@@ -3,6 +3,7 @@ import {
   hasExplicitBrandName,
   NO_BRAND_TEXT_FRAGMENT,
   normalizeBrandName,
+  preparePromptBodyForClientNotes,
   resolveMarkTypeForBrand,
 } from '@logo-platform/shared';
 import { searchPrinciples } from '@logo-platform/knowledge-base';
@@ -41,6 +42,7 @@ export function buildBasePromptFromRules(request: BrainGenerateRequest): Compose
     catalogInspiration: selection.catalogInspiration,
     markType: request.markType,
     typographyStyle: request.typographyStyle,
+    briefContext: request.briefContext,
   });
 }
 
@@ -133,9 +135,10 @@ export function mergeEnrichedPrompt(
   baseText: string,
   enrichedText: string,
   context: EnrichmentContext,
+  clientNotes?: string,
 ): string {
-  const base = baseText.trim();
-  let enriched = enrichedText.trim();
+  const base = preparePromptBodyForClientNotes(baseText.trim(), clientNotes);
+  let enriched = preparePromptBodyForClientNotes(enrichedText.trim(), clientNotes);
   const brandName = normalizeBrandName(context.companyName);
 
   if (!enriched) return base;

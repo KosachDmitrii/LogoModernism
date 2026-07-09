@@ -43,6 +43,7 @@ export function runPromptPipeline(request: PromptGenerationRequest): PipelineRes
       catalogInspiration: baseSelection.catalogInspiration,
       markType: request.markType,
       typographyStyle: request.typographyStyle,
+      briefContext: request.briefContext,
     },
     variationCount,
     (seed) =>

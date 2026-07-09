@@ -103,9 +103,15 @@ export interface BriefContext {
     | 'black_white'
     | 'monochrome'
     | 'two_color'
+    | 'multi_color'
     | 'corporate_blue'
     | 'red_accent'
-    | 'limited';
+    | 'limited'
+    | 'custom';
+  colorSelections?: string[];
+  allowShadows?: boolean;
+  allowPhotoreal?: boolean;
+  clientNotes?: string;
 }
 
 export interface DesignDecisionPrinciple {
@@ -134,6 +140,8 @@ export interface DesignDecision {
 export interface TasteProfile {
   preferredMarkTypes: string[];
   preferredGeometry: string[];
+  preferredColors?: string[];
+  preferredRendering?: string[];
   avoidedPatterns: string[];
   averageScore: number;
   signalCount: number;

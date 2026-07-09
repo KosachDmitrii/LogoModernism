@@ -198,6 +198,8 @@ export interface PromptScores {
   readabilityScore: number;
   scalabilityScore: number;
   brandRecognitionScore: number;
+  cohesionScore: number;
+  identityScore: number;
   promptQuality: number;
 }
 
@@ -221,6 +223,7 @@ export interface ComposedPrompt {
     confidence?: number;
     basePromptLength?: number;
     enrichedPromptLength?: number;
+    stylePreferences?: import('./brain-types').BriefContext;
   };
 }
 

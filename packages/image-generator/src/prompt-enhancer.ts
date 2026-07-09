@@ -7,11 +7,19 @@ import {
   resolveMarkTypeForBrand,
   resolveTypographyStyleForBrand,
   NO_BRAND_TEXT_INSTRUCTION,
+  buildImageArtDirectionSuffix,
+  isCombinationMark,
+  isDetailedLogoPrompt,
+  stylePreferenceOverrides,
 } from '@logo-platform/shared';
 
 const ICON_SUFFIX =
   ' Professional logo design, flat vector style, clean white background, ' +
   'scalable icon, modernist Swiss design, ' +
+  'no gradients, no shadows, no photorealism, centered composition.';
+
+const COMPACT_RENDER_SUFFIX =
+  ' Flat vector illustration, clean white background, monochrome, ' +
   'no gradients, no shadows, no photorealism, centered composition.';
 
 const CONSTRUCTED_SUFFIX =
@@ -67,6 +75,13 @@ function detectMarkType(request: ImageGenerationRequest): LogoMarkType | undefin
   ) {
     return 'wordmark';
   }
+  if (
+    text.includes('combination mark') ||
+    text.includes('symbol and wordmark') ||
+    text.includes('corporate identity mark')
+  ) {
+    return 'combination';
+  }
   return undefined;
 }
 
@@ -81,6 +96,59 @@ function withExactSpelling(
   return `${text} ${spelling}`;
 }
 
+function renderSuffixForPrompt(
+  base: string,
+  markType: LogoMarkType | undefined,
+  detailed: boolean,
+  request: ImageGenerationRequest,
+): string {
+  const style = stylePreferenceOverrides(request);
+  const renderBase = [
+    'Flat vector illustration',
+    'clean white background',
+    'monochrome',
+    !style.allowShadows ? 'no shadows' : '',
+    !style.allowPhotoreal ? 'no photorealism' : '',
+    'centered composition',
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const compactSuffix = ` ${renderBase}.`;
+
+  if (detailed) {
+    if (isCombinationMark(markType)) {
+      return `${compactSuffix}${buildImageArtDirectionSuffix({ markType })}`;
+    }
+    return compactSuffix;
+  }
+
+  if (isCombinationMark(markType)) {
+    return `${compactSuffix}${buildImageArtDirectionSuffix({ markType })}`;
+  }
+
+  return compactSuffix;
+}
+
+function applyImageStyleOverrides(text: string, request: ImageGenerationRequest): string {
+  const style = stylePreferenceOverrides(request);
+  let result = text;
+
+  if (style.allowShadows) {
+    result = result.replace(/\bno shadows?\b/gi, '').replace(/\bavoiding shadows?\b/gi, '');
+  }
+  if (style.allowPhotoreal) {
+    result = result
+      .replace(/\bno photoreal(?:ism|istic)?\b/gi, '')
+      .replace(/\bno photographic effects?\b/gi, '')
+      .replace(/\bflat vector only\b/gi, 'vector-compatible identity');
+  }
+  if (style.allowMultipleColors) {
+    result = result.replace(/\bsingle color\b/gi, '').replace(/\bone-color\b/gi, '');
+  }
+
+  return result.replace(/\s+,/g, ',').replace(/,\s*,+/g, ', ').replace(/\s+/g, ' ').trim();
+}
+
 export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
   const base = request.prompt.trim();
   const brandName = normalizeBrandName(request.companyName);
@@ -90,44 +158,55 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
   const markType = brandName
     ? (request.markType ?? detectedMarkType)
     : resolveMarkTypeForBrand(request.markType ?? detectedMarkType, brandName, typographyStyle);
+  const detailed = isDetailedLogoPrompt(base);
   const isConstructed =
     typographyStyle === 'constructed' ||
     base.toLowerCase().includes('constructed typography') ||
     base.toLowerCase().includes('constructed typographic');
 
   if (!brandName) {
+    const suffix = renderSuffixForPrompt(base, markType, detailed, request);
     const text = base.toLowerCase().includes('logo')
-      ? `${base}. ${ICON_SUFFIX} ${NO_BRAND_TEXT_INSTRUCTION}`
-      : `Minimal geometric logo: ${base}. ${ICON_SUFFIX} ${NO_BRAND_TEXT_INSTRUCTION}`;
-    return text;
+      ? `${base}. ${suffix} ${NO_BRAND_TEXT_INSTRUCTION}`
+      : `Minimal geometric logo: ${base}. ${suffix} ${NO_BRAND_TEXT_INSTRUCTION}`;
+    return applyImageStyleOverrides(text, request);
   }
 
   if (isConstructed) {
+    const suffix = detailed ? renderSuffixForPrompt(base, markType, detailed, request) : CONSTRUCTED_SUFFIX;
     const text = base.toLowerCase().includes('constructed')
-      ? `${base}${company}. ${CONSTRUCTED_SUFFIX}`
-      : `Constructed typography logo${company}: ${base}. ${CONSTRUCTED_SUFFIX}`;
-    return withExactSpelling(text, brandName, markType);
+      ? `${base}${company}. ${suffix}`
+      : `Constructed typography logo${company}: ${base}. ${suffix}`;
+    return applyImageStyleOverrides(withExactSpelling(text, brandName, markType), request);
   }
 
   if (markType === 'lettermark' && brandName) {
     const text = base.toLowerCase().includes('lettermark')
       ? `${base}${company}. ${lettermarkSuffix(brandName)}`
       : `Lettermark logo${company}: ${base}. ${lettermarkSuffix(brandName)}`;
-    return withExactSpelling(text, brandName, 'lettermark');
+    return applyImageStyleOverrides(withExactSpelling(text, brandName, 'lettermark'), request);
   }
 
   if (markType === 'wordmark') {
+    const suffix = detailed
+      ? `${renderSuffixForPrompt(base, markType, detailed, request)}${buildImageArtDirectionSuffix({ markType: 'wordmark' })}`
+      : WORDMARK_SUFFIX;
     const text = base.toLowerCase().includes('wordmark')
-      ? `${base}${company}. ${WORDMARK_SUFFIX}`
-      : `Typographic wordmark logo${company}: ${base}. ${WORDMARK_SUFFIX}`;
-    return withExactSpelling(text, brandName, 'wordmark');
+      ? `${base}${company}. ${suffix}`
+      : `Typographic wordmark logo${company}: ${base}. ${suffix}`;
+    return applyImageStyleOverrides(withExactSpelling(text, brandName, 'wordmark'), request);
   }
+
+  const suffix = renderSuffixForPrompt(base, markType, detailed, request);
 
   if (base.toLowerCase().includes('logo')) {
-    return withExactSpelling(`${base}${company}. ${ICON_SUFFIX}`, brandName, markType);
+    return applyImageStyleOverrides(withExactSpelling(`${base}${company}. ${suffix}`, brandName, markType), request);
   }
 
-  return withExactSpelling(`Minimal geometric logo${company}: ${base}. ${ICON_SUFFIX}`, brandName, markType);
+  return applyImageStyleOverrides(
+    withExactSpelling(`Minimal geometric logo${company}: ${base}. ${suffix}`, brandName, markType),
+    request,
+  );
 }
 
 export function resolveMarkTypeFromPrompt(text: string): LogoMarkType | undefined {
@@ -136,6 +215,6 @@ export function resolveMarkTypeFromPrompt(text: string): LogoMarkType | undefine
     return 'wordmark';
   }
   if (lower.includes('lettermark')) return 'lettermark';
-  if (lower.includes('combination mark')) return 'combination';
+  if (lower.includes('combination mark') || lower.includes('symbol and wordmark')) return 'combination';
   return undefined;
 }

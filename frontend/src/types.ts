@@ -49,6 +49,7 @@ export interface ComposedPrompt {
     markType?: 'wordmark' | 'lettermark' | 'combination';
     typographyStyle?: 'standard' | 'constructed';
     briefCoverage?: BriefFieldCoverage[];
+    stylePreferences?: BriefContextPayload;
   };
 }
 
@@ -70,7 +71,11 @@ export type BriefContextPayload = {
   geometry?: string;
   construction?: string;
   preferredShapes?: string;
-  colorPalette?: 'auto' | 'black_white' | 'monochrome' | 'two_color' | 'corporate_blue' | 'red_accent' | 'limited';
+  colorPalette?: 'auto' | 'black_white' | 'monochrome' | 'two_color' | 'multi_color' | 'corporate_blue' | 'red_accent' | 'limited' | 'custom';
+  colorSelections?: string[];
+  allowShadows?: boolean;
+  allowPhotoreal?: boolean;
+  clientNotes?: string;
 };
 
 export interface Recommendation {
@@ -125,7 +130,11 @@ export interface DesignBrief {
   narrative: string;
   markType: '' | 'wordmark' | 'lettermark' | 'combination';
   typographyStyle: '' | 'standard' | 'constructed';
-  colorPalette: '' | 'auto' | 'black_white' | 'monochrome' | 'two_color' | 'corporate_blue' | 'red_accent' | 'limited';
+  colorPalette: '' | 'auto' | 'black_white' | 'monochrome' | 'two_color' | 'multi_color' | 'corporate_blue' | 'red_accent' | 'limited' | 'custom';
+  colorSelections: string[];
+  allowShadows: boolean;
+  allowPhotoreal: boolean;
+  clientNotes: string;
   geometry: string;
   construction: string;
   composition: string;
@@ -167,6 +176,10 @@ export const EMPTY_DESIGN_BRIEF: DesignBrief = {
   markType: '',
   typographyStyle: '',
   colorPalette: '',
+  colorSelections: [],
+  allowShadows: false,
+  allowPhotoreal: false,
+  clientNotes: '',
   geometry: '',
   construction: '',
   composition: '',
@@ -186,6 +199,8 @@ export const EMPTY_DESIGN_BRIEF: DesignBrief = {
 export interface TasteProfile {
   preferredMarkTypes: string[];
   preferredGeometry: string[];
+  preferredColors?: string[];
+  preferredRendering?: string[];
   avoidedPatterns: string[];
   averageScore: number;
   signalCount: number;

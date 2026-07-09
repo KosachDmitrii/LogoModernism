@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "dev": "npm run build -w @logo-platform/design-brain && nest start --watch",
+    "dev": "npm run build -w @logo-platform/design-brain && nest build && nest start --watch",
     "start": "node dist/main.js"
   },
   "dependencies": {

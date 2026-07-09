@@ -64,7 +64,6 @@ export function PromptsPage() {
         <PromptStepProgress
           activeStep={activeStep}
           canGoToStep={canGoToStep}
-          onStepClick={setActiveStep}
         />
       </div>
 

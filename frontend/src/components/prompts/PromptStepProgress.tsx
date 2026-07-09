@@ -11,30 +11,24 @@ const STEPS: Array<{ n: PromptWizardStep; label: string }> = [
 interface PromptStepProgressProps {
   activeStep: PromptWizardStep;
   canGoToStep: (step: PromptWizardStep) => boolean;
-  onStepClick: (step: PromptWizardStep) => void;
 }
 
-function StepButton({
+function Step({
   step,
   reachable,
   isActive,
   isComplete,
-  onClick,
 }: {
   step: (typeof STEPS)[number];
   reachable: boolean;
   isActive: boolean;
   isComplete: boolean;
-  onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      disabled={!reachable}
-      onClick={onClick}
+    <div
       className={clsx(
         'flex flex-col items-center gap-2 shrink-0 group min-w-[4.5rem]',
-        reachable ? 'cursor-pointer' : 'cursor-default',
+        reachable ? 'cursor-default' : 'cursor-default',
       )}
     >
       <div
@@ -65,11 +59,11 @@ function StepButton({
       >
         {step.label}
       </span>
-    </button>
+    </div>
   );
 }
 
-export function PromptStepProgress({ activeStep, canGoToStep, onStepClick }: PromptStepProgressProps) {
+export function PromptStepProgress({ activeStep, canGoToStep }: PromptStepProgressProps) {
   return (
     <div className="flex w-full items-start">
       {STEPS.map((step, i) => {
@@ -79,12 +73,11 @@ export function PromptStepProgress({ activeStep, canGoToStep, onStepClick }: Pro
 
         return (
           <div key={step.n} className="contents">
-            <StepButton
+            <Step
               step={step}
               reachable={reachable}
               isActive={isActive}
               isComplete={isComplete}
-              onClick={() => reachable && onStepClick(step.n)}
             />
             {i < STEPS.length - 1 && <div className="flex-1 h-px bg-zinc-800 mx-0 mt-4 min-w-8" />}
           </div>

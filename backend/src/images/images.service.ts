@@ -31,6 +31,9 @@ export class ImagesService {
       count: 1,
       markType: dto.markType,
       typographyStyle: dto.typographyStyle,
+      colorSelections: dto.colorSelections,
+      allowShadows: dto.allowShadows,
+      allowPhotoreal: dto.allowPhotoreal,
     });
     return this.toPersistedResult(result);
   }

@@ -1,4 +1,4 @@
-import { IsIn, IsNumber, IsOptional, IsString, IsUrl, Max, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsNumber, IsOptional, IsString, IsUrl, Max, Min } from 'class-validator';
 import type { BrainSourceType, TasteSignalType } from '@logo-platform/shared';
 
 export class BriefContextDto {
@@ -43,15 +43,34 @@ export class BriefContextDto {
   preferredShapes?: string;
 
   @IsOptional()
-  @IsIn(['auto', 'black_white', 'monochrome', 'two_color', 'corporate_blue', 'red_accent', 'limited'])
+  @IsIn(['auto', 'black_white', 'monochrome', 'two_color', 'multi_color', 'corporate_blue', 'red_accent', 'limited', 'custom'])
   colorPalette?:
     | 'auto'
     | 'black_white'
     | 'monochrome'
     | 'two_color'
+    | 'multi_color'
     | 'corporate_blue'
     | 'red_accent'
-    | 'limited';
+    | 'limited'
+    | 'custom';
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  colorSelections?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  allowShadows?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowPhotoreal?: boolean;
+
+  @IsOptional()
+  @IsString()
+  clientNotes?: string;
 }
 
 export class BrainFeedbackDto {

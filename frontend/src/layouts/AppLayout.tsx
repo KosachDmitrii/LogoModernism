@@ -5,7 +5,7 @@ import { APP_NAV } from '../lib/navigation';
 export function AppLayout() {
   return (
     <div className="min-h-screen flex bg-zinc-950 text-zinc-100">
-      <aside className="w-60 border-r border-zinc-800 bg-zinc-950 flex flex-col shrink-0">
+      <aside className="sticky top-0 self-start h-screen w-60 border-r border-zinc-800 bg-zinc-950 flex flex-col shrink-0 overflow-y-auto">
         <div className="p-5 border-b border-zinc-800">
           <h1 className="text-sm font-semibold tracking-tight">Logo Design Platform</h1>
           <p className="text-xs text-zinc-500 mt-0.5">Admin</p>

@@ -1,4 +1,4 @@
-import type { DesignRule } from '@logo-platform/shared';
+import type { DesignRule, StyleOverrideOptions } from '@logo-platform/shared';
 
 const CONTRADICTIONS: [RegExp, RegExp][] = [
   [/single color/i, /two.?color/i],
@@ -181,17 +181,24 @@ function reconcileSymmetry(
   return { body: cleaned, avoidItems };
 }
 
-export function optimizePrompt(text: string, principles: DesignRule[]): string {
+export function optimizePrompt(
+  text: string,
+  principles: DesignRule[],
+  options: StyleOverrideOptions = {},
+): string {
   let { body, avoidItems } = splitPromptSections(text);
 
+  body = applyStyleOverrides(body, options);
+  avoidItems = filterAvoidItemsForStyleOverrides(avoidItems, options);
   body = removeDuplicates(body);
   body = removeContradictions(body);
   body = removeFiller(body);
-  body = strengthenPrompt(body, avoidItems);
-  body = enforceRestrictions(body, principles);
+  body = strengthenPrompt(body, avoidItems, options);
+  body = enforceRestrictions(body, principles, options);
   body = collapseRepeatedWords(body);
 
   avoidItems = dedupeAvoidItems(avoidItems);
+  avoidItems = filterAvoidItemsForStyleOverrides(avoidItems, options);
   avoidItems = filterAvoidRedundantWithBody(body, avoidItems);
   ({ body, avoidItems } = reconcileSymmetry(body, avoidItems));
 
@@ -269,11 +276,16 @@ function conceptMostlyPresent(text: string, phrase: string): boolean {
   return shared / phraseTokens.size >= 0.75;
 }
 
-function strengthenPrompt(text: string, avoidItems: string[] = []): string {
+function strengthenPrompt(
+  text: string,
+  avoidItems: string[] = [],
+  options: StyleOverrideOptions = {},
+): string {
   const additions: string[] = [];
 
   for (const { test, phrase } of STRENGTHENERS) {
     if (phrase.includes('symmetry') && avoidsOpticalSymmetry(avoidItems)) continue;
+    if (options.allowShadows && /no shadows/i.test(phrase)) continue;
     if (!test.test(text)) continue;
     if (conceptMostlyPresent(text, phrase)) continue;
     if (additions.some((existing) => clauseOverlaps(existing, phrase))) continue;
@@ -284,20 +296,24 @@ function strengthenPrompt(text: string, avoidItems: string[] = []): string {
   return `${text}, ${additions.join(', ')}`;
 }
 
-function enforceRestrictions(text: string, principles: DesignRule[]): string {
+function enforceRestrictions(
+  text: string,
+  principles: DesignRule[],
+  options: StyleOverrideOptions = {},
+): string {
   const restrictions: string[] = [];
   const ids = new Set(principles.map((p) => p.id));
 
-  if (ids.has('color-no-gradient') || ids.has('fx-gradient-avoid')) {
+  if (!options.allowPhotoreal && (ids.has('color-no-gradient') || ids.has('fx-gradient-avoid'))) {
     restrictions.push('no gradients');
   }
-  if (ids.has('render-no-shadows') || ids.has('fx-shadow-avoid')) {
+  if (!options.allowShadows && (ids.has('render-no-shadows') || ids.has('fx-shadow-avoid'))) {
     restrictions.push('no shadows');
   }
-  if (ids.has('color-one-color')) {
+  if (!options.allowMultipleColors && ids.has('color-one-color')) {
     restrictions.push('single color');
   }
-  if (ids.has('render-flat-vector')) {
+  if (!options.allowPhotoreal && ids.has('render-flat-vector')) {
     restrictions.push('flat vector');
   }
 
@@ -308,6 +324,48 @@ function enforceRestrictions(text: string, principles: DesignRule[]): string {
     }
   }
   return result;
+}
+
+function applyStyleOverrides(body: string, options: StyleOverrideOptions): string {
+  let result = body;
+
+  if (options.allowShadows) {
+    result = result
+      .replace(/\bno shadows?\b/gi, '')
+      .replace(/\bavoid(?:ing)? shadows?\b/gi, '')
+      .replace(/\bavoiding shadows?\b/gi, '')
+      .replace(/\bshadowless\b/gi, '');
+  }
+
+  if (options.allowPhotoreal) {
+    result = result
+      .replace(/\bno photoreal(?:ism|istic)?\b/gi, '')
+      .replace(/\bavoid(?:ing)? photoreal(?:ism|istic)?\b/gi, '')
+      .replace(/\bavoid(?:ing)? gradients?\b/gi, '')
+      .replace(/\bno photographic effects?\b/gi, '')
+      .replace(/\bflat vector only\b/gi, 'vector-compatible identity');
+  }
+
+  if (options.allowMultipleColors) {
+    result = result
+      .replace(/\bsingle color\b/gi, '')
+      .replace(/\bone-color\b/gi, '')
+      .replace(/\bmonochrome only\b/gi, '');
+  }
+
+  return result.replace(/\s+,/g, ',').replace(/,\s*,+/g, ', ').replace(/\s+/g, ' ').trim();
+}
+
+function filterAvoidItemsForStyleOverrides(
+  avoidItems: string[],
+  options: StyleOverrideOptions,
+): string[] {
+  return avoidItems.filter((item) => {
+    if (options.allowShadows && /shadows?/i.test(item)) return false;
+    if (options.allowPhotoreal && /photoreal|photographic|3d|gradient/i.test(item)) return false;
+    if (options.allowMultipleColors && /single color|one.?color|multi.?color|two.?color/i.test(item)) return false;
+    return true;
+  });
 }
 
 function normalizePunctuation(text: string): string {

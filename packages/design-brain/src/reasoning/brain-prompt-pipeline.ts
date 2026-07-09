@@ -10,6 +10,12 @@ import type {
   Recommendation,
   TasteProfile,
 } from '@logo-platform/shared';
+import {
+  appendArtDirectionFragments,
+  appendStylePreferenceFragments,
+  stylePreferenceOverrides,
+  prependClientNotes,
+} from '@logo-platform/shared';
 import { getPrincipleById, designPrinciples } from '@logo-platform/knowledge-base';
 import { appendAntiPatterns, optimizePrompt, scorePrompt } from '@logo-platform/prompt-engine';
 import type { PrismaClient } from '@logo-platform/database';
@@ -45,13 +51,21 @@ function buildRetrievalQuery(request: BrainGenerateRequest): string {
     brief?.geometry,
     brief?.typography,
     brief?.constraints,
+    brief?.colorPalette,
+    brief?.colorSelections?.join(' '),
+    brief?.allowShadows ? 'shadows allowed' : '',
+    brief?.allowPhotoreal ? 'photoreal allowed' : '',
+    brief?.clientNotes,
     request.preferredEra,
   ]
     .filter(Boolean)
     .join(' ');
 }
 
-function decisionToRules(decision: DesignDecision): DesignRule[] {
+function decisionToRules(
+  decision: DesignDecision,
+  request?: BrainGenerateRequest,
+): DesignRule[] {
   const rules: DesignRule[] = [];
 
   for (const principle of decision.principles) {
@@ -85,7 +99,14 @@ function decisionToRules(decision: DesignDecision): DesignRule[] {
     });
   }
 
-  for (const id of ['render-flat-vector', 'render-no-shadows', 'color-no-gradient']) {
+  const style = stylePreferenceOverrides(request?.briefContext);
+  const defaultRuleIds = [
+    !style.allowPhotoreal ? 'render-flat-vector' : undefined,
+    !style.allowShadows ? 'render-no-shadows' : undefined,
+    !style.allowPhotoreal ? 'color-no-gradient' : undefined,
+  ].filter((id): id is string => Boolean(id));
+
+  for (const id of defaultRuleIds) {
     const rule = getPrincipleById(id);
     if (rule && !rules.some((r) => r.id === id)) rules.push(rule);
   }
@@ -118,17 +139,23 @@ function decisionToComposedPrompt(
   basePrompt: ComposedPrompt,
   variationIndex?: number,
 ): ComposedPrompt {
-  const brainRules = decisionToRules(decision);
+  const brainRules = decisionToRules(decision, request);
   const principles = mergePrincipleSets(basePrompt.selectedPrinciples, brainRules);
   const dna = decisionToDna(decision, request, basePrompt.dna);
 
   const text = appendAntiPatterns(decision.promptText, decision.antiPatterns);
-  const optimized = optimizePrompt(text, principles);
-  const scores = scorePrompt(optimized, principles, dna);
+  const styled = appendStylePreferenceFragments(text, request.briefContext);
+  const directed = appendArtDirectionFragments(styled, {
+    markType: decision.markType,
+    industry: request.industry,
+  });
+  const optimized = optimizePrompt(directed, principles, stylePreferenceOverrides(request.briefContext));
+  const finalText = prependClientNotes(optimized, request.briefContext?.clientNotes);
+  const scores = scorePrompt(finalText, principles, dna);
 
   return {
     id: randomUUID(),
-    text: optimized,
+    text: finalText,
     industry: request.industry,
     selectedPrinciples: principles,
     scores,
@@ -143,6 +170,15 @@ function decisionToComposedPrompt(
       confidence: decision.confidence,
       basePromptLength: basePrompt.text.length,
       enrichedPromptLength: optimized.length,
+      stylePreferences: request.briefContext
+        ? {
+            colorPalette: request.briefContext.colorPalette,
+            colorSelections: request.briefContext.colorSelections,
+            allowShadows: request.briefContext.allowShadows,
+            allowPhotoreal: request.briefContext.allowPhotoreal,
+            clientNotes: request.briefContext.clientNotes,
+          }
+        : undefined,
     },
   };
 }

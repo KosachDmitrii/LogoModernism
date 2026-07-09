@@ -20,6 +20,8 @@ export async function computeTasteProfile(prisma: PrismaClient): Promise<TastePr
     return {
       preferredMarkTypes: ['wordmark', 'lettermark'],
       preferredGeometry: ['circle', 'grid-based'],
+      preferredColors: ['black_white'],
+      preferredRendering: ['flat vector'],
       avoidedPatterns: ['gradients', 'shadows', 'photorealism'],
       averageScore: 7,
       signalCount: 0,
@@ -29,6 +31,8 @@ export async function computeTasteProfile(prisma: PrismaClient): Promise<TastePr
 
   const markTypes = new Map<string, number>();
   const geometry = new Map<string, number>();
+  const colors = new Map<string, number>();
+  const rendering = new Map<string, number>();
   const avoided = new Map<string, number>();
   let scoreSum = 0;
 
@@ -59,6 +63,42 @@ export async function computeTasteProfile(prisma: PrismaClient): Promise<TastePr
       geometry.set(shape, (geometry.get(shape) ?? 0) + weight);
     }
 
+    for (const color of extractTags(text, [
+      'black_white',
+      'monochrome',
+      'two_color',
+      'multi_color',
+      'corporate_blue',
+      'red_accent',
+      'limited',
+      'custom',
+      'black',
+      'white',
+      'charcoal',
+      'red',
+      'orange',
+      'yellow',
+      'green',
+      'blue',
+      'purple',
+      'brown',
+      'gold',
+    ])) {
+      colors.set(color, (colors.get(color) ?? 0) + weight);
+    }
+
+    for (const render of extractTags(text, [
+      'shadow',
+      'shadows',
+      'photoreal',
+      'photorealism',
+      'flat vector',
+      'mockup',
+      'realistic',
+    ])) {
+      rendering.set(render, (rendering.get(render) ?? 0) + weight);
+    }
+
     if (weight < 0) {
       for (const pattern of extractTags(text, [
         'gradient',
@@ -83,6 +123,8 @@ export async function computeTasteProfile(prisma: PrismaClient): Promise<TastePr
 
   const preferredMarkTypes = topEntries(markTypes, 3);
   const preferredGeometry = topEntries(geometry, 5);
+  const preferredColors = topEntries(colors, 5);
+  const preferredRendering = topEntries(rendering, 5);
   const avoidedPatterns = topEntries(avoided, 6);
 
   const averageScore = Math.round((scoreSum / signals.length) * 10) / 10;
@@ -90,12 +132,21 @@ export async function computeTasteProfile(prisma: PrismaClient): Promise<TastePr
   return {
     preferredMarkTypes: preferredMarkTypes.length ? preferredMarkTypes : ['wordmark'],
     preferredGeometry: preferredGeometry.length ? preferredGeometry : ['geometric', 'minimal'],
+    preferredColors,
+    preferredRendering,
     avoidedPatterns: avoidedPatterns.length
       ? avoidedPatterns
       : ['gradients', 'shadows', 'photorealism'],
     averageScore,
     signalCount: signals.length,
-    summary: buildTasteSummary(preferredMarkTypes, preferredGeometry, avoidedPatterns, averageScore),
+    summary: buildTasteSummary(
+      preferredMarkTypes,
+      preferredGeometry,
+      avoidedPatterns,
+      averageScore,
+      preferredColors,
+      preferredRendering,
+    ),
   };
 }
 
@@ -104,11 +155,15 @@ function buildTasteSummary(
   geometry: string[],
   avoided: string[],
   avg: number,
+  colors: string[] = [],
+  rendering: string[] = [],
 ): string {
   return [
     `Prefers ${markTypes.join(', ') || 'modernist marks'}.`,
     `Favors ${geometry.join(', ') || 'geometric forms'}.`,
+    colors.length ? `Color taste: ${colors.join(', ')}.` : '',
+    rendering.length ? `Rendering taste: ${rendering.join(', ')}.` : '',
     `Avoids ${avoided.join(', ') || 'decorative effects'}.`,
     `Average taste score: ${avg}/10.`,
-  ].join(' ');
+  ].filter(Boolean).join(' ');
 }

@@ -64,6 +64,12 @@ export class PromptsService {
 
     const record = await this.promptRecords.getById(promptId);
     const updated = await this.promptRecords.setFeedback(promptId, signalType);
+    const stylePreferences =
+      typeof record.metadata === 'object' &&
+      record.metadata !== null &&
+      'stylePreferences' in record.metadata
+        ? (record.metadata as { stylePreferences?: Record<string, unknown> }).stylePreferences
+        : undefined;
 
     try {
       await designBrain.ingestFeedback({
@@ -74,6 +80,7 @@ export class PromptsService {
           record.companyName ? `Company: ${record.companyName}` : '',
           `Industry: ${record.industry}`,
           `Prompt ID: ${promptId}`,
+          stylePreferences ? `Style preferences: ${JSON.stringify(stylePreferences)}` : '',
           `Prompt: ${record.text}`,
         ]
           .filter(Boolean)
@@ -94,6 +101,7 @@ export class PromptsService {
             'era' in record.metadata
               ? (record.metadata as { era?: string }).era
               : undefined,
+          stylePreferences,
         },
       });
     } catch (error) {
@@ -120,6 +128,18 @@ export class PromptsService {
     }
 
     const record = await this.promptRecords.getById(promptId);
+    const stylePreferences =
+      typeof record.metadata === 'object' &&
+      record.metadata !== null &&
+      'stylePreferences' in record.metadata
+        ? (record.metadata as {
+            stylePreferences?: {
+              colorSelections?: string[];
+              allowShadows?: boolean;
+              allowPhotoreal?: boolean;
+            };
+          }).stylePreferences
+        : undefined;
     if (record.logos.length >= 3) {
       throw new BadRequestException('Maximum 3 logos per prompt');
     }
@@ -131,6 +151,9 @@ export class PromptsService {
       markType: body.markType,
       typographyStyle: body.typographyStyle,
       provider: body.provider,
+      colorSelections: stylePreferences?.colorSelections,
+      allowShadows: stylePreferences?.allowShadows,
+      allowPhotoreal: stylePreferences?.allowPhotoreal,
     });
 
     const image = generation.images[0];

@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 import { resolve } from 'node:path';
-import { enhanceDatabaseUrl } from '../../packages/database/src/db-url';
+import { enhanceDatabaseUrl } from '@logo-platform/database';
 
 const REPO_ROOT = resolve(__dirname, '../..');
 process.env.LOGO_PLATFORM_ROOT = process.env.LOGO_PLATFORM_ROOT ?? REPO_ROOT;

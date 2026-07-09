@@ -8,6 +8,7 @@ import { BriefShapesSection } from './BriefShapesSection';
 import { BriefReferencesSection } from './BriefReferencesSection';
 import { BriefProjectSummary } from './BriefProjectSummary';
 import { BriefCoverageMap } from './BriefCoverageMap';
+import { BriefStyleSection } from './BriefStyleSection';
 
 type Section = 'typography' | 'shapes' | 'style' | 'references';
 
@@ -33,7 +34,13 @@ function sectionStatus(
     return done ? 'done' : 'pending';
   }
   if (section === 'style') {
-    const done = Boolean(brief.colorPalette && brief.colorPalette !== 'auto');
+    const done = Boolean(
+      (brief.colorPalette && brief.colorPalette !== 'auto') ||
+        brief.colorSelections.length ||
+        brief.allowShadows ||
+        brief.allowPhotoreal ||
+        brief.clientNotes.trim(),
+    );
     return done ? 'done' : 'optional';
   }
   const done = (brief.catalogReferenceIds?.length ?? 0) > 0;
@@ -42,7 +49,6 @@ function sectionStatus(
 
 export function BriefBuildPanel({ onGoToReview }: BriefBuildPanelProps) {
   const designBrief = useAppStore((s) => s.designBrief);
-  const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
   const companyName = useAppStore((s) => s.companyName);
   const [openSection, setOpenSection] = useState<Section | null>('typography');
 
@@ -79,7 +85,7 @@ export function BriefBuildPanel({ onGoToReview }: BriefBuildPanelProps) {
       id: 'style',
       step: 3,
       label: 'Style',
-      description: 'Color palette preference',
+      description: 'Palette, selected colors, effects and client notes',
       icon: Palette,
     },
     {
@@ -149,30 +155,7 @@ export function BriefBuildPanel({ onGoToReview }: BriefBuildPanelProps) {
                 <div className="px-3 py-3 border-t border-zinc-800 bg-zinc-950/40">
                   {id === 'typography' && <BriefTypographySection />}
                   {id === 'shapes' && <BriefShapesSection />}
-                  {id === 'style' && (
-                    <div>
-                      <label className="block text-[10px] font-medium text-zinc-500 mb-1">
-                        Color palette
-                      </label>
-                      <select
-                        value={designBrief.colorPalette}
-                        onChange={(e) =>
-                          updateDesignBrief({
-                            colorPalette: e.target.value as typeof designBrief.colorPalette,
-                          })
-                        }
-                        className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
-                      >
-                        <option value="">Auto (from rules)</option>
-                        <option value="black_white">Black & white only</option>
-                        <option value="monochrome">Monochrome</option>
-                        <option value="two_color">Two-color max</option>
-                        <option value="corporate_blue">Corporate blue</option>
-                        <option value="red_accent">Red accent</option>
-                        <option value="limited">Limited palette</option>
-                      </select>
-                    </div>
-                  )}
+                  {id === 'style' && <BriefStyleSection />}
                   {id === 'references' && <BriefReferencesSection />}
                 </div>
               )}

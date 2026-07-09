@@ -50,7 +50,7 @@ Return ONLY JSON:
   "antiPatterns": ["gradients", "shadows", "photorealism"],
   "catalogReferences": ["ref-id or name"],
   "reasoning": "2-4 sentences explaining what you added and why",
-  "promptText": "ENRICHED image generation prompt — must preserve ALL base directives and add specificity",
+  "promptText": "Full enriched image-generation prompt preserving all base directives",
   "confidence": 0.0-1.0
 }
 
@@ -61,6 +61,7 @@ Enrichment rules:
 - promptText must be AT LEAST as long and detailed as the base prompt
 - NEVER replace the base prompt with a short generic template
 - Respect brief constraints and taste profile avoided patterns
+- If CLIENT NOTES are provided, use them for enrichment only — do NOT paste them verbatim in promptText (they are injected automatically as a Client preferences prefix)
 - Use catalog references as inspiration, not copies
 - Prefer minimal, timeless, Swiss/modernist aesthetic
 - promptText must be ready for an image model
@@ -114,6 +115,12 @@ export async function reasonDesignDecision(context: ReasoningContext): Promise<D
     'Taste profile:',
     context.tasteProfile.summary,
     `Preferred geometry: ${context.tasteProfile.preferredGeometry.join(', ')}`,
+    context.tasteProfile.preferredColors?.length
+      ? `Preferred colors: ${context.tasteProfile.preferredColors.join(', ')}`
+      : '',
+    context.tasteProfile.preferredRendering?.length
+      ? `Preferred rendering: ${context.tasteProfile.preferredRendering.join(', ')}`
+      : '',
     `Avoid: ${context.tasteProfile.avoidedPatterns.join(', ')}`,
     '',
     'Retrieved experience memory:',
@@ -182,17 +189,29 @@ function finalizeDecision(decision: DesignDecision, context: ReasoningContext): 
 
   return {
     ...sanitized,
-    promptText: mergeEnrichedPrompt(context.basePromptText, sanitized.promptText, enrichmentContext),
+    promptText: mergeEnrichedPrompt(
+      context.basePromptText,
+      sanitized.promptText,
+      enrichmentContext,
+      context.briefContext?.clientNotes,
+    ),
   };
 }
 
 function formatBrief(brief?: BriefContext): string {
   if (!brief) return 'No explicit brief — infer from industry and catalog.';
 
-  return Object.entries(brief)
-    .filter(([, value]) => Boolean(value))
-    .map(([key, value]) => `${key}: ${value}`)
-    .join('\n');
+  const lines: string[] = [];
+  if (brief.clientNotes?.trim()) {
+    lines.push(`CLIENT NOTES (context only — do not paste verbatim into promptText): ${brief.clientNotes.trim()}`);
+  }
+
+  for (const [key, value] of Object.entries(brief)) {
+    if (key === 'clientNotes' || !value) continue;
+    lines.push(`${key}: ${Array.isArray(value) ? value.join(', ') : value}`);
+  }
+
+  return lines.length > 0 ? lines.join('\n') : 'No explicit brief — infer from industry and catalog.';
 }
 
 const VALID_MARK_TYPES = new Set(['wordmark', 'lettermark', 'combination']);

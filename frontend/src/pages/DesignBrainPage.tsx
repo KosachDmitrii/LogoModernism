@@ -243,6 +243,16 @@ export function DesignBrainPage() {
                     +{g}
                   </span>
                 ))}
+                {(taste.preferredColors ?? []).map((c) => (
+                  <span key={c} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-300">
+                    color:{c}
+                  </span>
+                ))}
+                {(taste.preferredRendering ?? []).map((r) => (
+                  <span key={r} className="text-[10px] px-2 py-0.5 rounded-full bg-violet-900/30 text-violet-300">
+                    render:{r}
+                  </span>
+                ))}
                 {taste.avoidedPatterns.map((a) => (
                   <span key={a} className="text-[10px] px-2 py-0.5 rounded-full bg-red-900/20 text-red-300">
                     −{a}

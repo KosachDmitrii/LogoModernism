@@ -126,7 +126,13 @@ export const useAppStore = create<AppState>()(
             patch.catalogReferenceIds !== undefined &&
             !catalogRefsEqual(patch.catalogReferenceIds, state.designBrief.catalogReferenceIds);
           const eraChanged = patch.era !== undefined && patch.era !== state.designBrief.era;
-          return catalogChanged || eraChanged
+          const styleChanged =
+            patch.clientNotes !== undefined ||
+            patch.colorPalette !== undefined ||
+            patch.colorSelections !== undefined ||
+            patch.allowShadows !== undefined ||
+            patch.allowPhotoreal !== undefined;
+          return catalogChanged || eraChanged || styleChanged
             ? { designBrief, ...clearPromptResults() }
             : { designBrief };
         }),
