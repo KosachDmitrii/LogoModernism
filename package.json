@@ -20,6 +20,7 @@
     "db:generate": "npm run db:generate -w @logo-platform/database",
     "db:push": "npm run db:push -w @logo-platform/database",
     "db:brain-setup": "npm run db:brain-setup -w @logo-platform/database",
+    "db:prompts-setup": "npm run db:prompts-setup -w @logo-platform/database",
     "db:supabase-check": "npm run db:supabase-check -w @logo-platform/database",
     "brain:consolidate": "npm run consolidate -w @logo-platform/design-brain",
     "dev:backend": "npm run dev -w @logo-platform/backend",

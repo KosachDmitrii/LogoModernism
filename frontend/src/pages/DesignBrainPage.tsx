@@ -25,6 +25,8 @@ import {
   runBrainResearch,
 } from '../api';
 import type { BrainResearchCandidate } from '../types';
+import { PageContainer } from '../components/PageContainer';
+import { PageHeader } from '../components/PageHeader';
 import {
   useBrainIngestStore,
   useIsBrainIngesting,
@@ -37,17 +39,20 @@ export function DesignBrainPage() {
   const [tab, setTab] = useState<Tab>('overview');
   const queryClient = useQueryClient();
 
-  const { data: health } = useQuery({ queryKey: ['brain-health'], queryFn: getBrainHealth });
-  const { data: stats } = useQuery({ queryKey: ['brain-stats'], queryFn: getBrainStats });
-  const { data: taste } = useQuery({ queryKey: ['brain-taste'], queryFn: getBrainTasteProfile });
-  const { data: principles } = useQuery({
+  const { data: health, isLoading: healthLoading } = useQuery({ queryKey: ['brain-health'], queryFn: getBrainHealth });
+  const { data: stats, isLoading: statsLoading } = useQuery({ queryKey: ['brain-stats'], queryFn: getBrainStats });
+  const { data: taste, isLoading: tasteLoading } = useQuery({ queryKey: ['brain-taste'], queryFn: getBrainTasteProfile });
+  const { data: principles, isLoading: principlesLoading } = useQuery({
     queryKey: ['brain-principles'],
     queryFn: () => listBrainPrinciples(20),
   });
-  const { data: pendingResearch, refetch: refetchPending } = useQuery({
+  const { data: pendingResearch, isLoading: pendingResearchLoading, refetch: refetchPending } = useQuery({
     queryKey: ['brain-research-pending'],
     queryFn: () => listBrainResearchCandidates('pending'),
   });
+
+  const isLoading =
+    healthLoading || statsLoading || tasteLoading || principlesLoading || pendingResearchLoading;
 
   const [pdfTitle, setPdfTitle] = useState('');
   const [researchQuery, setResearchQuery] = useState('');
@@ -141,14 +146,11 @@ export function DesignBrainPage() {
   ];
 
   return (
-    <div className="max-w-5xl mx-auto px-8 py-10">
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold mb-1 flex items-center gap-2">
-          <Brain size={24} className="text-violet-400" /> Design Brain
-        </h1>
-        <p className="text-sm text-zinc-500">
-          Learning analytics, knowledge upload, and autonomous web research with quality control.
-        </p>
+    <PageContainer>
+      <PageHeader
+        page="brain"
+        subtitle="Central knowledge base — upload sources, research, taste signals. Applied automatically when composing prompts."
+      >
         <div className="flex flex-wrap gap-2 mt-3 text-[10px]">
           <StatusPill ok={health?.databaseConfigured} label="PostgreSQL" />
           <StatusPill ok={health?.embeddingConfigured} label="Embeddings" />
@@ -162,7 +164,7 @@ export function DesignBrainPage() {
             </span>
           )}
         </div>
-      </header>
+      </PageHeader>
 
       <div className="flex gap-1 mb-8 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
         {tabs.map(({ id, label, icon: Icon }) => (
@@ -187,6 +189,13 @@ export function DesignBrainPage() {
         ))}
       </div>
 
+      {isLoading ? (
+        <div className="flex items-center justify-center gap-2 py-24 text-zinc-500">
+          <Loader2 size={18} className="animate-spin" />
+          Loading brain data…
+        </div>
+      ) : (
+        <>
       {tab === 'overview' && (
         <div className="space-y-6">
           <div className="grid sm:grid-cols-4 gap-4">
@@ -430,7 +439,9 @@ export function DesignBrainPage() {
           </div>
         </div>
       )}
-    </div>
+        </>
+      )}
+    </PageContainer>
   );
 }
 

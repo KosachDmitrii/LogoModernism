@@ -1,7 +1,9 @@
 import type { DesignRule, LogoMarkType, TypographyStyle } from '@logo-platform/shared';
+import { hasExplicitBrandName } from '@logo-platform/shared';
 
 export interface MarkTypeFilterOptions {
   typographyStyle?: TypographyStyle;
+  companyName?: string | null;
 }
 
 const WORDMARK_SKIP_CATEGORIES = new Set<DesignRule['category']>([
@@ -18,6 +20,19 @@ const LETTERMARK_SKIP_CATEGORIES = new Set<DesignRule['category']>([
 ]);
 
 const CONSTRUCTED_ALLOW_CATEGORIES = new Set<DesignRule['category']>(['grid', 'construction']);
+
+const SYMBOL_ONLY_SKIP_CATEGORIES = new Set<DesignRule['category']>(['typography']);
+
+const SYMBOL_ONLY_BLOCKED_IDS = new Set([
+  'typ-initials',
+  'typ-wordmark',
+  'typ-monogram',
+  'typ-custom-letterform',
+  'mark-lettermark',
+]);
+
+const SYMBOL_ONLY_FRAGMENT =
+  /\b(lettermark|wordmark|monogram|bold initials|standalone initial|custom wordmark|typographic logotype)\b/i;
 
 const BLOCKED_IDS: Record<LogoMarkType, Set<string>> = {
   wordmark: new Set([
@@ -56,11 +71,19 @@ function isConstructed(options?: MarkTypeFilterOptions): boolean {
   return options?.typographyStyle === 'constructed';
 }
 
+function isSymbolOnlyMode(markType?: LogoMarkType, options?: MarkTypeFilterOptions): boolean {
+  return !markType && !hasExplicitBrandName(options?.companyName);
+}
+
 function shouldSkipCategory(
   category: DesignRule['category'],
   markType?: LogoMarkType,
   options?: MarkTypeFilterOptions,
 ): boolean {
+  if (isSymbolOnlyMode(markType, options) && SYMBOL_ONLY_SKIP_CATEGORIES.has(category)) {
+    return true;
+  }
+
   if (!markType) return false;
 
   if (isConstructed(options) && CONSTRUCTED_ALLOW_CATEGORIES.has(category)) {
@@ -77,6 +100,12 @@ export function isPrincipleAllowedForMarkType(
   markType?: LogoMarkType,
   options?: MarkTypeFilterOptions,
 ): boolean {
+  if (isSymbolOnlyMode(markType, options)) {
+    if (SYMBOL_ONLY_SKIP_CATEGORIES.has(rule.category)) return false;
+    if (SYMBOL_ONLY_BLOCKED_IDS.has(rule.id)) return false;
+    if (SYMBOL_ONLY_FRAGMENT.test(rule.promptFragment)) return false;
+  }
+
   if (!markType) return true;
 
   if (shouldSkipCategory(rule.category, markType, options)) {

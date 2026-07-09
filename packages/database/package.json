@@ -11,6 +11,7 @@
     "db:migrate": "tsx scripts/prisma-cli.ts migrate dev",
     "db:studio": "tsx scripts/prisma-cli.ts studio",
     "db:brain-setup": "tsx scripts/brain-setup.ts",
+    "db:prompts-setup": "tsx scripts/prompts-setup.ts",
     "db:supabase-check": "tsx scripts/supabase-check.ts"
   },
   "dependencies": {

@@ -5,6 +5,7 @@ exports.loadProjectEnv = loadProjectEnv;
 const node_fs_1 = require("node:fs");
 const dotenv_1 = require("dotenv");
 const node_path_1 = require("node:path");
+const db_url_1 = require("../src/db-url");
 function resolveRepoRoot() {
     if (process.env.LOGO_PLATFORM_ROOT) {
         return process.env.LOGO_PLATFORM_ROOT;
@@ -30,15 +31,20 @@ function resolveRepoRoot() {
     return (0, node_path_1.resolve)(__dirname, '../../..');
 }
 function resolveDatabaseUrl() {
-    if (process.env.DATABASE_URL)
+    if (process.env.DATABASE_POOLER_URL) {
+        process.env.DATABASE_URL = (0, db_url_1.enhanceDatabaseUrl)(process.env.DATABASE_POOLER_URL);
         return;
+    }
+    if (process.env.DATABASE_URL) {
+        process.env.DATABASE_URL = (0, db_url_1.enhanceDatabaseUrl)(process.env.DATABASE_URL);
+        return;
+    }
     const ref = process.env.SUPABASE_PROJECT_REF;
     const password = process.env.SUPABASE_DB_PASSWORD;
     if (!ref || !password)
         return;
     const encoded = encodeURIComponent(password);
-    process.env.DATABASE_URL =
-        `postgresql://postgres:${encoded}@db.${ref}.supabase.co:5432/postgres?sslmode=require`;
+    process.env.DATABASE_URL = (0, db_url_1.enhanceDatabaseUrl)(`postgresql://postgres:${encoded}@db.${ref}.supabase.co:5432/postgres?sslmode=require`);
 }
 function loadProjectEnv() {
     const repoRoot = resolveRepoRoot();

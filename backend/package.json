@@ -8,7 +8,12 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@logo-platform/ai-engines": "*",
+    "@logo-platform/database": "*",
     "@logo-platform/design-brain": "*",
+    "@logo-platform/image-generator": "*",
+    "@logo-platform/knowledge-base": "*",
+    "@logo-platform/prompt-engine": "*",
     "@logo-platform/shared": "*",
     "@nestjs/common": "^11.0.7",
     "@nestjs/core": "^11.0.7",

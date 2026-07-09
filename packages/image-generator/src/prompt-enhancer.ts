@@ -1,5 +1,13 @@
 import type { ImageGenerationRequest, LogoMarkType } from '@logo-platform/shared';
-import { isMultiWordCompanyName, lettermarkTextFromName } from '@logo-platform/shared';
+import {
+  exactBrandSpellingInstruction,
+  isMultiWordCompanyName,
+  lettermarkTextFromName,
+  normalizeBrandName,
+  resolveMarkTypeForBrand,
+  resolveTypographyStyleForBrand,
+  NO_BRAND_TEXT_INSTRUCTION,
+} from '@logo-platform/shared';
 
 const ICON_SUFFIX =
   ' Professional logo design, flat vector style, clean white background, ' +
@@ -54,48 +62,72 @@ function detectMarkType(request: ImageGenerationRequest): LogoMarkType | undefin
     text.includes('wordmark only') ||
     text.includes('typography-only wordmark') ||
     text.includes('typography only wordmark') ||
-    text.includes('wordmark logo design')
+    text.includes('wordmark logo design') ||
+    text.includes('typographic wordmark')
   ) {
     return 'wordmark';
   }
   return undefined;
 }
 
+function withExactSpelling(
+  text: string,
+  companyName: string | undefined,
+  markType: LogoMarkType | undefined,
+): string {
+  if (!companyName?.trim()) return text;
+  const effectiveMarkType = markType ?? 'wordmark';
+  const spelling = exactBrandSpellingInstruction(companyName, effectiveMarkType);
+  return `${text} ${spelling}`;
+}
+
 export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
   const base = request.prompt.trim();
-  const company = request.companyName ? ` for "${request.companyName}"` : '';
-  const markType = detectMarkType(request);
+  const brandName = normalizeBrandName(request.companyName);
+  const company = brandName ? ` for "${brandName}"` : '';
+  const detectedMarkType = detectMarkType(request);
+  const typographyStyle = resolveTypographyStyleForBrand(request.typographyStyle, brandName);
+  const markType = brandName
+    ? (request.markType ?? detectedMarkType)
+    : resolveMarkTypeForBrand(request.markType ?? detectedMarkType, brandName, typographyStyle);
   const isConstructed =
-    request.typographyStyle === 'constructed' ||
+    typographyStyle === 'constructed' ||
     base.toLowerCase().includes('constructed typography') ||
     base.toLowerCase().includes('constructed typographic');
 
-  if (isConstructed) {
-    if (base.toLowerCase().includes('constructed')) {
-      return `${base}${company}. ${CONSTRUCTED_SUFFIX}`;
-    }
-    return `Constructed typography logo${company}: ${base}. ${CONSTRUCTED_SUFFIX}`;
+  if (!brandName) {
+    const text = base.toLowerCase().includes('logo')
+      ? `${base}. ${ICON_SUFFIX} ${NO_BRAND_TEXT_INSTRUCTION}`
+      : `Minimal geometric logo: ${base}. ${ICON_SUFFIX} ${NO_BRAND_TEXT_INSTRUCTION}`;
+    return text;
   }
 
-  if (markType === 'lettermark' && request.companyName) {
-    if (base.toLowerCase().includes('lettermark')) {
-      return `${base}${company}. ${lettermarkSuffix(request.companyName)}`;
-    }
-    return `Lettermark logo${company}: ${base}. ${lettermarkSuffix(request.companyName)}`;
+  if (isConstructed) {
+    const text = base.toLowerCase().includes('constructed')
+      ? `${base}${company}. ${CONSTRUCTED_SUFFIX}`
+      : `Constructed typography logo${company}: ${base}. ${CONSTRUCTED_SUFFIX}`;
+    return withExactSpelling(text, brandName, markType);
+  }
+
+  if (markType === 'lettermark' && brandName) {
+    const text = base.toLowerCase().includes('lettermark')
+      ? `${base}${company}. ${lettermarkSuffix(brandName)}`
+      : `Lettermark logo${company}: ${base}. ${lettermarkSuffix(brandName)}`;
+    return withExactSpelling(text, brandName, 'lettermark');
   }
 
   if (markType === 'wordmark') {
-    if (base.toLowerCase().includes('wordmark')) {
-      return `${base}${company}. ${WORDMARK_SUFFIX}`;
-    }
-    return `Typographic wordmark logo${company}: ${base}. ${WORDMARK_SUFFIX}`;
+    const text = base.toLowerCase().includes('wordmark')
+      ? `${base}${company}. ${WORDMARK_SUFFIX}`
+      : `Typographic wordmark logo${company}: ${base}. ${WORDMARK_SUFFIX}`;
+    return withExactSpelling(text, brandName, 'wordmark');
   }
 
   if (base.toLowerCase().includes('logo')) {
-    return `${base}${company}. ${ICON_SUFFIX}`;
+    return withExactSpelling(`${base}${company}. ${ICON_SUFFIX}`, brandName, markType);
   }
 
-  return `Minimal geometric logo${company}: ${base}. ${ICON_SUFFIX}`;
+  return withExactSpelling(`Minimal geometric logo${company}: ${base}. ${ICON_SUFFIX}`, brandName, markType);
 }
 
 export function resolveMarkTypeFromPrompt(text: string): LogoMarkType | undefined {

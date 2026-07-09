@@ -12,7 +12,7 @@ import { critiqueLogo } from './logo-critic.engine';
 import { runEvolution } from './evolution.engine';
 
 export interface FullPipelineInput {
-  companyName: string;
+  companyName?: string;
   industry: string;
   variationCount?: number;
   inspirationMode?: BrandDNAInput['personality'];
@@ -21,11 +21,11 @@ export interface FullPipelineInput {
 }
 
 export interface FullPipelineResult {
-  brandDNA: ReturnType<typeof analyzeBrandDNA>;
-  letterDNA: ReturnType<typeof analyzeLetterDNA>;
+  brandDNA?: ReturnType<typeof analyzeBrandDNA>;
+  letterDNA?: ReturnType<typeof analyzeLetterDNA>;
   geometry: ReturnType<typeof analyzeGeometry>;
   shapePsychology: ReturnType<typeof analyzeShapePsychology>;
-  typography: ReturnType<typeof analyzeTypography>;
+  typography?: ReturnType<typeof analyzeTypography>;
   composition: ReturnType<typeof analyzeComposition>;
   construction: ReturnType<typeof solveConstruction>;
   svgBlueprint: ReturnType<typeof generateSVGBlueprint>;
@@ -35,43 +35,56 @@ export interface FullPipelineResult {
 }
 
 export function runFullPipeline(input: FullPipelineInput): FullPipelineResult {
-  const brandDNA = analyzeBrandDNA({
-    companyName: input.companyName,
-    industry: input.industry,
-    preferredEra: input.preferredEra,
-    personality: input.inspirationMode,
-    markType: mapMarkType(input.markType),
-  });
-
-  const letterDNA = analyzeLetterDNA({ text: input.companyName, style: 'geometric' });
+  const companyName = input.companyName?.trim();
+  const hasBrandName = Boolean(companyName);
+  const resolvedMarkType = hasBrandName ? mapMarkType(input.markType) : undefined;
+  const compositionMarkType = hasBrandName
+    ? mapCompositionMarkType(input.markType)
+    : 'symbol';
 
   const geometry = analyzeGeometry({
     industry: input.industry,
-    complexity: brandDNA.visualTraits.complexity,
+    complexity: 'minimal',
   });
+  const brandDNA = hasBrandName
+    ? analyzeBrandDNA({
+        companyName: companyName!,
+        industry: input.industry,
+        preferredEra: input.preferredEra,
+        personality: input.inspirationMode,
+        markType: resolvedMarkType,
+      })
+    : undefined;
+  const letterDNA = hasBrandName
+    ? analyzeLetterDNA({ text: companyName!, style: 'geometric' })
+    : undefined;
 
   const shapePsychology = analyzeShapePsychology({
     shapes: geometry.recommendations.slice(0, 3).map((r) => r.name.toLowerCase()),
     industry: input.industry,
-    brandPersonality: brandDNA.personality,
+    brandPersonality: brandDNA?.personality ?? 'technical',
   });
 
-  const typography = analyzeTypography({
-    companyName: input.companyName,
-    industry: input.industry,
-    markType: mapMarkType(input.markType),
-  });
+  const typography = hasBrandName
+    ? analyzeTypography({
+        companyName: companyName!,
+        industry: input.industry,
+        markType: resolvedMarkType,
+      })
+    : undefined;
 
   const composition = analyzeComposition({
-    markType: mapCompositionMarkType(input.markType ?? brandDNA.markType),
+    markType: hasBrandName
+      ? mapCompositionMarkType(input.markType ?? brandDNA?.markType)
+      : compositionMarkType,
     industry: input.industry,
-    hasNegativeSpace: letterDNA.counterSpaceStrategy.toLowerCase().includes('negative'),
+    hasNegativeSpace: letterDNA?.counterSpaceStrategy.toLowerCase().includes('negative') ?? false,
   });
 
   const topPrimitives = geometry.recommendations.slice(0, 2).map((r) => r.primitiveId);
   const construction = solveConstruction({
     primitiveIds: topPrimitives,
-    targetComplexity: brandDNA.visualTraits.complexity,
+    targetComplexity: brandDNA?.visualTraits.complexity ?? 'minimal',
   });
 
   const svgBlueprint = generateSVGBlueprint({
@@ -80,20 +93,21 @@ export function runFullPipeline(input: FullPipelineInput): FullPipelineResult {
   });
 
   const analysisPrincipleIds = [
-    ...brandDNA.principleIds,
+    ...(brandDNA?.principleIds ?? []),
     ...composition.recommendedLayout.principleIds,
-    typography.primaryRecommendation.principleId,
-    ...typography.alternatives.slice(0, 2).map((a) => a.principleId),
+    ...(typography ? [typography.primaryRecommendation.principleId] : []),
+    ...(typography?.alternatives.slice(0, 2).map((a) => a.principleId) ?? []),
   ].filter((id, i, arr) => arr.indexOf(id) === i);
 
   const promptRequest: PromptGenerationRequest = {
     industry: input.industry,
-    companyName: input.companyName,
+    companyName,
     variationCount: input.variationCount ?? 5,
-    preferredEra: input.preferredEra ?? brandDNA.visualTraits.era,
-    minimalismLevel: brandDNA.visualTraits.complexity === 'minimal' ? 9 : 7,
+    preferredEra: input.preferredEra ?? brandDNA?.visualTraits.era,
+    minimalismLevel: brandDNA?.visualTraits.complexity === 'minimal' ? 9 : 8,
     inspirationMode: input.inspirationMode as PromptGenerationRequest['inspirationMode'],
     analysisPrincipleIds,
+    markType: hasBrandName ? undefined : 'combination',
   };
 
   const prompts = runPromptPipeline(promptRequest);

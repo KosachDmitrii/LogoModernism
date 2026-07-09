@@ -11,12 +11,17 @@ import type {
   TasteProfile,
 } from '@logo-platform/shared';
 import { getPrincipleById, designPrinciples } from '@logo-platform/knowledge-base';
-import { scorePrompt, optimizePrompt } from '@logo-platform/prompt-engine';
+import { appendAntiPatterns, optimizePrompt, scorePrompt } from '@logo-platform/prompt-engine';
 import type { PrismaClient } from '@logo-platform/database';
 import { computeTasteProfile } from '../learning/taste-profile';
 import { listLearnedPrinciples } from '../storage/experience.repository';
 import { semanticSearch } from '../retrieval/semantic-search';
 import { reasonDesignDecision } from './brain-reasoning';
+import {
+  buildBasePromptFromRules,
+  buildVariationPrompt,
+  mergePrincipleSets,
+} from './prompt-enrichment';
 
 export interface BrainPipelineResult {
   prompts: ComposedPrompt[];
@@ -88,34 +93,36 @@ function decisionToRules(decision: DesignDecision): DesignRule[] {
   return rules;
 }
 
-function decisionToDna(decision: DesignDecision, request: BrainGenerateRequest): LogoDNA {
+function decisionToDna(
+  decision: DesignDecision,
+  request: BrainGenerateRequest,
+  baseDna?: LogoDNA,
+): LogoDNA {
   return {
-    geometry: decision.geometry,
-    construction: decision.construction,
-    balance: decision.composition,
-    complexity: request.minimalismLevel && request.minimalismLevel >= 7 ? 'minimal' : 'medium',
-    era: (decision.era as Era) ?? 'swiss',
-    typography: decision.typography,
+    geometry: decision.geometry.length ? decision.geometry : (baseDna?.geometry ?? []),
+    construction: decision.construction.length ? decision.construction : (baseDna?.construction ?? []),
+    balance: decision.composition.length ? decision.composition : (baseDna?.balance ?? []),
+    complexity: request.minimalismLevel && request.minimalismLevel >= 7 ? 'minimal' : (baseDna?.complexity ?? 'medium'),
+    era: (decision.era as Era) ?? baseDna?.era ?? 'swiss',
+    typography: decision.typography.length ? decision.typography : (baseDna?.typography ?? []),
     recognition: Math.round(decision.confidence * 10),
-    minimalism: request.minimalismLevel ?? 8,
-    visualWeight: ['medium'],
-    harmony: ['geometric'],
+    minimalism: request.minimalismLevel ?? baseDna?.minimalism ?? 8,
+    visualWeight: baseDna?.visualWeight ?? ['medium'],
+    harmony: baseDna?.harmony ?? ['geometric'],
   };
 }
 
 function decisionToComposedPrompt(
   decision: DesignDecision,
   request: BrainGenerateRequest,
+  basePrompt: ComposedPrompt,
   variationIndex?: number,
 ): ComposedPrompt {
-  const principles = decisionToRules(decision);
-  const dna = decisionToDna(decision, request);
+  const brainRules = decisionToRules(decision);
+  const principles = mergePrincipleSets(basePrompt.selectedPrinciples, brainRules);
+  const dna = decisionToDna(decision, request, basePrompt.dna);
 
-  let text = decision.promptText;
-  if (decision.antiPatterns.length) {
-    text += `. Avoid: ${decision.antiPatterns.join(', ')}`;
-  }
-
+  const text = appendAntiPatterns(decision.promptText, decision.antiPatterns);
   const optimized = optimizePrompt(text, principles);
   const scores = scorePrompt(optimized, principles, dna);
 
@@ -134,6 +141,8 @@ function decisionToComposedPrompt(
       brainPowered: true,
       reasoning: decision.reasoning,
       confidence: decision.confidence,
+      basePromptLength: basePrompt.text.length,
+      enrichedPromptLength: optimized.length,
     },
   };
 }
@@ -155,6 +164,7 @@ export async function runBrainPromptPipeline(
 ): Promise<BrainPipelineResult> {
   const variationCount = Math.min(request.variationCount ?? 5, 20);
   const retrievalQuery = buildRetrievalQuery(request);
+  const basePrompt = buildBasePromptFromRules(request);
 
   const [searchResult, learned, tasteProfile] = await Promise.all([
     semanticSearch(prisma, { query: retrievalQuery, limit: 8 }),
@@ -180,19 +190,18 @@ export async function runBrainPromptPipeline(
     typographyStyle: request.typographyStyle,
     preferredEra: request.preferredEra,
     minimalismLevel: request.minimalismLevel,
+    basePromptText: basePrompt.text,
+    basePrinciples: basePrompt.selectedPrinciples,
   });
 
   const prompts: ComposedPrompt[] = [];
   for (let i = 0; i < variationCount; i++) {
     const variantDecision: DesignDecision = {
       ...decision,
-      promptText:
-        i === 0
-          ? decision.promptText
-          : `${decision.promptText}. Variation ${i + 1}: emphasize ${decision.geometry[i % decision.geometry.length] ?? 'geometric clarity'}.`,
+      promptText: buildVariationPrompt(decision.promptText, decision.geometry, i),
       confidence: Math.max(0.3, decision.confidence - i * 0.03),
     };
-    prompts.push(decisionToComposedPrompt(variantDecision, request, i + 1));
+    prompts.push(decisionToComposedPrompt(variantDecision, request, basePrompt, i + 1));
   }
 
   prompts.sort((a, b) => b.scores.promptQuality - a.scores.promptQuality);

@@ -134,7 +134,30 @@ model PromptRun {
   bestScore   Float?
   createdAt   DateTime @default(now())
 
-  project Project? @relation(fields: [projectId], references: [id])
+  project Project?              @relation(fields: [projectId], references: [id])
+  prompts ComposedPromptRecord[]
+}
+
+model ComposedPromptRecord {
+  id                 String   @id
+  promptRunId        String?
+  industry           String
+  companyName        String?
+  text               String   @db.Text
+  scores             Json
+  dna                Json
+  metadata           Json     @default("{}")
+  selectedPrinciples Json     @default("[]")
+  rank               Int?
+  logos              Json     @default("[]")
+  feedback           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  promptRun PromptRun? @relation(fields: [promptRunId], references: [id], onDelete: SetNull)
+
+  @@index([promptRunId])
+  @@index([createdAt])
 }
 
 model DesignPrinciple {

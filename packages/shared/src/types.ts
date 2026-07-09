@@ -112,6 +112,8 @@ export interface CatalogSearchFilters {
   section?: string;
   era?: Era;
   industry?: string;
+  /** Sort results by relevance to this project industry */
+  rankByIndustry?: string;
   designer?: string;
   entryKind?: CatalogEntryKind;
   markType?: CatalogMarkType;
@@ -206,6 +208,8 @@ export interface ComposedPrompt {
   selectedPrinciples: DesignRule[];
   scores: PromptScores;
   dna: LogoDNA;
+  logos?: import('./image-types').GeneratedImage[];
+  feedback?: 'LIKE' | 'DISLIKE';
   metadata: {
     era: Era;
     variationIndex?: number;
@@ -215,6 +219,8 @@ export interface ComposedPrompt {
     brainPowered?: boolean;
     reasoning?: string;
     confidence?: number;
+    basePromptLength?: number;
+    enrichedPromptLength?: number;
   };
 }
 
@@ -237,7 +243,7 @@ export interface PromptGenerationRequest {
   catalogNarrative?: string;
   /** Design brief context from client */
   briefContext?: import('./brain-types').BriefContext;
-  /** Use Design Brain reasoning instead of rule-based pipeline */
+  /** When false, skip Brain and use rule-based pipeline only */
   useBrain?: boolean;
 }
 

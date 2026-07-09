@@ -1,5 +1,17 @@
-import type { BriefContext, DesignDecision, TasteProfile } from '@logo-platform/shared';
+import type { BriefContext, DesignDecision, DesignRule, TasteProfile } from '@logo-platform/shared';
 import { buildCatalogPromptContext } from '@logo-platform/knowledge-base';
+import {
+  exactBrandSpellingFragment,
+  hasExplicitBrandName,
+  normalizeBrandName,
+  NO_BRAND_TEXT_FRAGMENT,
+  resolveMarkTypeForBrand,
+} from '@logo-platform/shared';
+import {
+  mergeEnrichedPrompt,
+  sanitizeDecision,
+  type EnrichmentContext,
+} from './prompt-enrichment';
 
 export interface ReasoningContext {
   industry: string;
@@ -14,12 +26,14 @@ export interface ReasoningContext {
   typographyStyle?: string;
   preferredEra?: string;
   minimalismLevel?: number;
+  /** Rules-engine base prompt — Brain must enrich, not replace */
+  basePromptText?: string;
+  basePrinciples?: DesignRule[];
 }
 
-const SYSTEM_PROMPT = `You are the Design Brain — a self-learning logo design intelligence.
+const SYSTEM_PROMPT = `You are the Brain — a self-learning logo design knowledge system.
 
-Given client brief, catalog references, retrieved experience memory, learned principles, and taste profile,
-produce a structured design decision for a modernist logo.
+You ENRICH a base prompt from the rules engine. Your job is to make it MORE specific and BETTER — never shorter or more generic.
 
 Return ONLY JSON:
 {
@@ -35,21 +49,32 @@ Return ONLY JSON:
   ],
   "antiPatterns": ["gradients", "shadows", "photorealism"],
   "catalogReferences": ["ref-id or name"],
-  "reasoning": "2-4 sentences explaining the design decision",
-  "promptText": "Complete image generation prompt, flat vector modernist logo, specific and actionable",
+  "reasoning": "2-4 sentences explaining what you added and why",
+  "promptText": "ENRICHED image generation prompt — must preserve ALL base directives and add specificity",
   "confidence": 0.0-1.0
 }
 
-Rules:
+Enrichment rules:
+- The BASE PROMPT is the foundation — keep every substantive directive from it
+- ADD industry-specific visual language (concrete symbols, forms, metaphors — not just the industry name)
+- ADD insights from retrieved experience, learned principles, and catalog references
+- promptText must be AT LEAST as long and detailed as the base prompt
+- NEVER replace the base prompt with a short generic template
 - Respect brief constraints and taste profile avoided patterns
 - Use catalog references as inspiration, not copies
 - Prefer minimal, timeless, Swiss/modernist aesthetic
-- promptText must be ready for an image model`;
+- promptText must be ready for an image model
+- If companyName is provided, the logo text must spell that name exactly — correct letters in order, no substitutions or invented letters
+- If companyName is NOT provided: symbol-only logo, markType must NOT be wordmark or lettermark, no typography in promptText, no text/letters/words/initials
+- Do not require symmetry in promptText while listing perfect optical symmetry in antiPatterns — prefer grid-based balance or optical balance instead
+- antiPatterns must not repeat restrictions already stated in promptText (e.g. if prompt says "no gradients", do not list gradients in antiPatterns)`;
 
 export async function reasonDesignDecision(context: ReasoningContext): Promise<DesignDecision> {
+  const enrichmentContext = toEnrichmentContext(context);
   const apiKey = process.env.OPENAI_API_KEY;
+
   if (!apiKey) {
-    return fallbackDecision(context);
+    return finalizeDecision(fallbackDecision(context), context);
   }
 
   const catalog = buildCatalogPromptContext(context.catalogReferenceIds ?? [], {
@@ -58,15 +83,28 @@ export async function reasonDesignDecision(context: ReasoningContext): Promise<D
   });
 
   const model = process.env.OPENAI_TEXT_MODEL ?? 'gpt-4o-mini';
+  const brandName = normalizeBrandName(context.companyName);
+  const symbolOnly = !hasExplicitBrandName(brandName);
 
   const userPrompt = [
     `Industry: ${context.industry}`,
-    context.companyName ? `Company: ${context.companyName}` : '',
+    brandName ? `Company: ${brandName}` : 'Company: (none — symbol-only logo, no text)',
+    brandName
+      ? `Required logo text: ${exactBrandSpellingFragment(brandName, context.markType as DesignDecision['markType'])}`
+      : `Required: ${NO_BRAND_TEXT_FRAGMENT}`,
     context.markType ? `Requested mark type: ${context.markType}` : '',
+    symbolOnly ? 'Mark type constraint: abstract symbol only — NOT lettermark or wordmark' : '',
     context.typographyStyle ? `Typography style: ${context.typographyStyle}` : '',
     context.preferredEra ? `Preferred era: ${context.preferredEra}` : '',
     context.minimalismLevel ? `Minimalism level: ${context.minimalismLevel}/10` : '',
     '',
+    context.basePromptText
+      ? [
+          'BASE PROMPT (preserve ALL directives — enrich with specificity, do NOT shorten or replace):',
+          context.basePromptText,
+          '',
+        ].join('\n')
+      : '',
     'Brief:',
     formatBrief(context.briefContext),
     '',
@@ -102,7 +140,7 @@ export async function reasonDesignDecision(context: ReasoningContext): Promise<D
     body: JSON.stringify({
       model,
       temperature: 0.3,
-      max_tokens: 2000,
+      max_tokens: 3000,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
@@ -111,7 +149,7 @@ export async function reasonDesignDecision(context: ReasoningContext): Promise<D
   });
 
   if (!response.ok) {
-    return fallbackDecision(context);
+    return finalizeDecision(fallbackDecision(context), context);
   }
 
   const data = (await response.json()) as {
@@ -119,10 +157,33 @@ export async function reasonDesignDecision(context: ReasoningContext): Promise<D
   };
 
   const content = data.choices?.[0]?.message?.content ?? '';
-  const parsed = parseDecisionJson(content);
-  if (parsed) return parsed;
+  const parsed = parseDecisionJson(content, symbolOnly);
+  if (parsed) return finalizeDecision(parsed, context);
 
-  return fallbackDecision(context);
+  return finalizeDecision(fallbackDecision(context), context);
+}
+
+function toEnrichmentContext(context: ReasoningContext): EnrichmentContext {
+  return {
+    industry: context.industry,
+    companyName: context.companyName,
+    markType: context.markType,
+    typographyStyle: context.typographyStyle,
+  };
+}
+
+function finalizeDecision(decision: DesignDecision, context: ReasoningContext): DesignDecision {
+  const enrichmentContext = toEnrichmentContext(context);
+  const sanitized = sanitizeDecision(decision, enrichmentContext);
+
+  if (!context.basePromptText?.trim()) {
+    return sanitized;
+  }
+
+  return {
+    ...sanitized,
+    promptText: mergeEnrichedPrompt(context.basePromptText, sanitized.promptText, enrichmentContext),
+  };
 }
 
 function formatBrief(brief?: BriefContext): string {
@@ -134,13 +195,21 @@ function formatBrief(brief?: BriefContext): string {
     .join('\n');
 }
 
-export function parseDecisionJson(content: string): DesignDecision | null {
+const VALID_MARK_TYPES = new Set(['wordmark', 'lettermark', 'combination']);
+
+export function parseDecisionJson(content: string, symbolOnly = false): DesignDecision | null {
   const match = content.match(/\{[\s\S]*\}/);
   if (!match) return null;
 
   try {
     const parsed = JSON.parse(match[0]) as DesignDecision;
     if (!parsed.promptText || !parsed.markType) return null;
+    if (!VALID_MARK_TYPES.has(parsed.markType)) return null;
+    if (symbolOnly && (parsed.markType === 'wordmark' || parsed.markType === 'lettermark')) {
+      parsed.markType = 'combination';
+      parsed.typography = [];
+    }
+
     return {
       markType: parsed.markType,
       typographyStyle: parsed.typographyStyle,
@@ -162,16 +231,46 @@ export function parseDecisionJson(content: string): DesignDecision | null {
 }
 
 function fallbackDecision(context: ReasoningContext): DesignDecision {
-  const markType = (context.markType as DesignDecision['markType']) ?? 'wordmark';
-  const company = context.companyName ? ` for "${context.companyName}"` : '';
+  const brandName = normalizeBrandName(context.companyName);
+  const markType =
+    resolveMarkTypeForBrand(
+      context.markType as DesignDecision['markType'],
+      brandName,
+      context.typographyStyle as DesignDecision['typographyStyle'],
+    ) ?? 'combination';
+
+  if (context.basePromptText?.trim()) {
+    return {
+      markType: brandName ? ((context.markType as DesignDecision['markType']) ?? 'wordmark') : 'combination',
+      typographyStyle: context.typographyStyle as DesignDecision['typographyStyle'],
+      geometry: context.tasteProfile.preferredGeometry,
+      construction: ['grid-based', 'modular construction'],
+      composition: ['optical balance', 'negative space'],
+      typography: brandName ? ['geometric sans-serif'] : [],
+      era: context.preferredEra ?? 'swiss',
+      principles: context.learnedPrinciples.slice(0, 5).map((p) => ({
+        category: p.category,
+        promptFragment: p.promptFragment,
+        weight: p.weight,
+      })),
+      antiPatterns: context.tasteProfile.avoidedPatterns,
+      catalogReferences: context.catalogReferenceIds ?? [],
+      reasoning: 'Brain unavailable — using rules-engine base prompt with taste profile.',
+      promptText: context.basePromptText,
+      confidence: 0.55,
+    };
+  }
+
+  const company = brandName ? ` for "${brandName}"` : '';
+  const noText = brandName ? '' : ` ${NO_BRAND_TEXT_FRAGMENT}.`;
 
   return {
-    markType,
+    markType: brandName ? ((context.markType as DesignDecision['markType']) ?? 'wordmark') : 'combination',
     typographyStyle: context.typographyStyle as DesignDecision['typographyStyle'],
     geometry: context.tasteProfile.preferredGeometry,
     construction: ['grid-based', 'modular construction'],
     composition: ['optical balance', 'negative space'],
-    typography: ['geometric sans-serif'],
+    typography: brandName ? ['geometric sans-serif'] : [],
     era: context.preferredEra ?? 'swiss',
     principles: context.learnedPrinciples.slice(0, 5).map((p) => ({
       category: p.category,
@@ -181,7 +280,7 @@ function fallbackDecision(context: ReasoningContext): DesignDecision {
     antiPatterns: context.tasteProfile.avoidedPatterns,
     catalogReferences: context.catalogReferenceIds ?? [],
     reasoning: 'Fallback decision using taste profile and learned principles.',
-    promptText: `Minimal geometric ${markType} logo${company}. Flat vector, Swiss modernism, black on white. ${context.tasteProfile.preferredGeometry.join(', ')}. Avoid ${context.tasteProfile.avoidedPatterns.join(', ')}.`,
+    promptText: `Minimal geometric ${brandName ? markType : 'symbol'} logo${company}. Flat vector, Swiss modernism, black on white. ${context.industry}. ${context.tasteProfile.preferredGeometry.join(', ')}. Avoid ${context.tasteProfile.avoidedPatterns.join(', ')}.${noText}${brandName ? ` ${exactBrandSpellingFragment(brandName, markType)}.` : ''}`,
     confidence: 0.5,
   };
 }

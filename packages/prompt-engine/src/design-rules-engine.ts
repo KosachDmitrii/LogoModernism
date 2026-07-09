@@ -1,5 +1,10 @@
 import type { DesignRule, Era, InspirationMode, LogoDNA, LogoMarkType, Recommendation, TypographyStyle } from '@logo-platform/shared';
 import {
+  normalizeBrandName,
+  resolveMarkTypeForBrand,
+  resolveTypographyStyleForBrand,
+} from '@logo-platform/shared';
+import {
   designPrinciples,
   getConflictingPrinciples,
   getPrincipleById,
@@ -135,13 +140,16 @@ function eraPrincipleId(era: Era): string {
 
 export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResult {
   const rand = seededRandom(input.variationSeed ?? Date.now());
+  const brandName = normalizeBrandName(input.companyName);
+  const markType = resolveMarkTypeForBrand(input.markType, brandName, input.typographyStyle);
+  const typographyStyle = resolveTypographyStyleForBrand(input.typographyStyle, brandName);
   const selected: DesignRule[] = [];
   const selectedIds = new Set<string>();
-  const markFilterOptions = { typographyStyle: input.typographyStyle };
+  const markFilterOptions = { typographyStyle, companyName: brandName };
 
   const addRule = (rule: DesignRule | undefined) => {
     if (!rule || selectedIds.has(rule.id)) return;
-    if (!isPrincipleAllowedForMarkType(rule, input.markType, markFilterOptions)) return;
+    if (!isPrincipleAllowedForMarkType(rule, markType, markFilterOptions)) return;
     const conflicts = getConflictingPrinciples([...selectedIds, rule.id]);
     if (conflicts.length > 0) return;
     selected.push(rule);
@@ -155,14 +163,14 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
   // Analysis-driven principles (Brand DNA, Pipeline, Knowledge Graph, Logo Catalog)
   const catalogContext = buildCatalogPromptContext(input.catalogReferenceIds ?? [], {
     narrative: input.catalogNarrative,
-    typographyStyle: input.typographyStyle,
+    typographyStyle,
   });
   const lockedPrincipleIds = filterPrincipleIdsForMarkType(
     [
       ...(input.analysisPrincipleIds ?? []),
       ...(catalogContext?.principleIds ?? []),
     ],
-    input.markType,
+    markType,
   );
   if (lockedPrincipleIds.length) {
     for (const id of lockedPrincipleIds) {
@@ -204,7 +212,7 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
 
   for (const category of CATEGORY_ORDER) {
     if (['industry', 'era', 'inspiration'].includes(category)) continue;
-    if (shouldSkipCategoryForMarkType(category, input.markType, markFilterOptions)) continue;
+    if (shouldSkipCategoryForMarkType(category, markType, markFilterOptions)) continue;
 
     const pool = CURATED_PRINCIPLES.filter((p) => {
       if (p.category !== category) return false;
@@ -247,18 +255,18 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
     addRule(getPrincipleById('cx-high-simplicity'));
   }
 
-  if (input.markType === 'wordmark') {
+  if (markType === 'wordmark' && brandName) {
     addRule(getPrincipleById('typ-wordmark'));
   }
 
-  if (input.typographyStyle === 'constructed') {
+  if (typographyStyle === 'constructed') {
     for (const id of ['con-modular-grid', 'con-grid-based', 'typ-custom-letterform', 'comp-stacked']) {
       addRule(getPrincipleById(id));
     }
   }
 
-  const dna = buildLogoDNA(selected, input, catalogContext);
-  const recommendations = buildRecommendations(input.industry, selected, input.markType);
+  const dna = buildLogoDNA(selected, input, catalogContext, markType, typographyStyle);
+  const recommendations = buildRecommendations(input.industry, selected, markType);
   const conflicts = getConflictingPrinciples(selected.map((p) => p.id));
 
   return {
@@ -274,6 +282,8 @@ function buildLogoDNA(
   principles: DesignRule[],
   input: RuleSelectionInput,
   catalogContext?: ReturnType<typeof buildCatalogPromptContext>,
+  markType?: LogoMarkType,
+  typographyStyle?: TypographyStyle,
 ): LogoDNA {
   const byCategory = (cat: DesignRule['category']) =>
     principles.filter((p) => p.category === cat).map((p) => p.name);
@@ -281,9 +291,8 @@ function buildLogoDNA(
   const complexityRule = principles.find((p) => p.category === 'complexity');
   const eraRule = principles.find((p) => p.category === 'era');
 
-  const constructed = input.typographyStyle === 'constructed';
-  const typographicOnly =
-    input.markType === 'wordmark' || input.markType === 'lettermark';
+  const constructed = typographyStyle === 'constructed';
+  const typographicOnly = markType === 'wordmark' || markType === 'lettermark';
 
   return {
     geometry:

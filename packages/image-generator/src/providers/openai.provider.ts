@@ -5,8 +5,35 @@ interface OpenAIImageResponse {
   data: Array<{ url?: string; revised_prompt?: string; b64_json?: string }>;
 }
 
+function readEnv(name: string, fallback: string): string {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  return raw.replace(/^["']|["']$/g, '');
+}
+
 function getImageModel(): string {
-  return process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1';
+  return readEnv('OPENAI_IMAGE_MODEL', 'gpt-image-1');
+}
+
+function getImageQuality(): string {
+  return readEnv('OPENAI_IMAGE_QUALITY', 'high');
+}
+
+function mapQualityForGptImage(quality: string): string {
+  const normalized = quality.toLowerCase();
+  if (normalized === 'low' || normalized === 'medium' || normalized === 'high' || normalized === 'auto') {
+    return normalized;
+  }
+  if (normalized === 'standard' || normalized === 'hd') {
+    return normalized === 'hd' ? 'high' : 'medium';
+  }
+  return 'high';
+}
+
+function mapQualityForDalle3(quality: string): 'standard' | 'hd' {
+  const normalized = quality.toLowerCase();
+  if (normalized === 'hd' || normalized === 'high') return 'hd';
+  return 'standard';
 }
 
 function isGptImageModel(model: string): boolean {
@@ -22,7 +49,13 @@ function mapSizeForGptImage(size: ImageSize): string {
   return map[size] ?? '1024x1024';
 }
 
-function buildRequestBody(model: string, prompt: string, size: ImageSize, count: number): Record<string, unknown> {
+function buildRequestBody(
+  model: string,
+  prompt: string,
+  size: ImageSize,
+  count: number,
+  quality: string,
+): Record<string, unknown> {
   const body: Record<string, unknown> = {
     model,
     prompt: prompt.slice(0, 4000),
@@ -32,7 +65,7 @@ function buildRequestBody(model: string, prompt: string, size: ImageSize, count:
     // gpt-image-* returns base64 only; response_format is not supported
     body.n = 1;
     body.size = mapSizeForGptImage(size);
-    body.quality = 'medium';
+    body.quality = mapQualityForGptImage(quality);
     body.output_format = 'png';
     // Opaque white background so dark marks stay visible on dark UI
     body.background = 'opaque';
@@ -42,7 +75,7 @@ function buildRequestBody(model: string, prompt: string, size: ImageSize, count:
   if (model === 'dall-e-3') {
     body.n = Math.min(count, 1);
     body.size = size;
-    body.quality = 'standard';
+    body.quality = mapQualityForDalle3(quality);
     body.style = 'natural';
     return body;
   }
@@ -69,6 +102,7 @@ export async function generateWithOpenAI(request: ImageGenerationRequest): Promi
   const size = request.size ?? '1024x1024';
   const count = Math.min(request.count ?? 1, 4);
   const model = getImageModel();
+  const quality = getImageQuality();
 
   const response = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
@@ -76,7 +110,7 @@ export async function generateWithOpenAI(request: ImageGenerationRequest): Promi
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(buildRequestBody(model, enhancedPrompt, size, count)),
+    body: JSON.stringify(buildRequestBody(model, enhancedPrompt, size, count, quality)),
   });
 
   if (!response.ok) {

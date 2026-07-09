@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { config } from 'dotenv';
 import { join, resolve } from 'node:path';
+import { resolveDatabaseUrl as applyDatabaseUrl } from '../src/db-url';
 
 function resolveRepoRoot(): string {
   if (process.env.LOGO_PLATFORM_ROOT) {
@@ -24,17 +25,7 @@ function resolveRepoRoot(): string {
   return resolve(__dirname, '../../..');
 }
 
-export function resolveDatabaseUrl(): void {
-  if (process.env.DATABASE_URL) return;
-
-  const ref = process.env.SUPABASE_PROJECT_REF;
-  const password = process.env.SUPABASE_DB_PASSWORD;
-  if (!ref || !password) return;
-
-  const encoded = encodeURIComponent(password);
-  process.env.DATABASE_URL =
-    `postgresql://postgres:${encoded}@db.${ref}.supabase.co:5432/postgres?sslmode=require`;
-}
+export { applyDatabaseUrl as resolveDatabaseUrl };
 
 export function loadProjectEnv(): string {
   const repoRoot = resolveRepoRoot();
@@ -42,7 +33,7 @@ export function loadProjectEnv(): string {
   config({ path: join(repoRoot, '.env') });
   config({ path: join(repoRoot, 'apps/.env') });
   config({ path: join(process.cwd(), '.env') });
-  resolveDatabaseUrl();
+  applyDatabaseUrl();
   return repoRoot;
 }
 

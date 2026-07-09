@@ -1,4 +1,5 @@
 import type { ComposedPrompt, PromptGenerationRequest } from '@logo-platform/shared';
+import { normalizeBrandName } from '@logo-platform/shared';
 import { promptTemplates, getPrincipleById } from '@logo-platform/knowledge-base';
 import { selectDesignRules } from './design-rules-engine';
 import { composePrompt, composePromptVariations, buildPromptFromTemplate } from './prompt-composer';
@@ -12,10 +13,11 @@ export interface PipelineResult {
 
 export function runPromptPipeline(request: PromptGenerationRequest): PipelineResult {
   const variationCount = Math.min(request.variationCount ?? 5, 100);
+  const companyName = normalizeBrandName(request.companyName);
 
   const sharedInput = {
     industry: request.industry,
-    companyName: request.companyName,
+    companyName,
     preferredEra: request.preferredEra,
     minimalismLevel: request.minimalismLevel ?? 8,
     inspirationMode: request.inspirationMode,
@@ -34,7 +36,7 @@ export function runPromptPipeline(request: PromptGenerationRequest): PipelineRes
   const prompts = composePromptVariations(
     {
       industry: request.industry,
-      companyName: request.companyName,
+      companyName,
       principles: baseSelection.principles,
       dna: baseSelection.dna,
       inspirationMode: request.inspirationMode,

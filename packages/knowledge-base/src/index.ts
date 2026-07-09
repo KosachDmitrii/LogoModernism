@@ -17,6 +17,7 @@ import {
   CATALOG_TAXONOMY,
   getFullCatalog,
   buildCatalogPromptContext,
+  getCatalogRecommendations,
 } from './catalog';
 
 export const designPrinciples: DesignRule[] = principlesData as DesignRule[];
@@ -39,6 +40,7 @@ export {
   getCatalogPrincipleIds,
   getFullCatalog,
   buildCatalogPromptContext,
+  getCatalogRecommendations,
 };
 
 export function getPrincipleById(id: string): DesignRule | undefined {
