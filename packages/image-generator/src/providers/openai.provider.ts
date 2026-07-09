@@ -5,6 +5,9 @@ interface OpenAIImageResponse {
   data: Array<{ url?: string; revised_prompt?: string; b64_json?: string }>;
 }
 
+const OPENAI_IMAGE_RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504, 520, 522, 524]);
+const OPENAI_IMAGE_MAX_ATTEMPTS = 3;
+
 function readEnv(name: string, fallback: string): string {
   const raw = process.env[name]?.trim();
   if (!raw) return fallback;
@@ -92,6 +95,54 @@ function toImageUrl(item: { url?: string; b64_json?: string }): string {
   throw new Error('OpenAI response contained no image data');
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function compactErrorBody(body: string): string {
+  const plain = body
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return (plain || body).slice(0, 500);
+}
+
+async function postOpenAIImageRequest(
+  apiKey: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= OPENAI_IMAGE_MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!OPENAI_IMAGE_RETRY_STATUSES.has(response.status) || attempt === OPENAI_IMAGE_MAX_ATTEMPTS) {
+        return response;
+      }
+
+      await response.text().catch(() => '');
+      await sleep(800 * attempt);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt === OPENAI_IMAGE_MAX_ATTEMPTS) throw lastError;
+      await sleep(800 * attempt);
+    }
+  }
+
+  throw lastError ?? new Error('OpenAI image generation request failed');
+}
+
 export async function generateWithOpenAI(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -103,19 +154,13 @@ export async function generateWithOpenAI(request: ImageGenerationRequest): Promi
   const count = Math.min(request.count ?? 1, 4);
   const model = getImageModel();
   const quality = getImageQuality();
+  const body = buildRequestBody(model, enhancedPrompt, size, count, quality);
 
-  const response = await fetch('https://api.openai.com/v1/images/generations', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(buildRequestBody(model, enhancedPrompt, size, count, quality)),
-  });
+  const response = await postOpenAIImageRequest(apiKey, body);
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`OpenAI image generation failed (${response.status}): ${errorBody}`);
+    throw new Error(`OpenAI image generation failed (${response.status}): ${compactErrorBody(errorBody)}`);
   }
 
   const data = (await response.json()) as OpenAIImageResponse;

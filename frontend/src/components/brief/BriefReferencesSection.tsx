@@ -4,7 +4,7 @@ import { BookOpen, ExternalLink } from 'lucide-react';
 import { getCatalogEntry } from '../../api';
 import { useAppStore } from '../../store';
 
-export function BriefReferencesSection() {
+export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: () => void }) {
   const designBrief = useAppStore((s) => s.designBrief);
   const appliedIds = designBrief.catalogReferenceIds ?? [];
 
@@ -32,6 +32,9 @@ export function BriefReferencesSection() {
 
       <Link
         to="/logo-catalog"
+        onClick={() => {
+          sessionStorage.setItem('brief-build-section', 'references');
+        }}
         className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-violet-800/50 bg-violet-950/30 hover:bg-violet-900/30 text-xs font-medium text-violet-200 transition-colors"
       >
         <BookOpen size={14} />
@@ -51,6 +54,13 @@ export function BriefReferencesSection() {
               </li>
             ))}
           </ul>
+          <button
+            type="button"
+            onClick={onStepComplete}
+            className="w-full mt-1 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-white text-xs font-medium"
+          >
+            Continue to client brief
+          </button>
         </div>
       ) : (
         <p className="text-[10px] text-zinc-600 text-center">

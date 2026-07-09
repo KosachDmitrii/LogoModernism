@@ -162,6 +162,7 @@ function decisionToComposedPrompt(
     companyName: request.companyName,
     markType: decision.markType,
     colorPalette: request.briefContext?.colorPalette,
+    abstractionLevel: architecture.clientIntent.abstractionLevel,
   });
   const scores = scorePrompt(finalText, principles, dna);
 
@@ -247,7 +248,11 @@ export async function runBrainPromptPipeline(
     clientIntent: architecture.clientIntent,
   });
 
-  const constrainedDecision = solveConstraints(decision, architecture.designStrategy);
+  const constrainedDecision = solveConstraints(
+    decision,
+    architecture.designStrategy,
+    architecture.clientIntent.abstractionLevel,
+  );
 
   const prompts: ComposedPrompt[] = [];
   for (let i = 0; i < variationCount; i++) {

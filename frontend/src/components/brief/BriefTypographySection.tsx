@@ -18,50 +18,61 @@ const TYPOGRAPHY_STYLES = [
 type MarkType = (typeof MARK_TYPES)[number]['value'];
 type TypographyStyle = (typeof TYPOGRAPHY_STYLES)[number]['value'];
 
-export function BriefTypographySection() {
+interface BriefTypographySectionProps {
+  onStepComplete?: () => void;
+}
+
+export function BriefTypographySection({ onStepComplete }: BriefTypographySectionProps) {
   const companyName = useAppStore((s) => s.companyName);
   const industry = useAppStore((s) => s.industry);
   const designBrief = useAppStore((s) => s.designBrief);
   const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
   const applyBrandDNA = useAppStore((s) => s.applyBrandDNA);
 
-  const markType = (designBrief.markType || 'wordmark') as MarkType;
+  const markType = (designBrief.markType || 'combination') as MarkType;
   const typographyStyle = (designBrief.typographyStyle || 'standard') as TypographyStyle;
 
   const brandName = companyName.trim();
-  const needsBrandName =
-    markType === 'wordmark' ||
-    markType === 'lettermark' ||
-    typographyStyle === 'constructed';
+  const requiresName =
+    markType === 'wordmark' || markType === 'lettermark' || typographyStyle === 'constructed';
 
   const analysis = useMutation({
     mutationFn: () => {
       const brief = useAppStore.getState().designBrief;
-      const selectedMarkType = (brief.markType || 'wordmark') as MarkType;
+      const selectedMarkType = (brief.markType || 'combination') as MarkType;
       const selectedTypographyStyle = (brief.typographyStyle || 'standard') as TypographyStyle;
+      const name = useAppStore.getState().companyName.trim();
 
       return analyzeBrandDNA({
-        companyName: brandName,
-        industry,
+        companyName: name || industry.trim() || 'Brand',
+        industry: industry.trim(),
         markType: selectedMarkType,
         typographyStyle: selectedTypographyStyle,
       });
     },
     onSuccess: (result) => {
       const brief = useAppStore.getState().designBrief;
-      applyBrandDNA(brandName, industry, {
+      const name = useAppStore.getState().companyName.trim() || industry.trim();
+      applyBrandDNA(name, industry.trim(), {
         ...result,
         markType: brief.markType || result.markType,
         typographyStyle: brief.typographyStyle || result.typographyStyle,
       });
+      onStepComplete?.();
     },
   });
 
   const result = analysis.data;
-  const canAnalyze = Boolean(industry.trim()) && (!needsBrandName || Boolean(brandName));
+  const canAnalyze = Boolean(industry.trim()) && (!requiresName || Boolean(brandName));
+
+  const disabledReason = !industry.trim()
+    ? 'Set industry on the Project step first.'
+    : requiresName && !brandName
+      ? 'Add Company Name on the Project step for wordmark, lettermark, or constructed type.'
+      : null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 relative z-10" onClick={(e) => e.stopPropagation()}>
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="block text-[10px] text-zinc-500 mb-1">Mark type</label>
@@ -103,17 +114,19 @@ export function BriefTypographySection() {
         type="button"
         disabled={!canAnalyze || analysis.isPending}
         onClick={() => analysis.mutate()}
-        className="w-full px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium disabled:opacity-40 flex items-center justify-center gap-2"
+        className="w-full px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {analysis.isPending && <Loader2 size={12} className="animate-spin" />}
         Analyze Typography
       </button>
 
-      {!canAnalyze && (
-        <p className="text-[10px] text-zinc-600">
-          {needsBrandName && !brandName
-            ? 'Add Company Name on the Project step for wordmark or lettermark.'
-            : 'Set industry on the Project step first.'}
+      {disabledReason && (
+        <p className="text-[10px] text-amber-300/80">{disabledReason}</p>
+      )}
+
+      {analysis.isError && (
+        <p className="text-[10px] text-red-400">
+          {analysis.error instanceof Error ? analysis.error.message : 'Typography analysis failed'}
         </p>
       )}
 

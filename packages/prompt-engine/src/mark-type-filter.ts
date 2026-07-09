@@ -39,6 +39,7 @@ const TEXTUAL_BRAND_MARK_TYPES = new Set<LogoMarkType>(['wordmark', 'lettermark'
 const BLOCKED_FOR_TEXTUAL_BRAND = new Set([
   'mar-extra-numeric',
   'geo-extra-capsule',
+  'mark-emblem',
 ]);
 
 const BLOCKED_IDS: Record<LogoMarkType, Set<string>> = {

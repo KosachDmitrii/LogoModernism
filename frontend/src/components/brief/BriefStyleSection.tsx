@@ -1,52 +1,45 @@
+import { useMutation } from '@tanstack/react-query';
+import { Loader2, Palette } from 'lucide-react';
+import { analyzeComposition } from '../../api';
 import { useAppStore } from '../../store';
+import { applyStyleToBrief } from '../../lib/apply-brief';
 import type { DesignBrief } from '../../types';
+import { parseMarkTypeFromBrief } from '../../lib/brief-mappers';
 
 const COLOR_OPTIONS: Array<{ value: DesignBrief['colorPalette']; label: string }> = [
   { value: '', label: 'Auto (from rules)' },
   { value: 'black_white', label: 'Black & white only' },
   { value: 'monochrome', label: 'Monochrome' },
   { value: 'two_color', label: 'Two-color max' },
-  { value: 'multi_color', label: 'Multi-color controlled' },
-  { value: 'corporate_blue', label: 'Corporate blue' },
-  { value: 'red_accent', label: 'Red accent' },
   { value: 'limited', label: 'Limited palette' },
-  { value: 'custom', label: 'Custom selected colors' },
 ];
 
-const COLOR_SWATCHES = [
-  'black',
-  'white',
-  'warm white',
-  'charcoal',
-  'red',
-  'orange',
-  'yellow',
-  'green',
-  'blue',
-  'purple',
-  'brown',
-  'gold',
-];
-
-export function BriefStyleSection() {
+export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => void }) {
+  const industry = useAppStore((s) => s.industry);
   const designBrief = useAppStore((s) => s.designBrief);
   const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
 
-  const toggleColor = (color: string) => {
-    const selected = new Set(designBrief.colorSelections);
-    if (selected.has(color)) {
-      selected.delete(color);
-    } else {
-      selected.add(color);
-    }
-    updateDesignBrief({
-      colorSelections: [...selected],
-      colorPalette: selected.size > 0 ? designBrief.colorPalette || 'custom' : designBrief.colorPalette,
-    });
-  };
+  const analysis = useMutation({
+    mutationFn: () =>
+      analyzeComposition({
+        industry: industry.trim(),
+        markType: parseMarkTypeFromBrief(designBrief),
+      }),
+    onSuccess: (result) => {
+      const layout = result.recommendedLayout?.name ?? result.recommendedLayout;
+      const brief = applyStyleToBrief(designBrief, {
+        colorPalette: designBrief.colorPalette,
+        composition: typeof layout === 'string' ? layout : undefined,
+      });
+      updateDesignBrief(brief);
+      onStepComplete?.();
+    },
+  });
+
+  const canApply = Boolean(industry.trim()) && Boolean(designBrief.colorPalette);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div>
         <label className="block text-[10px] font-medium text-zinc-500 mb-1">Color palette</label>
         <select
@@ -54,6 +47,9 @@ export function BriefStyleSection() {
           onChange={(e) =>
             updateDesignBrief({
               colorPalette: e.target.value as DesignBrief['colorPalette'],
+              colorSelections: [],
+              allowShadows: false,
+              allowPhotoreal: false,
             })
           }
           className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
@@ -66,68 +62,46 @@ export function BriefStyleSection() {
         </select>
       </div>
 
-      <div>
-        <p className="text-[10px] font-medium text-zinc-500 mb-2">Selected colors</p>
-        <div className="flex flex-wrap gap-1.5">
-          {COLOR_SWATCHES.map((color) => {
-            const active = designBrief.colorSelections.includes(color);
-            return (
-              <button
-                key={color}
-                type="button"
-                onClick={() => toggleColor(color)}
-                className={`px-2 py-1 rounded-full border text-[10px] capitalize ${
-                  active
-                    ? 'border-emerald-700 bg-emerald-950/40 text-emerald-300'
-                    : 'border-zinc-800 bg-zinc-950 text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                {color}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <button
+        type="button"
+        disabled={!canApply || analysis.isPending}
+        onClick={(e) => {
+          e.stopPropagation();
+          analysis.mutate();
+        }}
+        className="w-full px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium disabled:opacity-40 flex items-center justify-center gap-2"
+      >
+        {analysis.isPending ? (
+          <Loader2 size={12} className="animate-spin" />
+        ) : (
+          <Palette size={12} />
+        )}
+        Apply style to brief
+      </button>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
-          <input
-            type="checkbox"
-            checked={designBrief.allowShadows}
-            onChange={(e) => updateDesignBrief({ allowShadows: e.target.checked })}
-            className="accent-emerald-500"
-          />
-          Allow shadows
-        </label>
-        <label className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
-          <input
-            type="checkbox"
-            checked={designBrief.allowPhotoreal}
-            onChange={(e) => updateDesignBrief({ allowPhotoreal: e.target.checked })}
-            className="accent-emerald-500"
-          />
-          Allow photoreal
-        </label>
-      </div>
+      {!industry.trim() && (
+        <p className="text-[10px] text-zinc-600">Set industry on the Project step first.</p>
+      )}
+      {industry.trim() && !designBrief.colorPalette && (
+        <p className="text-[10px] text-zinc-600">Choose a color palette, then apply.</p>
+      )}
 
-      {(designBrief.allowShadows || designBrief.allowPhotoreal || designBrief.colorSelections.length > 1) && (
-        <p className="text-[10px] text-amber-300/80 leading-relaxed">
-          Explicit client choices weaken conflicting modernist anti-patterns for this generation.
+      {analysis.isError && (
+        <p className="text-[10px] text-red-400">
+          {analysis.error instanceof Error ? analysis.error.message : 'Style analysis failed'}
         </p>
       )}
 
-      <div>
-        <label className="block text-[10px] font-medium text-zinc-500 mb-1">
-          Client preferences / details
-        </label>
-        <textarea
-          value={designBrief.clientNotes}
-          onChange={(e) => updateDesignBrief({ clientNotes: e.target.value })}
-          rows={3}
-          placeholder="Examples: avoid forks, softer geometry, make it more premium, use green and gold..."
-          className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 resize-none"
-        />
-      </div>
+      {analysis.data && (
+        <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1">
+          <p className="text-[10px] text-emerald-400/80">Style applied to brief</p>
+          {analysis.data.recommendedLayout?.name && (
+            <p className="text-[10px] text-zinc-500">
+              Layout: {analysis.data.recommendedLayout.name}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

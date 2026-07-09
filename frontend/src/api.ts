@@ -134,6 +134,20 @@ export async function analyzeGeometry(body: { industry: string; complexity?: str
   return res.json();
 }
 
+export async function analyzeComposition(body: {
+  industry: string;
+  markType?: string;
+  hasNegativeSpace?: boolean;
+}) {
+  const res = await fetch(`${API_BASE}/engines/composition`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) await parseApiError(res, 'Composition analysis failed');
+  return res.json();
+}
+
 export async function getPrimitives() {
   const res = await fetch(`${API_BASE}/engines/primitives`);
   if (!res.ok) await parseApiError(res, 'Failed to load primitives');
@@ -229,6 +243,7 @@ export async function generateImageFromPrompt(body: {
 export async function runBriefInterview(body: {
   industry: string;
   companyName?: string;
+  markType?: 'wordmark' | 'lettermark' | 'combination';
   briefContext?: BriefContextPayload;
 }): Promise<BriefInterviewResponse> {
   const res = await fetch(`${API_BASE}/brain/brief/interview`, {

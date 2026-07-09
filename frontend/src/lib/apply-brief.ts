@@ -194,6 +194,25 @@ export function applyKnowledgeGraphToBrief(
   );
 }
 
+export function applyStyleToBrief(
+  current: DesignBrief,
+  patch: { colorPalette?: DesignBrief['colorPalette']; composition?: string },
+): DesignBrief {
+  return mergeBrief(
+    current,
+    {
+      colorPalette: patch.colorPalette ?? current.colorPalette,
+      composition: patch.composition
+        ? joinTags([current.composition, patch.composition])
+        : current.composition,
+      colorSelections: [],
+      allowShadows: false,
+      allowPhotoreal: false,
+    },
+    'Style',
+  );
+}
+
 export function applyPipelineToBrief(
   current: DesignBrief,
   result: {

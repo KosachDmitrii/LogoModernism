@@ -1,30 +1,73 @@
-import { useState } from 'react';
-import { ArrowRight, BookOpen, ChevronDown, Palette, Shapes, Type, Wand2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  ChevronDown,
+  MessageCircle,
+  Palette,
+  Shapes,
+  Sparkles,
+  Type,
+} from 'lucide-react';
 import clsx from 'clsx';
 import { useAppStore } from '../../store';
-import { AutoBriefButton } from './AutoBriefButton';
 import { BriefTypographySection } from './BriefTypographySection';
 import { BriefShapesSection } from './BriefShapesSection';
 import { BriefReferencesSection } from './BriefReferencesSection';
 import { BriefProjectSummary } from './BriefProjectSummary';
 import { BriefCoverageMap } from './BriefCoverageMap';
 import { BriefStyleSection } from './BriefStyleSection';
+import { BriefClientSection } from './BriefClientSection';
+import { BriefAnalyzeSection } from './BriefAnalyzeSection';
 
-type Section = 'typography' | 'shapes' | 'style' | 'references';
+export type BuildSection = 'typography' | 'shapes' | 'style' | 'references' | 'client' | 'analyze';
+
+const BUILD_SECTIONS: BuildSection[] = [
+  'typography',
+  'shapes',
+  'style',
+  'references',
+  'client',
+  'analyze',
+];
+
+const SECTION_STORAGE_KEY = 'brief-build-section';
+const SECTION_ADVANCE_KEY = 'brief-build-advance';
+
+function readInitialSection(): BuildSection {
+  const advance = sessionStorage.getItem(SECTION_ADVANCE_KEY);
+  if (advance && BUILD_SECTIONS.includes(advance as BuildSection)) {
+    sessionStorage.removeItem(SECTION_ADVANCE_KEY);
+    return advance as BuildSection;
+  }
+  const saved = sessionStorage.getItem(SECTION_STORAGE_KEY);
+  if (saved && BUILD_SECTIONS.includes(saved as BuildSection)) {
+    return saved as BuildSection;
+  }
+  return 'typography';
+}
+
+export function advanceBriefBuildSection(from: BuildSection) {
+  const idx = BUILD_SECTIONS.indexOf(from);
+  if (idx >= 0 && idx < BUILD_SECTIONS.length - 1) {
+    sessionStorage.setItem(SECTION_ADVANCE_KEY, BUILD_SECTIONS[idx + 1]!);
+  }
+}
 
 interface BriefBuildPanelProps {
   onGoToReview: () => void;
+  onBack?: () => void;
 }
 
 function sectionStatus(
   brief: ReturnType<typeof useAppStore.getState>['designBrief'],
-  section: Section,
+  section: BuildSection,
 ) {
   if (section === 'typography') {
     const done =
-      Boolean(brief.markType) ||
-      Boolean(brief.typography.trim()) ||
-      brief.sources.some((s) => s.includes('Brand DNA') || s.includes('Pipeline'));
+      brief.sources.some((s) => s.includes('Brand DNA') || s.includes('Pipeline')) ||
+      Boolean(brief.typography.trim());
     return done ? 'done' : 'pending';
   }
   if (section === 'shapes') {
@@ -34,32 +77,48 @@ function sectionStatus(
     return done ? 'done' : 'pending';
   }
   if (section === 'style') {
-    const done = Boolean(
-      (brief.colorPalette && brief.colorPalette !== 'auto') ||
-        brief.colorSelections.length ||
-        brief.allowShadows ||
-        brief.allowPhotoreal ||
-        brief.clientNotes.trim(),
-    );
+    const done =
+      Boolean(brief.colorPalette && brief.colorPalette !== 'auto') ||
+      brief.sources.includes('Style');
+    return done ? 'done' : 'optional';
+  }
+  if (section === 'client') {
+    const done = Boolean(brief.clientNotes.trim()) || brief.sources.includes('Client brief');
+    return done ? 'done' : 'optional';
+  }
+  if (section === 'analyze') {
+    const done = brief.sources.includes('Brain interview');
     return done ? 'done' : 'optional';
   }
   const done = (brief.catalogReferenceIds?.length ?? 0) > 0;
   return done ? 'done' : 'optional';
 }
 
-export function BriefBuildPanel({ onGoToReview }: BriefBuildPanelProps) {
+export function BriefBuildPanel({ onGoToReview, onBack }: BriefBuildPanelProps) {
   const designBrief = useAppStore((s) => s.designBrief);
-  const companyName = useAppStore((s) => s.companyName);
-  const [openSection, setOpenSection] = useState<Section | null>('typography');
+  const [openSection, setOpenSection] = useState<BuildSection | null>(readInitialSection);
 
-  const toggle = (id: Section) => {
+  const goToNext = (current: BuildSection) => {
+    const idx = BUILD_SECTIONS.indexOf(current);
+    if (idx >= 0 && idx < BUILD_SECTIONS.length - 1) {
+      setOpenSection(BUILD_SECTIONS[idx + 1]!);
+    }
+  };
+
+  useEffect(() => {
+    if (openSection) {
+      sessionStorage.setItem(SECTION_STORAGE_KEY, openSection);
+    }
+  }, [openSection]);
+
+  const toggle = (id: BuildSection) => {
     setOpenSection((current) => (current === id ? null : id));
   };
 
-  const hasBriefContent = designBrief.sources.length > 0;
+  const companyName = useAppStore((s) => s.companyName);
 
   const sections: Array<{
-    id: Section;
+    id: BuildSection;
     step: number;
     label: string;
     description: string;
@@ -85,7 +144,7 @@ export function BriefBuildPanel({ onGoToReview }: BriefBuildPanelProps) {
       id: 'style',
       step: 3,
       label: 'Style',
-      description: 'Palette, selected colors, effects and client notes',
+      description: 'Color palette and composition layout',
       icon: Palette,
     },
     {
@@ -95,31 +154,33 @@ export function BriefBuildPanel({ onGoToReview }: BriefBuildPanelProps) {
       description: 'Logo Catalog — Müller modernism inspiration',
       icon: BookOpen,
     },
+    {
+      id: 'client',
+      step: 5,
+      label: 'Client brief',
+      description: 'Client preferences and details',
+      icon: MessageCircle,
+    },
+    {
+      id: 'analyze',
+      step: 6,
+      label: 'Analyze brief',
+      description: 'Brain checks gaps and asks what is missing',
+      icon: Sparkles,
+    },
   ];
 
   return (
     <div className="space-y-4">
       <BriefProjectSummary />
 
-      <div className="p-4 rounded-xl border border-violet-900/40 bg-violet-950/20 space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-lg bg-violet-900/40 shrink-0">
-            <Wand2 size={16} className="text-violet-300" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-zinc-100">Quick brief</p>
-            <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
-              Run typography, shapes, and composition analysis in one click. Best if you have a
-              company name.
-            </p>
-          </div>
-        </div>
-        <AutoBriefButton />
+      <div className="p-3 rounded-xl bg-zinc-900/40 border border-zinc-800">
+        <p className="text-[11px] text-zinc-400 leading-relaxed">
+          Steps 1–4 build the design brief, step 5 captures client notes, and step 6{' '}
+          <span className="text-zinc-300">Analyze brief</span> lets Brain check what is missing before
+          generation.
+        </p>
       </div>
-
-      <p className="text-[10px] text-zinc-600 uppercase tracking-wider text-center">
-        or customize step by step
-      </p>
 
       <div className="space-y-2">
         {sections.map(({ id, step, label, description, icon: Icon }) => {
@@ -153,10 +214,22 @@ export function BriefBuildPanel({ onGoToReview }: BriefBuildPanelProps) {
               </button>
               {isOpen && (
                 <div className="px-3 py-3 border-t border-zinc-800 bg-zinc-950/40">
-                  {id === 'typography' && <BriefTypographySection />}
-                  {id === 'shapes' && <BriefShapesSection />}
-                  {id === 'style' && <BriefStyleSection />}
-                  {id === 'references' && <BriefReferencesSection />}
+                  {id === 'typography' && (
+                    <BriefTypographySection onStepComplete={() => goToNext('typography')} />
+                  )}
+                  {id === 'shapes' && (
+                    <BriefShapesSection onStepComplete={() => goToNext('shapes')} />
+                  )}
+                  {id === 'style' && (
+                    <BriefStyleSection onStepComplete={() => goToNext('style')} />
+                  )}
+                  {id === 'references' && (
+                    <BriefReferencesSection onStepComplete={() => goToNext('references')} />
+                  )}
+                  {id === 'client' && (
+                    <BriefClientSection onStepComplete={() => goToNext('client')} />
+                  )}
+                  {id === 'analyze' && <BriefAnalyzeSection />}
                 </div>
               )}
             </div>
@@ -166,16 +239,26 @@ export function BriefBuildPanel({ onGoToReview }: BriefBuildPanelProps) {
 
       <BriefCoverageMap designBrief={designBrief} />
 
-      {hasBriefContent && (
+      <div className="flex items-center gap-3 pt-2">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-3 py-3.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-zinc-800 transition-colors shrink-0"
+          >
+            <ArrowLeft size={14} />
+            Project
+          </button>
+        )}
         <button
           type="button"
           onClick={onGoToReview}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-sm text-zinc-200 transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-zinc-100 text-zinc-900 font-medium text-sm hover:bg-white transition-colors"
         >
-          Review brief & generate prompts
+          Review brief
           <ArrowRight size={14} />
         </button>
-      )}
+      </div>
     </div>
   );
 }

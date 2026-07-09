@@ -31,7 +31,7 @@ export function buildDesignStrategy(
   );
 
   const constructionSystem =
-    node?.constructionBias.join(', ') ?? 'baseline grid, modular construction, optical balance';
+    node?.constructionBias[0] ?? 'baseline grid with modular construction and optical balance';
 
   const markArchitecture =
     options?.markType === 'wordmark'
@@ -70,6 +70,7 @@ export function buildDesignStrategy(
 
   const avoidFragments = [
     ...intent.forbiddenMotifs,
+    ...(intent.abstractionLevel !== 'recognizable' ? ['emblem badge format', 'circular bracket template'] : []),
     'gradients',
     'photorealism',
     'mockups',

@@ -76,6 +76,13 @@ function buildItems(
       optional: true,
     },
     {
+      id: 'client',
+      label: 'Client notes',
+      hint: 'Step 5 on Build',
+      done: Boolean(brief.clientNotes.trim()),
+      optional: true,
+    },
+    {
       id: 'references',
       label: 'Catalog references',
       hint: 'Logo Catalog inspiration',

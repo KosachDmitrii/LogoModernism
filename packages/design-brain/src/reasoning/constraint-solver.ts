@@ -1,5 +1,6 @@
 import type { DesignDecision } from '@logo-platform/shared';
-import type { DesignStrategy } from '@logo-platform/shared';
+import type { AbstractionLevel, DesignStrategy } from '@logo-platform/shared';
+import { polishLogoPrompt } from '@logo-platform/shared';
 
 const DEFAULT_MODERNIST_AVOID = [
   'gradients',
@@ -7,11 +8,13 @@ const DEFAULT_MODERNIST_AVOID = [
   'mockups',
   'busy backgrounds',
   'stock clipart',
+  'emblem badge format',
 ];
 
 export function solveConstraints(
   decision: DesignDecision,
   strategy: DesignStrategy,
+  abstractionLevel: AbstractionLevel = 'stylized',
 ): DesignDecision {
   const avoidSet = new Set<string>();
 
@@ -28,20 +31,16 @@ export function solveConstraints(
     return true;
   });
 
-  const strategyPrefix = strategy.suggestFragments
-    .filter((fragment) => !promptLower.includes(fragment.slice(0, 24).toLowerCase()))
-    .slice(0, 3)
-    .join('. ');
-
-  const enrichedPrompt = strategyPrefix
-    ? `${decision.promptText.replace(/\s*\.?\s*$/, '')}. ${strategyPrefix}.`
-    : decision.promptText;
+  const polished = polishLogoPrompt(decision.promptText, {
+    colorPalette: strategy.colorSystem.toLowerCase().includes('black and white') ? 'black_white' : undefined,
+    abstractionLevel,
+  });
 
   return {
     ...decision,
     antiPatterns: filteredAvoid,
     reasoning: [decision.reasoning, strategy.reasoning].filter(Boolean).join(' '),
-    promptText: enrichedPrompt,
+    promptText: polished,
     confidence: Math.min(0.98, (decision.confidence + strategy.confidence) / 2 + 0.05),
   };
 }

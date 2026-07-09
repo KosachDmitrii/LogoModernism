@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Eye, Hammer, Loader2, Sparkles, ArrowLeft } from 'lucide-react';
 import clsx from 'clsx';
 import { useAppStore } from '../../store';
 import { getBriefReadiness } from '../../lib/brief-readiness';
 import { DesignBriefPanel } from '../DesignBriefPanel';
-import { BriefInterviewPanel } from './BriefInterviewPanel';
 import { BriefBuildPanel } from './BriefBuildPanel';
 import { BriefCoverageMap } from './BriefCoverageMap';
 import { BriefChecklist } from './BriefChecklist';
@@ -22,14 +21,6 @@ export function BriefWorkflowPanel({ onCompose, onBack, isComposing, canCompose 
   const designBrief = useAppStore((s) => s.designBrief);
   const readiness = getBriefReadiness(designBrief);
   const [subTab, setSubTab] = useState<BriefSubTab>('build');
-  const prevSourceCount = useRef(designBrief.sources.length);
-
-  useEffect(() => {
-    if (designBrief.sources.length > prevSourceCount.current) {
-      setSubTab('review');
-    }
-    prevSourceCount.current = designBrief.sources.length;
-  }, [designBrief.sources.length]);
 
   const subTabs: Array<{ id: BriefSubTab; label: string; description: string; icon: typeof Hammer }> = [
     { id: 'build', label: 'Build', description: 'Run analysis & set preferences', icon: Hammer },
@@ -75,7 +66,7 @@ export function BriefWorkflowPanel({ onCompose, onBack, isComposing, canCompose 
       </div>
 
       {subTab === 'build' ? (
-        <BriefBuildPanel onGoToReview={() => setSubTab('review')} />
+        <BriefBuildPanel onGoToReview={() => setSubTab('review')} onBack={onBack} />
       ) : (
         <div className="space-y-4">
           <div className="p-3 rounded-xl bg-zinc-900/40 border border-zinc-800">
@@ -97,8 +88,6 @@ export function BriefWorkflowPanel({ onCompose, onBack, isComposing, canCompose 
           </div>
 
           <DesignBriefPanel />
-
-          <BriefInterviewPanel />
 
           <BriefCoverageMap designBrief={designBrief} />
 

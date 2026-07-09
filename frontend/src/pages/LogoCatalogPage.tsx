@@ -10,6 +10,7 @@ import {
   searchCatalog,
 } from '../api';
 import { useAppStore } from '../store';
+import { advanceBriefBuildSection } from '../components/brief/BriefBuildPanel';
 import { ApplyToPromptsButton } from '../components/ApplyToPromptsButton';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
@@ -135,6 +136,7 @@ export function LogoCatalogPage() {
         : designBrief.preferredShapes,
       sources,
     });
+    advanceBriefBuildSection('references');
   };
 
   const removeApplied = (id: string) => {

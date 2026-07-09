@@ -80,10 +80,16 @@ const MONOCHROME_PALETTES = new Set(['black_white', 'monochrome']);
 
 const BLOCKED_WHEN_MONOCHROME = new Set([
   'col-extra-teal',
+  'col-extra-green-accent',
+  'typ-extra-serif-classic',
+  'typ-extra-slab-serif',
   'fx-perspective',
 ]);
 
-const ACCENT_COLOR_FRAGMENT = /\b(?:teal accent|corporate blue|red accent|warm palette|multi-?color|two-?color)\b/i;
+const ACCENT_COLOR_FRAGMENT =
+  /\b(?:teal accent|green accent|corporate blue|red accent|warm palette|multi-?color|two-?color)\b/i;
+
+const BLOCKED_AT_HIGH_MINIMALISM = new Set(['mark-emblem', 'fx-perspective', 'con-isometric']);
 
 function isMonochromePalette(colorPalette?: string): boolean {
   return Boolean(colorPalette && MONOCHROME_PALETTES.has(colorPalette));
@@ -94,6 +100,15 @@ function isBlockedForPalette(rule: DesignRule, colorPalette?: string): boolean {
   if (BLOCKED_WHEN_MONOCHROME.has(rule.id)) return true;
   if (rule.category === 'color' && ACCENT_COLOR_FRAGMENT.test(rule.promptFragment)) return true;
   if (rule.category === 'effects' && /perspective|pseudo/i.test(rule.promptFragment)) return true;
+  return false;
+}
+
+function isBlockedForMinimalism(rule: DesignRule, minimalismLevel?: number): boolean {
+  if ((minimalismLevel ?? 8) < 7) return false;
+  if (BLOCKED_AT_HIGH_MINIMALISM.has(rule.id)) return true;
+  if (rule.category === 'construction' && /isometric|45.?degree|30.?degree/i.test(rule.promptFragment)) {
+    return true;
+  }
   return false;
 }
 
@@ -172,6 +187,7 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
   const addRule = (rule: DesignRule | undefined) => {
     if (!rule || selectedIds.has(rule.id)) return;
     if (isBlockedForPalette(rule, input.colorPalette)) return;
+    if (isBlockedForMinimalism(rule, input.minimalismLevel)) return;
     if (!isPrincipleAllowedForMarkType(rule, markType, markFilterOptions)) return;
     const conflicts = getConflictingPrinciples([...selectedIds, rule.id]);
     if (conflicts.length > 0) return;
@@ -241,6 +257,7 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
       if (p.category !== category) return false;
       if (selectedIds.has(p.id)) return false;
       if (isBlockedForPalette(p, input.colorPalette)) return false;
+      if (isBlockedForMinimalism(p, input.minimalismLevel)) return false;
 
       const compatibleWithSelected = selected.some(
         (s) =>

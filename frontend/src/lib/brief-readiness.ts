@@ -25,7 +25,7 @@ export function getBriefReadiness(brief: DesignBrief): BriefReadiness {
 
   const hints: string[] = [];
   if (brief.sources.length === 0) {
-    hints.push('Run Quick brief or Typography / Shapes on the Build tab');
+    hints.push('Run Typography, Shapes, or Style on the Build tab');
   }
   if (!brief.geometry.trim() && !brief.preferredShapes.trim() && brief.sources.length > 0) {
     hints.push('Add shapes in step 2 or references in step 4 (Logo Catalog)');

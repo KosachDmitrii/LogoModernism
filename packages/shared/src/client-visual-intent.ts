@@ -21,8 +21,21 @@ const FORBIDDEN_PATTERNS = [
 ];
 
 const ABSTRACT_SIGNALS = /\babstract(?:\s+form)?\s+only\b|\bno\s+literal\b|\bform\s+language\s+only\b/i;
-const STYLIZED_SIGNALS = /\bstyli[sz]ed\b|\brecognizable\b|\bdistinctive\s+silhouette\b/i;
-const RECOGNIZABLE_SIGNALS = /\bliteral\b|\bexplicit\b|\bclear(?:ly)?\s+show\b|\biconic\s+(?:of|for)\b/i;
+const STYLIZED_SIGNALS = /\bstyli[sz]ed\b|\bdistinctive\s+silhouette\b/i;
+const RECOGNIZABLE_SIGNALS =
+  /\bliteral\b|\bexplicit(?:ly)?\s+show\b|\bclear(?:ly)?\s+show\b|\biconic\s+(?:of|for)\b|\brecognizable\s+(?:and\s+understandable|abstraction|symbol|silhouette)\b/i;
+
+const FOOD_INDUSTRY_PATTERN =
+  /\b(?:food|restaurant|pizza|cafe|bakery|beverage|culinary|dining)\b/i;
+
+const INTERVIEW_BOILERPLATE_MOTIFS = new Set([
+  'abstract geometry only',
+  'stylized industry cue',
+  'open to designer interpretation',
+  'wordmark',
+  'lettermark',
+  'combination',
+]);
 
 function unique(items: string[]): string[] {
   const seen = new Set<string>();
@@ -64,11 +77,16 @@ function extractDesiredFromNotes(notes: string): string[] {
   return unique(motifs);
 }
 
-function detectAbstractionLevel(text: string): AbstractionLevel {
+function detectAbstractionLevel(text: string, industry?: string): AbstractionLevel {
   if (ABSTRACT_SIGNALS.test(text)) return 'abstract';
   if (RECOGNIZABLE_SIGNALS.test(text)) return 'recognizable';
   if (STYLIZED_SIGNALS.test(text)) return 'stylized';
+  if (industry && FOOD_INDUSTRY_PATTERN.test(industry)) return 'stylized';
   return 'stylized';
+}
+
+function filterInterviewMotifs(motifs: string[]): string[] {
+  return motifs.filter((motif) => !INTERVIEW_BOILERPLATE_MOTIFS.has(motif.toLowerCase().trim()));
 }
 
 export function analyzeClientVisualIntent(input: {
@@ -85,7 +103,7 @@ export function analyzeClientVisualIntent(input: {
     .join('. ');
 
   const forbiddenMotifs = extractForbidden(combined);
-  const explicitRequests = extractDesiredFromNotes(combined);
+  const explicitRequests = filterInterviewMotifs(extractDesiredFromNotes(combined));
   const personality = unique(
     [brief?.personality, brief?.primaryEmotion].filter((v): v is string => Boolean(v?.trim())),
   );
@@ -103,7 +121,7 @@ export function analyzeClientVisualIntent(input: {
     industryDomain: input.industry,
     desiredMotifs: explicitRequests,
     forbiddenMotifs,
-    abstractionLevel: detectAbstractionLevel(combined),
+    abstractionLevel: detectAbstractionLevel(combined, input.industry),
     personality,
     visualTone,
     explicitRequests,

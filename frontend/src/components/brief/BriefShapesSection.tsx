@@ -19,7 +19,7 @@ interface Primitive {
   svgPath: string;
 }
 
-export function BriefShapesSection() {
+export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => void }) {
   const industry = useAppStore((s) => s.industry);
   const applyGeometry = useAppStore((s) => s.applyGeometry);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -74,24 +74,31 @@ export function BriefShapesSection() {
       ...analysis.data,
       selectedRecommendations,
     });
+    onStepComplete?.();
   };
 
   const canAnalyze = Boolean(industry.trim());
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 relative z-10" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         onClick={() => analysis.mutate()}
         disabled={!canAnalyze || analysis.isPending}
-        className="w-full px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium disabled:opacity-40 flex items-center justify-center gap-2"
+        className="w-full px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {analysis.isPending && <Loader2 size={12} className="animate-spin" />}
         Analyze Shapes
       </button>
 
       {!canAnalyze && (
-        <p className="text-[10px] text-zinc-600">Set industry on the Project step first.</p>
+        <p className="text-[10px] text-amber-300/80">Set industry on the Project step first.</p>
+      )}
+
+      {analysis.isError && (
+        <p className="text-[10px] text-red-400">
+          {analysis.error instanceof Error ? analysis.error.message : 'Shapes analysis failed'}
+        </p>
       )}
 
       {analysis.data && recommendations.length > 0 && (

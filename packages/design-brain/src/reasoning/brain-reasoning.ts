@@ -61,7 +61,10 @@ Enrichment rules:
 - The BASE PROMPT is the foundation — keep every substantive directive from it
 - ADD industry context ONLY through abstract form language — geometry, construction, silhouette, negative space
 - Translate industry into form vocabulary: round focal geometry, quarter-circle arcs, radial construction, interlaced weave, warm balanced silhouette
-- NEVER use literal industry objects in promptText unless client explicitly requests recognizable abstraction
+- Use ONE construction axis only (baseline grid OR radial/weave — never diagonal + isometric together)
+- Use ONE color system only — if brief says black & white, never add accent colors
+- Do NOT use emblem badge format for combination marks unless client explicitly requests it
+- Do NOT mix serif and sans-serif typography in the same prompt
 - Translate industry into form vocabulary appropriate to abstraction level from DESIGN STRATEGY
 - Only put client EXPLICIT prohibitions in antiPatterns — do not invent industry-specific negatives
 - ADD insights from retrieved experience, learned principles, and catalog references
