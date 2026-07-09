@@ -8,9 +8,12 @@ const CONTRADICTIONS: [RegExp, RegExp][] = [
   [/single color/i, /two.?color/i],
   [/no gradients?/i, /(?<!no\s)gradients?/i],
   [/minimal complexity/i, /dense/i],
+  [/minimal complexity/i, /medium complexity/i],
   [/no shadows/i, /(?<!no\s)shadows?/i],
   [/outline only/i, /solid fill/i],
   [/asymmetric/i, /perfect symmetry/i],
+  [/strict black and white/i, /reversed light on dark/i],
+  [/black and white only/i, /light on dark/i],
 ];
 
 const POSITIVE_SYMMETRY_PHRASES: Array<{ pattern: RegExp; replacement: string }> = [

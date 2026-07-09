@@ -148,7 +148,7 @@ function decisionToComposedPrompt(
   const principles = mergePrincipleSets(basePrompt.selectedPrinciples, brainRules);
   const dna = decisionToDna(decision, request, basePrompt.dna);
 
-  const clientAvoid = buildClientAvoidFragments(architecture.designStrategy.avoidFragments);
+  const clientAvoid = buildClientAvoidFragments(architecture.clientIntent.forbiddenMotifs);
   const text = appendAntiPatterns(decision.promptText, clientAvoid);
   const styled = appendStylePreferenceFragments(text, request.briefContext);
   const directed = appendArtDirectionFragments(styled, {
@@ -163,6 +163,9 @@ function decisionToComposedPrompt(
     markType: decision.markType,
     colorPalette: request.briefContext?.colorPalette,
     abstractionLevel: architecture.clientIntent.abstractionLevel,
+    minimalismLevel: request.minimalismLevel,
+    geometry: request.briefContext?.geometry,
+    preferredShapes: request.briefContext?.preferredShapes,
   });
   const scores = scorePrompt(finalText, principles, dna);
 
@@ -252,6 +255,7 @@ export async function runBrainPromptPipeline(
     decision,
     architecture.designStrategy,
     architecture.clientIntent.abstractionLevel,
+    request.minimalismLevel,
   );
 
   const prompts: ComposedPrompt[] = [];

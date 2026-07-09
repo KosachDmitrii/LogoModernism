@@ -70,7 +70,11 @@ export function buildDesignStrategy(
 
   const avoidFragments = [
     ...intent.forbiddenMotifs,
-    ...(intent.abstractionLevel !== 'recognizable' ? ['emblem badge format', 'circular bracket template'] : []),
+    ...(intent.abstractionLevel !== 'recognizable' && options?.markType !== 'combination'
+      ? ['emblem badge format', 'circular bracket template']
+      : intent.abstractionLevel !== 'recognizable'
+        ? ['circular bracket template']
+        : []),
     'gradients',
     'photorealism',
     'mockups',

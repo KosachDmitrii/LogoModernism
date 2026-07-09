@@ -9,6 +9,9 @@ export interface PolishPromptOptions {
   markType?: LogoMarkType;
   colorPalette?: string;
   abstractionLevel?: AbstractionLevel;
+  minimalismLevel?: number;
+  geometry?: string;
+  preferredShapes?: string;
   /** Reserve headroom for image-model enhancer suffixes (OpenAI hard limit is 4000). */
   maxLength?: number;
 }
@@ -39,6 +42,14 @@ const ACCENT_COLOR_PATTERNS = [
   /\bmulti-?color\b/gi,
 ];
 
+const MONOCHROME_REVERSED_PATTERNS = [
+  /\breversed light on dark\b/gi,
+  /\breversed mark\b/gi,
+  /\blight on dark\b/gi,
+  /\bwhite on black\b/gi,
+  /\bdark background\b/gi,
+];
+
 const TYPOGRAPHY_SANS_SIGNALS =
   /\b(?:neo-?grotesque|geometric sans|Helvetica|sans-serif|grotesque sans)\b/i;
 
@@ -52,23 +63,49 @@ const TYPOGRAPHY_CONFLICT_PATTERNS = [
 const CONSTRUCTION_AXIS_PATTERNS: Array<{ pattern: RegExp; family: string; score: number }> = [
   { pattern: /\bbaseline grid\b/gi, family: 'baseline', score: 10 },
   { pattern: /\b8px baseline\b/gi, family: 'baseline', score: 9 },
+  { pattern: /\bmodular grid\b/gi, family: 'modular', score: 8 },
+  { pattern: /\borthogonal grid\b/gi, family: 'modular', score: 7 },
+  { pattern: /\bsquare grid modules?\b/gi, family: 'modular', score: 6 },
   { pattern: /\bradial (?:construction|grid)\b/gi, family: 'radial', score: 9 },
+  { pattern: /\bconcentric circles?\b/gi, family: 'radial', score: 8 },
+  { pattern: /\bnested circular modules?\b/gi, family: 'radial', score: 8 },
+  { pattern: /\bgolden ratio\b/gi, family: 'radial', score: 5 },
   { pattern: /\binterlac(?:ed|ing)? weave\b/gi, family: 'weave', score: 8 },
   { pattern: /\bellipse construction\b/gi, family: 'radial', score: 8 },
+  { pattern: /\bfigure-?ground\b/gi, family: 'figureground', score: 6 },
   { pattern: /\b45[- ]?degree\b/gi, family: 'diagonal', score: 4 },
-  { pattern: /\bdiagonal construction\b/gi, family: 'diagonal', score: 4 },
+  { pattern: /\bdiagonal (?:construction|tension|energy)\b/gi, family: 'diagonal', score: 4 },
   { pattern: /\bisometric\b/gi, family: 'isometric', score: 3 },
   { pattern: /\b30[- ]?degree\b/gi, family: 'isometric', score: 3 },
 ];
 
 const PIPELINE_METADATA_PATTERNS = [
   /\bPrompt ID:\s*[a-f0-9-]+\b/gi,
-  /\bStyle preferences:\s*\{[^}]+\}\b/gi,
-  /\bCompany:\s*[^.]+(?=\s+Industry:)/gi,
-  /\bIndustry:\s*[^.]+(?=\s+Prompt ID:)/gi,
+  /\bStyle preferences:\s*\{[\s\S]*?\}\b/gi,
+  /\bCompany:\s*[^.,]+/gi,
+  /\bIndustry:\s*[^.,]+/gi,
   /\bSymbol explores:\s*abstract geometry,\s*stylized industry cue\b/gi,
   /\bat recognizable abstraction\b/gi,
 ];
+
+const TYPOGRAPHY_REDUNDANT_PATTERNS = [
+  /\bHelvetica(?:\s+Neue)?\b/gi,
+  /\bSwiss grotesque sans-?serif\b/gi,
+  /\bgeometric sans-?serif\b/gi,
+  /\bgrotesque sans-?serif\b/gi,
+  /\bcustom geometric sans\b/gi,
+  /\bneo-?grotesque sans\b/gi,
+];
+
+const GENERIC_AVOID_DEFAULTS = new Set([
+  'gradients',
+  'photorealism',
+  'mockups',
+  'busy backgrounds',
+  'stock clipart',
+  'emblem badge format',
+  'circular bracket template',
+]);
 
 const REPEATED_PHRASE_PATTERNS = [
   /\bit must be recognizable and understandable\b/gi,
@@ -83,7 +120,74 @@ const INTERVIEW_NOTES_BOILERPLATE = [
   /^wordmark$/i,
   /^lettermark$/i,
   /^combination$/i,
+  /^recognition\.?$/i,
 ];
+
+const BROKEN_FRAGMENT_PATTERNS = [
+  /\bfrom center point,\s*construction\.?\s*and movement,\s*reversal\.?/gi,
+  /\b(?:^|\.\s+)and movement,\s*reversal\.?/gi,
+  /\bInterchangeable figure and ground\.?\s*(?=from center point)/gi,
+  /\bbuilt on system\.?/gi,
+  /\brecognition\.?(?=\s*(?:International|Client preferences|$))/gi,
+];
+
+const GEOMETRIC_FAMILY_PATTERNS = [
+  /\bbuilt from circle construction\b/gi,
+  /\bintegrated quarter arcs?(?:\s+for[^.]*)?\b/gi,
+  /\bquarter-circle arcs?\b/gi,
+  /\bcircle construction\b/gi,
+  /\bround focal geometry\b/gi,
+];
+
+const ORGANIC_FAMILY_PATTERNS = [
+  /\borganic blob shapes?(?:\s+for[^.]*)?\b/gi,
+  /\b(?:utilizing|using)\s+organic blob shapes?\b/gi,
+  /\bblob shapes?\b/gi,
+];
+
+const TYPOGRAPHY_CANONICAL =
+  'Custom neo-grotesque wordmark with one modified distinctive glyph';
+
+const SCATTERED_TYPOGRAPHY_PATTERNS = [
+  /\bSwiss International typography\b/gi,
+  /\bModified unique glyphs\b/gi,
+  /\bcustom wordmark typography\b/gi,
+  /\bTypographic logotype\b/gi,
+  /\bHelvetica-style neo-grotesque\b/gi,
+  /\bCustom modified letterforms\b/gi,
+  /\bgeometric sans-serif\b/gi,
+  /\bTypography aligned to baseline\b/gi,
+  /\b, built on system\b/gi,
+  /\bCustom wordmark typography with at least one modified distinctive glyph\b/gi,
+];
+
+export type GeometryFamilyPreference = 'geometric' | 'organic';
+
+export function parseGeometryPreference(
+  geometry?: string,
+  preferredShapes?: string,
+): GeometryFamilyPreference | undefined {
+  const hay = `${geometry ?? ''} ${preferredShapes ?? ''}`.toLowerCase();
+  if (/organic blob|blob shapes?|organic shapes?/i.test(hay)) return 'organic';
+  if (/geometric circles?|quarter arcs?|circle construction|geometric axis/i.test(hay)) {
+    return 'geometric';
+  }
+  return undefined;
+}
+
+export function detectGeometryAxisConflict(text: string): boolean {
+  const hay = text.toLowerCase();
+  const hasGeometric =
+    /\b(?:circle construction|quarter arcs?|quarter-circle|baseline grid|modular grid|geometric circles?)\b/i.test(
+      hay,
+    );
+  const hasOrganic = /\b(?:blob|organic blob|organic shape|amorphous)\b/i.test(hay);
+  return hasGeometric && hasOrganic;
+}
+
+export function hasLockedGeometryPreference(geometry?: string, preferredShapes?: string): boolean {
+  return parseGeometryPreference(geometry, preferredShapes) !== undefined;
+}
 
 const FLAT_CONFLICT_PATTERNS = [
   /\bflat pseudo-perspective\b/gi,
@@ -193,7 +297,11 @@ function resolveColorContradictions(body: string, colorPalette?: string): string
   if (!isMonochromePrompt(body, colorPalette)) return body;
 
   let result = body;
-  for (const pattern of [...COLOR_CONFLICT_PATTERNS, ...ACCENT_COLOR_PATTERNS]) {
+  for (const pattern of [
+    ...COLOR_CONFLICT_PATTERNS,
+    ...ACCENT_COLOR_PATTERNS,
+    ...MONOCHROME_REVERSED_PATTERNS,
+  ]) {
     result = result.replace(pattern, '').replace(/\s+,/g, ',');
   }
 
@@ -207,6 +315,63 @@ function resolveColorContradictions(body: string, colorPalette?: string): string
     .trim();
 }
 
+function resolveComplexityContradictions(body: string, minimalismLevel?: number): string {
+  const hasMinimal = /\bminimal complexity\b/i.test(body);
+  const hasMedium = /\bmedium complexity\b/i.test(body);
+  if (!hasMinimal || !hasMedium) return body;
+
+  const preferMinimal = (minimalismLevel ?? 8) >= 6;
+  if (preferMinimal) {
+    return body.replace(/\bmedium complexity\b/gi, '').replace(/Complexity:\s*,/gi, 'Complexity:').trim();
+  }
+
+  return body.replace(/\bminimal complexity\b/gi, '').replace(/Complexity:\s*,/gi, 'Complexity:').trim();
+}
+
+const TYPOGRAPHY_SCORE_RULES: Array<{ pattern: RegExp; score: number }> = [
+  { pattern: /custom.*(?:glyph|letterform)/i, score: 10 },
+  { pattern: /neo-?grotesque/i, score: 9 },
+  { pattern: /constructed/i, score: 8 },
+  { pattern: /geometric sans/i, score: 5 },
+  { pattern: /Helvetica/i, score: 2 },
+  { pattern: /grotesque/i, score: 4 },
+  { pattern: /sans-?serif/i, score: 3 },
+];
+
+function scoreTypographyItem(item: string): number {
+  return TYPOGRAPHY_SCORE_RULES.reduce(
+    (sum, rule) => (rule.pattern.test(item) ? sum + rule.score : sum),
+    0,
+  );
+}
+
+function dedupeTypographyRedundancy(body: string): string {
+  const regex = /\bTypography:\s*([^.]+)\./i;
+  const match = body.match(regex);
+  if (!match?.[1]) {
+    let result = body;
+    for (const pattern of TYPOGRAPHY_REDUNDANT_PATTERNS) {
+      if (/\bneo-?grotesque\b/i.test(result)) {
+        result = result.replace(pattern, '');
+      }
+    }
+    return result.replace(/,\s*,+/g, ', ').replace(/\s{2,}/g, ' ').trim();
+  }
+
+  const items = match[1]
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (items.length <= 2) return body;
+
+  const kept = [...items]
+    .sort((a, b) => scoreTypographyItem(b) - scoreTypographyItem(a))
+    .slice(0, 2);
+
+  return body.replace(regex, `Typography: ${kept.join(', ')}.`);
+}
+
 function resolveTypographyContradictions(body: string): string {
   if (!TYPOGRAPHY_SANS_SIGNALS.test(body)) return body;
 
@@ -218,18 +383,21 @@ function resolveTypographyContradictions(body: string): string {
   return result.replace(/,\s*,+/g, ', ').replace(/\s{2,}/g, ' ').trim();
 }
 
-function consolidateConstructionAxis(body: string): string {
+function consolidateConstructionAxis(body: string, minimalismLevel?: number): string {
   const families = new Map<string, number>();
 
   for (const axis of CONSTRUCTION_AXIS_PATTERNS) {
     if (axis.pattern.test(body)) {
-      families.set(axis.family, (families.get(axis.family) ?? 0) + axis.score);
+      families.set(axis.family, Math.max(families.get(axis.family) ?? 0, axis.score));
     }
   }
 
   if (families.size <= 1) return body;
 
-  const winner = [...families.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  let winner = [...families.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if ((minimalismLevel ?? 8) >= 6 && families.has('baseline')) {
+    winner = 'baseline';
+  }
   if (!winner) return body;
 
   let result = body;
@@ -280,6 +448,48 @@ function stripPipelineMetadata(body: string): string {
   return result.replace(/\s{2,}/g, ' ').trim();
 }
 
+function avoidItemRedundantWithBody(body: string, item: string): boolean {
+  const lower = item.trim().toLowerCase();
+  if (!lower) return true;
+
+  if (GENERIC_AVOID_DEFAULTS.has(lower)) return true;
+
+  const bodyLower = body.toLowerCase();
+  if (bodyLower.includes(`no ${lower}`)) return true;
+  if (bodyLower.includes(`avoid ${lower}`)) return true;
+
+  if (/^company:/i.test(item) || /^industry:/i.test(item) || /^prompt id:/i.test(item)) return true;
+  if (/^style preferences:/i.test(item)) return true;
+
+  return false;
+}
+
+function sanitizeAvoidSuffix(avoidSuffix: string, body: string): string {
+  if (!avoidSuffix.trim()) return '';
+
+  let raw = stripPipelineMetadata(avoidSuffix.replace(/^Avoid:\s*/i, '').trim());
+  raw = raw.replace(/\.\s*$/, '');
+
+  const items = raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => !avoidItemRedundantWithBody(body, item));
+
+  const unique: string[] = [];
+  for (const item of items) {
+    const lower = item.toLowerCase();
+    if (unique.some((existing) => existing.toLowerCase() === lower)) continue;
+    if (unique.some((existing) => existing.toLowerCase().includes(lower) || lower.includes(existing.toLowerCase()))) {
+      continue;
+    }
+    unique.push(item);
+  }
+
+  if (unique.length === 0) return '';
+  return `Avoid: ${unique.join(', ')}`;
+}
+
 function dedupeRepeatedPhrases(body: string): string {
   let result = body;
   for (const pattern of REPEATED_PHRASE_PATTERNS) {
@@ -310,7 +520,20 @@ export function sanitizeClientNotesForPrompt(notes: string): string {
     .map((clause) => clause.trim())
     .filter((clause) => clause.length > 0 && !INTERVIEW_NOTES_BOILERPLATE.some((p) => p.test(clause)));
 
-  return clauses.join('. ').trim();
+  const unique: string[] = [];
+  for (const clause of clauses) {
+    const lower = clause.toLowerCase();
+    if (unique.some((existing) => existing.toLowerCase() === lower)) continue;
+    if (unique.some((existing) => {
+      const existingLower = existing.toLowerCase();
+      return existingLower.length > 6 && (existingLower.includes(lower) || lower.includes(existingLower));
+    })) {
+      continue;
+    }
+    unique.push(clause);
+  }
+
+  return unique.join('. ').trim();
 }
 
 function resolveFlatContradictions(body: string): string {
@@ -353,10 +576,13 @@ function dedupeRepeatedFragments(text: string): string {
   return result;
 }
 
-function polishTailSection(tail: string, options: PolishPromptOptions): string {
+function polishTailSection(tail: string, body: string, options: PolishPromptOptions): string {
   if (!tail.trim()) return '';
 
-  let result = sanitizeIndustryHintBlock(tail);
+  let result = sanitizeAvoidSuffix(tail, body);
+  if (!result) return '';
+
+  result = sanitizeIndustryHintBlock(result);
   result = resolveColorContradictions(result, options.colorPalette);
   result = resolveFlatContradictions(result);
   result = dedupeRepeatedFragments(result);
@@ -488,6 +714,116 @@ function truncateClientNotes(notes: string, maxChars = 220): string {
   return `${trimmed.slice(0, maxChars - 3).trim()}...`;
 }
 
+function resolveGeometryFamilyConflict(
+  body: string,
+  options: PolishPromptOptions,
+): string {
+  const hasGeometric = GEOMETRIC_FAMILY_PATTERNS.some((p) => p.test(body));
+  const hasOrganic = ORGANIC_FAMILY_PATTERNS.some((p) => p.test(body));
+  if (!hasGeometric || !hasOrganic) return body;
+
+  const preference =
+    parseGeometryPreference(options.geometry, options.preferredShapes) ??
+    ((options.minimalismLevel ?? 8) >= 6 ? 'geometric' : 'organic');
+
+  let result = body;
+  const strip = preference === 'geometric' ? ORGANIC_FAMILY_PATTERNS : GEOMETRIC_FAMILY_PATTERNS;
+  for (const pattern of strip) {
+    result = result.replace(pattern, '');
+  }
+
+  if (preference === 'geometric' && !/circle construction|quarter arc/i.test(result)) {
+    result = result.replace(
+      /\bGeometry:\s*([^.]*)\./i,
+      'Geometry: built from circle construction with integrated quarter arcs.',
+    );
+  }
+
+  return cleanupEmptyLabeledSections(
+    result
+      .replace(/,\s*utilizing\b/gi, '')
+      .replace(/\butilizing\s*\./gi, '')
+      .replace(/,\s*for playful character\b/gi, '')
+      .replace(/\.\s*,\s*/g, '. ')
+      .replace(/\s{2,}/g, ' ')
+      .trim(),
+  );
+}
+
+function stripBrokenFragments(body: string): string {
+  let result = body;
+  for (const pattern of BROKEN_FRAGMENT_PATTERNS) {
+    result = result.replace(pattern, '');
+  }
+  return result
+    .replace(/\bInterchangeable figure and ground\b/gi, '')
+    .replace(/\.\s*,\s*/g, '. ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function resolveStrokeWeight(body: string): string {
+  return body
+    .replace(/\bhairline thin strokes?\b/gi, 'medium stroke weight for small-size legibility')
+    .replace(/\bhairline strokes?\b/gi, 'medium stroke weight for small-size legibility');
+}
+
+function normalizeTypographyLanguage(body: string): string {
+  const labeled = /\bTypography:\s*([^.]+)\./i.test(body);
+  const scatteredCount =
+    (body.match(
+      /\b(?:Helvetica|neo-grotesque|geometric sans|wordmark typography|letterform|Swiss International typography|Typographic logotype|custom wordmark)/gi,
+    ) ?? []).length;
+
+  if (!labeled && scatteredCount < 3) return body;
+
+  let result = body;
+  if (labeled) {
+    result = result.replace(/\bTypography:\s*[^.]+\./i, `Typography: ${TYPOGRAPHY_CANONICAL}.`);
+  } else {
+    result = `${result.replace(/\.\s*$/, '')}. Typography: ${TYPOGRAPHY_CANONICAL}.`;
+  }
+
+  for (const pattern of SCATTERED_TYPOGRAPHY_PATTERNS) {
+    result = result.replace(pattern, '');
+  }
+
+  return result.replace(/,\s*,+/g, ', ').replace(/\s{2,}/g, ' ').trim();
+}
+
+function dedupeMonochromeColorPhrases(text: string, colorPalette?: string): string {
+  if (!isMonochromePrompt(text, colorPalette)) return text;
+
+  let result = text;
+  const hasColorStrict = /\bColor:\s*strict black and white only\b/i.test(result);
+  const hasPaletteStrict = /\bColor palette:\s*strict black and white only\b/i.test(result);
+
+  if (hasColorStrict && hasPaletteStrict) {
+    result = result.replace(/\bColor palette:\s*strict black and white only\.?\s*/gi, '');
+  } else if (hasPaletteStrict && !hasColorStrict) {
+    result = result.replace(
+      /\bColor palette:\s*strict black and white only\b/gi,
+      'Color: strict black and white only',
+    );
+  }
+
+  return dedupeExactFragment(result, 'Color: strict black and white only')
+    .replace(/\bColor:\s*no gradients\b/gi, 'no gradients')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function cleanupEmptyLabeledSections(body: string): string {
+  return body
+    .replace(/\b([A-Za-z]+):\s*,\s*\./g, '')
+    .replace(/\b([A-Za-z]+):\s*,\s*(?=[A-Z])/g, '')
+    .replace(/\b([A-Za-z]+):\s*\./g, '')
+    .replace(/,\s*\./g, '.')
+    .replace(/,\s*,+/g, ', ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function polishLogoPrompt(text: string, options: PolishPromptOptions = {}): string {
   const maxLength = options.maxLength ?? DEFAULT_MAX_LENGTH;
   const { body: rawBody, avoidSuffix } = splitAvoidSection(text);
@@ -495,39 +831,51 @@ export function polishLogoPrompt(text: string, options: PolishPromptOptions = {}
   let body = stripPipelineMetadata(rawBody);
   body = sanitizeLiteralIndustryLanguage(body);
   body = resolveColorContradictions(body, options.colorPalette);
+  body = resolveComplexityContradictions(body, options.minimalismLevel);
   body = resolveTypographyContradictions(body);
-  body = consolidateConstructionAxis(body);
+  body = dedupeTypographyRedundancy(body);
+  body = normalizeTypographyLanguage(body);
+  body = resolveGeometryFamilyConflict(body, options);
   body = resolveAbstractionLanguage(body, options.abstractionLevel);
   body = resolveMarkTypeConflicts(body);
   body = resolveFlatContradictions(body);
+  body = resolveStrokeWeight(body);
+  body = stripBrokenFragments(body);
+  body = cleanupEmptyLabeledSections(body);
   body = removeIrrelevantFragments(body, options);
   body = sanitizeIndustryHintBlock(body);
   body = consolidateGeometrySections(body);
   body = dedupeRepeatedPhrases(body);
   body = ensureModernistFormLanguage(body);
+  body = consolidateConstructionAxis(body, options.minimalismLevel);
+  body = cleanupEmptyLabeledSections(body);
   body = ensureBrandSpellingConstraint(body, options.companyName, options.markType);
   body = dedupeArtDirection(body);
   body = stripClientPreferencesFromBody(body);
 
-  let tail = polishTailSection(avoidSuffix, options);
+  let tail = polishTailSection(avoidSuffix, body, options);
   let combined = dedupeRepeatedFragments(tail ? `${body} ${tail}`.trim() : body);
 
   combined = combined
     .replace(/(?:\.\s*){2,}/g, '.')
+    .replace(/\s+\./g, '.')
     .replace(/\.([A-Za-z])/g, '. $1')
     .replace(/,\s*,+/g, ', ')
     .replace(/\s+,/g, ',')
     .replace(/([^\s.])\s+Avoid:/i, '$1. Avoid:')
     .trim();
 
-  if (isMonochromePrompt(combined, options.colorPalette) && !combined.includes(COLOR_PALETTE_FRAGMENT)) {
-    const avoidIdx = combined.search(/\bAvoid:\s*/i);
-    if (avoidIdx > 0) {
-      combined = `${combined.slice(0, avoidIdx).trim()}. ${COLOR_PALETTE_FRAGMENT}. ${combined.slice(avoidIdx)}`;
-    } else {
-      combined = `${combined.replace(/\.\s*$/, '')}. ${COLOR_PALETTE_FRAGMENT}.`;
+  if (isMonochromePrompt(combined, options.colorPalette)) {
+    combined = dedupeMonochromeColorPhrases(combined, options.colorPalette);
+    if (!/\bstrict black and white only\b/i.test(combined)) {
+      const avoidIdx = combined.search(/\bAvoid:\s*/i);
+      if (avoidIdx > 0) {
+        combined = `${combined.slice(0, avoidIdx).trim()}. Color: strict black and white only. ${combined.slice(avoidIdx)}`;
+      } else {
+        combined = `${combined.replace(/\.\s*$/, '')}. Color: strict black and white only.`;
+      }
     }
-    combined = dedupeRepeatedFragments(combined);
+    combined = dedupeMonochromeColorPhrases(combined, options.colorPalette);
   }
 
   const { body: finalBody, avoidSuffix: finalAvoid } = splitAvoidSection(combined);
@@ -546,6 +894,9 @@ export function finalizeLogoPromptText(
     markType: opts.markType,
     colorPalette: opts.colorPalette,
     abstractionLevel: opts.abstractionLevel,
+    minimalismLevel: opts.minimalismLevel,
+    geometry: opts.geometry,
+    preferredShapes: opts.preferredShapes,
     maxLength: opts.maxLength,
   });
 
@@ -553,7 +904,7 @@ export function finalizeLogoPromptText(
 
   const sanitizedNotes = sanitizeLiteralIndustryLanguage(
     sanitizeClientNotesForPrompt(truncateClientNotes(opts.clientNotes)),
-  );
+  ).replace(/\brecognition\.?\s*$/i, '').trim();
   const fragment = `Client preferences: ${sanitizedNotes.replace(/\.+$/, '')}`;
   const cleanBody = polished.replace(/\.\s*$/, '').trim();
   if (!cleanBody) return `${fragment}.`;
@@ -575,6 +926,9 @@ export function finalizeLogoPromptText(
     markType: opts.markType,
     colorPalette: opts.colorPalette,
     abstractionLevel: opts.abstractionLevel,
+    minimalismLevel: opts.minimalismLevel,
+    geometry: opts.geometry,
+    preferredShapes: opts.preferredShapes,
     maxLength: opts.maxLength,
   });
 }

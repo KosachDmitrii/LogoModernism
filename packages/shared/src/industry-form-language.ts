@@ -61,7 +61,6 @@ const LITERAL_PHRASE_REPLACEMENTS: Array<{ pattern: RegExp; replacement: string 
 
 const MODERNIST_FORM_PHRASES = [
   'International Typographic Style with Bauhaus geometric system',
-  'baseline grid alignment with radial construction and interlaced circular weave',
 ];
 
 /** Generic modernist defaults — client-specific forbids come from DesignStrategy. */

@@ -62,6 +62,8 @@ Enrichment rules:
 - ADD industry context ONLY through abstract form language — geometry, construction, silhouette, negative space
 - Translate industry into form vocabulary: round focal geometry, quarter-circle arcs, radial construction, interlaced weave, warm balanced silhouette
 - Use ONE construction axis only (baseline grid OR radial/weave — never diagonal + isometric together)
+- Use ONE geometry family only — circles/quarter arcs OR organic blobs, never both in the same prompt
+- If brief geometry field specifies an axis, follow it exactly
 - Use ONE color system only — if brief says black & white, never add accent colors
 - Do NOT use emblem badge format for combination marks unless client explicitly requests it
 - Do NOT mix serif and sans-serif typography in the same prompt

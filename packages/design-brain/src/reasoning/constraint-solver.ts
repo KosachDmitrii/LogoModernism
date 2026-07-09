@@ -15,6 +15,7 @@ export function solveConstraints(
   decision: DesignDecision,
   strategy: DesignStrategy,
   abstractionLevel: AbstractionLevel = 'stylized',
+  minimalismLevel?: number,
 ): DesignDecision {
   const avoidSet = new Set<string>();
 
@@ -34,6 +35,7 @@ export function solveConstraints(
   const polished = polishLogoPrompt(decision.promptText, {
     colorPalette: strategy.colorSystem.toLowerCase().includes('black and white') ? 'black_white' : undefined,
     abstractionLevel,
+    minimalismLevel,
   });
 
   return {

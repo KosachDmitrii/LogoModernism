@@ -42,6 +42,10 @@ export function BriefAnalyzeSection() {
       });
       return;
     }
+    if (field === 'geometry') {
+      updateDesignBrief({ geometry: value });
+      return;
+    }
     if (field in designBrief) {
       updateDesignBrief({ [field]: value } as Partial<typeof designBrief>);
     }
