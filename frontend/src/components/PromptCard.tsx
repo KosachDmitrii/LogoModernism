@@ -32,7 +32,8 @@ export function PromptCard({
   const [copied, setCopied] = useState(false);
   const companyName = useAppStore((s) => s.companyName);
   const designBrief = useAppStore((s) => s.designBrief);
-  const setGenerating = useAppStore((s) => s.setGenerating);
+  const startGenerating = useAppStore((s) => s.startGenerating);
+  const stopGenerating = useAppStore((s) => s.stopGenerating);
   const setPromptLogos = useAppStore((s) => s.setPromptLogos);
   const setPromptFeedback = useAppStore((s) => s.setPromptFeedback);
 
@@ -61,8 +62,8 @@ export function PromptCard({
 
   const generateImage = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (atLogoLimit) return;
-    setGenerating(prompt.id);
+    if (atLogoLimit || isGenerating) return;
+    startGenerating(prompt.id);
     try {
       const brandName = companyName.trim() || undefined;
       const rawMarkType =
@@ -86,7 +87,7 @@ export function PromptCard({
       console.error(err);
       alert(err instanceof Error ? err.message : 'Image generation failed');
     } finally {
-      setGenerating(null);
+      stopGenerating(prompt.id);
     }
   };
 

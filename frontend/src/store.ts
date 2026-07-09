@@ -20,7 +20,7 @@ function clearPromptResults() {
     prompts: [] as ComposedPrompt[],
     recommendations: [] as Recommendation[],
     selectedPromptId: null as string | null,
-    generatingPromptId: null as string | null,
+    generatingPromptIds: new Set<string>(),
   };
 }
 
@@ -57,7 +57,7 @@ interface AppState {
   prompts: ComposedPrompt[];
   recommendations: Recommendation[];
   selectedPromptId: string | null;
-  generatingPromptId: string | null;
+  generatingPromptIds: Set<string>;
   projects: SavedProject[];
   activeProjectId: string | null;
   setIndustry: (v: string) => void;
@@ -74,7 +74,8 @@ interface AppState {
   applyPipeline: (companyName: string, industry: string, result: Parameters<typeof applyPipelineToBrief>[1]) => void;
   setResults: (prompts: ComposedPrompt[], recommendations: Recommendation[]) => void;
   selectPrompt: (id: string) => void;
-  setGenerating: (promptId: string | null) => void;
+  startGenerating: (promptId: string) => void;
+  stopGenerating: (promptId: string) => void;
   appendPromptLogo: (promptId: string, image: GeneratedImage) => void;
   setPromptLogos: (promptId: string, logos: GeneratedImage[]) => void;
   setPromptFeedback: (promptId: string, feedback: 'LIKE' | 'DISLIKE') => void;
@@ -97,7 +98,7 @@ export const useAppStore = create<AppState>()(
       prompts: [],
       recommendations: [],
       selectedPromptId: null,
-      generatingPromptId: null,
+      generatingPromptIds: new Set<string>(),
       projects: [],
       activeProjectId: null,
       setIndustry: (industry) =>
@@ -190,12 +191,23 @@ export const useAppStore = create<AppState>()(
           prompts,
           recommendations,
           selectedPromptId: prompts[0]?.id ?? null,
-          generatingPromptId: null,
+          generatingPromptIds: new Set<string>(),
         });
         get().syncActiveProject();
       },
       selectPrompt: (selectedPromptId) => set({ selectedPromptId }),
-      setGenerating: (generatingPromptId) => set({ generatingPromptId }),
+      startGenerating: (promptId) =>
+        set((state) => {
+          const next = new Set(state.generatingPromptIds);
+          next.add(promptId);
+          return { generatingPromptIds: next };
+        }),
+      stopGenerating: (promptId) =>
+        set((state) => {
+          const next = new Set(state.generatingPromptIds);
+          next.delete(promptId);
+          return { generatingPromptIds: next };
+        }),
       appendPromptLogo: (promptId, image) => {
         set((state) => ({
           prompts: state.prompts.map((prompt) =>
@@ -291,7 +303,7 @@ export const useAppStore = create<AppState>()(
           prompts: project.prompts,
           recommendations: project.recommendations,
           selectedPromptId: project.selectedPromptId,
-          generatingPromptId: null,
+          generatingPromptIds: new Set<string>(),
         });
       },
       deleteProject: (id) =>
@@ -348,7 +360,7 @@ export function usePromptImages(promptId: string): GeneratedImage[] {
 }
 
 export function useIsGenerating(promptId: string): boolean {
-  return useAppStore((state) => state.generatingPromptId === promptId);
+  return useAppStore((state) => state.generatingPromptIds.has(promptId));
 }
 
 export function useHasDesignBrief(): boolean {
