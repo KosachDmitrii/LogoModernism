@@ -37,7 +37,8 @@ export async function computeTasteProfile(prisma: PrismaClient): Promise<TastePr
   let scoreSum = 0;
 
   for (const signal of signals) {
-    const text = [signal.context, JSON.stringify(signal.metadata ?? {})].join(' ').toLowerCase();
+    const metadata = (signal.metadata ?? {}) as Record<string, unknown>;
+    const text = [signal.context, JSON.stringify(metadata)].join(' ').toLowerCase();
     const weight = POSITIVE.includes(signal.signalType)
       ? signal.score
       : NEGATIVE.includes(signal.signalType)
@@ -45,6 +46,21 @@ export async function computeTasteProfile(prisma: PrismaClient): Promise<TastePr
         : signal.score;
 
     scoreSum += signal.score;
+
+    const workedTags = Array.isArray(metadata.workedTags) ? (metadata.workedTags as string[]) : [];
+    const missedTags = Array.isArray(metadata.missedTags) ? (metadata.missedTags as string[]) : [];
+
+    for (const tag of workedTags) {
+      const lower = tag.toLowerCase();
+      if (lower.includes('geometry')) geometry.set('geometric', (geometry.get('geometric') ?? 0) + Math.abs(weight));
+      if (lower.includes('typography')) markTypes.set('wordmark', (markTypes.get('wordmark') ?? 0) + Math.abs(weight));
+      if (lower.includes('color')) colors.set('monochrome', (colors.get('monochrome') ?? 0) + Math.abs(weight));
+    }
+
+    for (const tag of missedTags) {
+      const key = tag.toLowerCase().replace(/\s+/g, '_');
+      avoided.set(key, (avoided.get(key) ?? 0) + Math.abs(weight));
+    }
 
     for (const mark of extractTags(text, ['wordmark', 'lettermark', 'combination', 'symbol', 'emblem'])) {
       markTypes.set(mark, (markTypes.get(mark) ?? 0) + weight);

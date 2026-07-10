@@ -8,6 +8,8 @@ import {
   sanitizeLiteralIndustryLanguage,
   ensureModernistFormLanguage,
   polishLogoPrompt,
+  stripTextualMarkLanguage,
+  ensureSymbolOnlyDirectives,
 } from '@logo-platform/shared';
 import { searchPrinciples } from '@logo-platform/knowledge-base';
 import { composePrompt, selectDesignRules, significantTokens } from '@logo-platform/prompt-engine';
@@ -101,39 +103,6 @@ export function ensureIndustryPresent(text: string, industry: string): string {
 
   const trimmed = text.replace(/\.\s*$/, '');
   return `${trimmed}. ${fragment}`;
-}
-
-const TEXTUAL_MARK_PATTERNS = [
-  /\b(?:as a |featuring a |using a )?lettermark\b/gi,
-  /\bwordmark\b/gi,
-  /\bmonogram\b/gi,
-  /\bgeometric sans(?:\s+typography)?\b/gi,
-  /\bbold initials\b/gi,
-  /\bstandalone initial letters\b/gi,
-  /\btypographic logotype\b/gi,
-];
-
-export function stripTextualMarkLanguage(text: string): string {
-  const placeholder = '__NO_BRAND_TEXT_FRAGMENT__';
-  let working = text.includes(NO_BRAND_TEXT_FRAGMENT)
-    ? text.replace(NO_BRAND_TEXT_FRAGMENT, placeholder)
-    : text;
-
-  for (const pattern of TEXTUAL_MARK_PATTERNS) {
-    working = working.replace(pattern, 'abstract symbol mark');
-  }
-
-  return working
-    .replace(placeholder, NO_BRAND_TEXT_FRAGMENT)
-    .replace(/\s{2,}/g, ' ')
-    .replace(/\.\s*\./g, '.')
-    .trim();
-}
-
-export function ensureSymbolOnlyDirectives(text: string): string {
-  if (text.toLowerCase().includes('abstract symbol mark only')) return text;
-  const trimmed = text.replace(/\.\s*$/, '');
-  return `${trimmed}. ${NO_BRAND_TEXT_FRAGMENT}`;
 }
 
 export function mergeEnrichedPrompt(

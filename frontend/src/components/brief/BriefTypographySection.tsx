@@ -44,15 +44,16 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
       const name = useAppStore.getState().companyName.trim();
 
       return analyzeBrandDNA({
-        companyName: name || industry.trim() || 'Brand',
+        companyName: name || undefined,
         industry: industry.trim(),
-        markType: selectedMarkType,
-        typographyStyle: selectedTypographyStyle,
+        markType: name ? selectedMarkType : undefined,
+        typographyStyle: name ? selectedTypographyStyle : undefined,
       });
     },
     onSuccess: (result) => {
       const brief = useAppStore.getState().designBrief;
-      const name = useAppStore.getState().companyName.trim() || industry.trim();
+      const name = useAppStore.getState().companyName.trim();
+      if (!name) return;
       applyBrandDNA(name, industry.trim(), {
         ...result,
         markType: brief.markType || result.markType,

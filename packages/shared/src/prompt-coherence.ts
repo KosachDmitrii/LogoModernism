@@ -1,6 +1,6 @@
 import type { LogoMarkType } from './types';
 import type { AbstractionLevel } from './client-visual-intent';
-import { exactBrandSpellingFragment, normalizeBrandName } from './brand-text';
+import { exactBrandSpellingFragment, normalizeBrandName, hasExplicitBrandName, ensureSymbolOnlyDirectives, stripTextualMarkLanguage } from './brand-text';
 import { ensureModernistFormLanguage, sanitizeLiteralIndustryLanguage, buildAbstractIndustryFragment } from './industry-form-language';
 
 export interface PolishPromptOptions {
@@ -590,6 +590,17 @@ function polishTailSection(tail: string, body: string, options: PolishPromptOpti
   return result.trim();
 }
 
+function enforceSymbolOnlyPrompt(body: string, options: PolishPromptOptions): string {
+  if (hasExplicitBrandName(options.companyName)) return body;
+
+  let result = stripTextualMarkLanguage(body);
+  result = result.replace(/\bTypography:\s*[^.]+\./gi, '');
+  result = result.replace(/\bbrand name must read exactly[^.]+\./gi, '');
+  result = result.replace(/\bwordmark for\s+"[^"]+"/gi, '');
+  result = ensureSymbolOnlyDirectives(result);
+  return result.replace(/\s{2,}/g, ' ').replace(/\.\s*\./g, '.').trim();
+}
+
 function removeIrrelevantFragments(body: string, options: PolishPromptOptions): string {
   let result = body;
   const hasBrandText = Boolean(normalizeBrandName(options.companyName));
@@ -850,6 +861,7 @@ export function polishLogoPrompt(text: string, options: PolishPromptOptions = {}
   body = consolidateConstructionAxis(body, options.minimalismLevel);
   body = cleanupEmptyLabeledSections(body);
   body = ensureBrandSpellingConstraint(body, options.companyName, options.markType);
+  body = enforceSymbolOnlyPrompt(body, options);
   body = dedupeArtDirection(body);
   body = stripClientPreferencesFromBody(body);
 

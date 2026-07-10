@@ -1,9 +1,11 @@
 import type { LogoMarkType } from './types';
 import type { ClientVisualIntent } from './client-visual-intent';
+import { hasExplicitBrandName, isSymbolOnlyLogo } from './brand-text';
 import { buildAbstractIndustryFragment } from './industry-form-language';
 
 export interface ArtDirectionInput {
   markType?: LogoMarkType;
+  companyName?: string;
   industry?: string;
   personality?: string;
   clientIntent?: Pick<ClientVisualIntent, 'abstractionLevel' | 'desiredMotifs' | 'forbiddenMotifs'>;
@@ -73,8 +75,12 @@ const DETAILED_PROMPT_MARKERS = [
   'symbol and wordmark',
 ];
 
-export function isCombinationMark(markType?: LogoMarkType): boolean {
-  return markType === 'combination' || !markType;
+export function isCombinationMark(
+  markType?: LogoMarkType,
+  companyName?: string | null,
+): boolean {
+  if (isSymbolOnlyLogo(companyName, markType)) return false;
+  return markType === 'combination' || (!markType && hasExplicitBrandName(companyName));
 }
 
 export function isDetailedLogoPrompt(text: string): boolean {
@@ -114,7 +120,32 @@ export function buildArtDirectionFragments(input: ArtDirectionInput): string[] {
   return fragments;
 }
 
+export function buildSymbolOnlyArtDirectionFragments(input: ArtDirectionInput): string[] {
+  const fragments = [
+    'Abstract symbol mark only — no lettering, no words, no initials, no monogram letters',
+    'Standalone iconic symbol with strong silhouette and confident negative space',
+    'Flat vector geometric mark designed for small-size recognition',
+  ];
+
+  if (input.industry?.trim()) {
+    fragments.push(buildAbstractIndustryFragment(input.industry.trim(), input.clientIntent));
+  }
+
+  fragments.push(
+    'Avoid wordmarks, lettermarks, typography, badges with text, and any readable characters',
+  );
+
+  return fragments;
+}
+
 export function buildImageArtDirectionSuffix(input: ArtDirectionInput): string {
+  if (isSymbolOnlyLogo(input.companyName, input.markType)) {
+    return (
+      ' Abstract symbol mark only — no text, no lettering, no initials. ' +
+      'Strong geometric silhouette, flat vector, confident negative space.'
+    );
+  }
+
   if (input.markType === 'wordmark' || input.markType === 'lettermark') {
     return (
       ' Custom typographic identity with modified distinctive glyphs, not an off-the-shelf font, ' +

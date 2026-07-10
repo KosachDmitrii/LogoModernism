@@ -7,7 +7,12 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "consolidate": "tsx src/cli/consolidate.ts"
+    "consolidate": "tsx src/cli/consolidate.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:eval": "vitest run --config vitest.eval.config.ts"
   },
   "dependencies": {
     "@logo-platform/ai-engines": "*",
@@ -21,7 +26,9 @@
   },
   "devDependencies": {
     "@types/pdf-parse": "^1.1.4",
+    "testcontainers": "^10.28.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.4"
   }
 }

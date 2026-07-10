@@ -14,7 +14,9 @@ function parseFeedback(value: unknown): PromptFeedback | undefined {
 function parseLogoFeedback(value: unknown): LogoFeedback | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const row = value as LogoFeedback;
-  if (typeof row.score !== 'number' || typeof row.emoji !== 'string') return undefined;
+  const hasRating = typeof row.score === 'number';
+  const hasTags = Boolean(row.workedTags?.length || row.missedTags?.length);
+  if (!hasRating && !hasTags) return undefined;
   return row;
 }
 
@@ -125,6 +127,43 @@ export class PromptRecordsService {
     }
 
     logos[index] = { ...logos[index]!, feedback };
+    const updated = await prisma.composedPromptRecord.update({
+      where: { id },
+      data: { logos: logos as unknown as Prisma.InputJsonValue },
+    });
+
+    return this.toClientRecord(updated);
+  }
+
+  async setLogoTags(
+    id: string,
+    logoId: string,
+    tags: { workedTags?: string[]; missedTags?: string[] },
+  ) {
+    const record = await prisma.composedPromptRecord.findUnique({ where: { id } });
+    if (!record) {
+      throw new NotFoundException(`Prompt not found: ${id}`);
+    }
+
+    const logos = parseLogos(record.logos);
+    const index = logos.findIndex((logo) => logo.id === logoId);
+    if (index === -1) {
+      throw new NotFoundException(`Logo not found: ${logoId}`);
+    }
+
+    const prev = logos[index]!.feedback;
+    const now = new Date().toISOString();
+    logos[index] = {
+      ...logos[index]!,
+      feedback: {
+        ...prev,
+        workedTags: tags.workedTags,
+        missedTags: tags.missedTags,
+        submittedAt: prev?.submittedAt ?? now,
+        tagsUpdatedAt: now,
+      },
+    };
+
     const updated = await prisma.composedPromptRecord.update({
       where: { id },
       data: { logos: logos as unknown as Prisma.InputJsonValue },

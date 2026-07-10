@@ -112,6 +112,9 @@ export function isPrincipleAllowedForMarkType(
     if (SYMBOL_ONLY_SKIP_CATEGORIES.has(rule.category)) return false;
     if (SYMBOL_ONLY_BLOCKED_IDS.has(rule.id)) return false;
     if (SYMBOL_ONLY_FRAGMENT.test(rule.promptFragment)) return false;
+    if (/\b(wordmark|combination mark|symbol and wordmark|typographic)\b/i.test(rule.promptFragment)) {
+      return false;
+    }
   }
 
   if (!markType) return true;

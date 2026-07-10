@@ -39,7 +39,7 @@ export interface ExtractedPrinciple {
   tags?: string[];
 }
 
-function parsePrinciples(content: string): ExtractedPrinciple[] {
+export function parsePrinciples(content: string): ExtractedPrinciple[] {
   const match = content.match(/\[[\s\S]*\]/);
   if (!match) return [];
 
@@ -57,7 +57,7 @@ function parsePrinciples(content: string): ExtractedPrinciple[] {
   }
 }
 
-function dedupePrinciples(principles: ExtractedPrinciple[]): ExtractedPrinciple[] {
+export function dedupePrinciples(principles: ExtractedPrinciple[]): ExtractedPrinciple[] {
   const seen = new Set<string>();
   const result: ExtractedPrinciple[] = [];
 
@@ -71,7 +71,7 @@ function dedupePrinciples(principles: ExtractedPrinciple[]): ExtractedPrinciple[
   return result;
 }
 
-function rankFallback(candidates: ExtractedPrinciple[]): ExtractedPrinciple[] {
+export function rankFallback(candidates: ExtractedPrinciple[]): ExtractedPrinciple[] {
   return dedupePrinciples(candidates)
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, MAX_SELECTED);

@@ -9,7 +9,8 @@ export const LOGO_RATING_LEVELS = [
 export const LOGO_WORKED_TAGS = ['Geometry', 'Typography', 'Color'] as const;
 export const LOGO_MISSED_TAGS = ['Too literal', 'Too complex', 'Off-brand'] as const;
 
-export function scoreToStars(score: number): number {
+export function scoreToStars(score?: number): number {
+  if (score === undefined) return 0;
   const match = [...LOGO_RATING_LEVELS].reverse().find((level) => score >= level.score);
   return match?.stars ?? 0;
 }

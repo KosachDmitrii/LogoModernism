@@ -270,7 +270,10 @@ export function parseDecisionJson(content: string, symbolOnly = false): DesignDe
     if (!VALID_MARK_TYPES.has(parsed.markType)) return null;
     if (symbolOnly && (parsed.markType === 'wordmark' || parsed.markType === 'lettermark')) {
       parsed.markType = 'combination';
+    }
+    if (symbolOnly) {
       parsed.typography = [];
+      parsed.typographyStyle = undefined;
     }
 
     return {

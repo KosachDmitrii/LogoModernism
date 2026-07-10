@@ -6,6 +6,7 @@ import { GeneratePromptLogoDto } from './dto/generate-prompt-logo.dto';
 import { PromptFeedbackDto } from './dto/prompt-feedback.dto';
 import { PromptSaveDto } from './dto/prompt-save.dto';
 import { LogoFeedbackDto } from './dto/logo-feedback.dto';
+import { LogoTagsDto } from './dto/logo-tags.dto';
 import type { PromptGenerationRequest } from '@logo-platform/shared';
 import { normalizeBrandName } from '@logo-platform/shared';
 import { slimPipelineResult } from './prompt-response';
@@ -99,6 +100,15 @@ export class PromptsController {
     @Body() body: LogoFeedbackDto,
   ) {
     return this.promptsService.submitLogoFeedback(id, logoId, body);
+  }
+
+  @Post(':id/logos/:logoId/tags')
+  submitLogoTags(
+    @Param('id') id: string,
+    @Param('logoId') logoId: string,
+    @Body() body: LogoTagsDto,
+  ) {
+    return this.promptsService.submitLogoTags(id, logoId, body);
   }
 
   @Get(':id')

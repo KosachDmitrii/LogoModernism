@@ -20,6 +20,7 @@ import { BriefCoverageMap } from './BriefCoverageMap';
 import { BriefStyleSection } from './BriefStyleSection';
 import { BriefClientSection } from './BriefClientSection';
 import { BriefAnalyzeSection } from './BriefAnalyzeSection';
+import { StartOverButton } from '../prompts/StartOverButton';
 
 export type BuildSection = 'typography' | 'shapes' | 'style' | 'references' | 'client' | 'analyze';
 
@@ -58,6 +59,7 @@ export function advanceBriefBuildSection(from: BuildSection) {
 interface BriefBuildPanelProps {
   onGoToReview: () => void;
   onBack?: () => void;
+  onStartOver?: () => void;
 }
 
 function sectionStatus(
@@ -94,7 +96,7 @@ function sectionStatus(
   return done ? 'done' : 'optional';
 }
 
-export function BriefBuildPanel({ onGoToReview, onBack }: BriefBuildPanelProps) {
+export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuildPanelProps) {
   const designBrief = useAppStore((s) => s.designBrief);
   const [openSection, setOpenSection] = useState<BuildSection | null>(readInitialSection);
 
@@ -258,6 +260,7 @@ export function BriefBuildPanel({ onGoToReview, onBack }: BriefBuildPanelProps) 
           Review brief
           <ArrowRight size={14} />
         </button>
+        {onStartOver && <StartOverButton onClick={onStartOver} />}
       </div>
     </div>
   );

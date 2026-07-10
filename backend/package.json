@@ -5,7 +5,8 @@
   "scripts": {
     "build": "nest build",
     "dev": "npm run build -w @logo-platform/design-brain && nest build && nest start --watch",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "test:e2e": "nest build && vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@logo-platform/ai-engines": "*",
@@ -26,9 +27,14 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.2",
+    "@nestjs/testing": "^11.0.7",
     "@types/express": "^5.0.0",
     "@types/multer": "^2.2.0",
     "@types/node": "^22.10.5",
-    "typescript": "^5.7.3"
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4",
+    "testcontainers": "^10.28.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.4"
   }
 }

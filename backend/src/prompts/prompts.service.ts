@@ -100,8 +100,6 @@ export class PromptsService {
     body: {
       score: number;
       emoji: string;
-      workedTags?: string[];
-      missedTags?: string[];
     },
   ) {
     if (!process.env.DATABASE_URL) {
@@ -114,11 +112,11 @@ export class PromptsService {
       throw new BadRequestException(`Logo not found: ${logoId}`);
     }
 
+    const prev = logo.feedback;
     const feedback = {
+      ...prev,
       score: body.score,
       emoji: body.emoji,
-      workedTags: body.workedTags,
-      missedTags: body.missedTags,
       submittedAt: new Date().toISOString(),
     };
 
@@ -132,21 +130,21 @@ export class PromptsService {
           `Logo rating: ${body.score}/10 (${body.emoji})`,
           record.companyName ? `Company: ${record.companyName}` : '',
           `Industry: ${record.industry}`,
-          body.workedTags?.length ? `Worked: ${body.workedTags.join(', ')}` : '',
-          body.missedTags?.length ? `Missed: ${body.missedTags.join(', ')}` : '',
+          prev?.workedTags?.length ? `Worked: ${prev.workedTags.join(', ')}` : '',
+          prev?.missedTags?.length ? `Missed: ${prev.missedTags.join(', ')}` : '',
           `Prompt: ${record.text.slice(0, 500)}`,
           `Image: ${logo.url}`,
         ]
           .filter(Boolean)
           .join('\n'),
         metadata: {
-          kind: 'logo_feedback',
+          kind: 'logo_rating',
           promptId,
           logoId,
           score: body.score,
           emoji: body.emoji,
-          workedTags: body.workedTags,
-          missedTags: body.missedTags,
+          workedTags: prev?.workedTags,
+          missedTags: prev?.missedTags,
           companyName: record.companyName,
           industry: record.industry,
           imageUrl: logo.url,
@@ -154,6 +152,89 @@ export class PromptsService {
       });
     } catch (error) {
       console.warn('Brain ingest failed for logo feedback', promptId, logoId, error);
+    }
+
+    const savedLogo = updated.logos.find((item) => item.id === logoId);
+    return {
+      promptId,
+      logoId,
+      feedback: savedLogo?.feedback,
+      logos: updated.logos,
+    };
+  }
+
+  async submitLogoTags(
+    promptId: string,
+    logoId: string,
+    body: {
+      workedTags?: string[];
+      missedTags?: string[];
+    },
+  ) {
+    if (!process.env.DATABASE_URL) {
+      throw new BadRequestException('DATABASE_URL is required to store logo tags');
+    }
+
+    const record = await this.promptRecords.getById(promptId);
+    const logo = record.logos.find((item) => item.id === logoId);
+    if (!logo) {
+      throw new BadRequestException(`Logo not found: ${logoId}`);
+    }
+
+    const updated = await this.promptRecords.setLogoTags(promptId, logoId, body);
+
+    const baseContext = [
+      record.companyName ? `Company: ${record.companyName}` : '',
+      `Industry: ${record.industry}`,
+      `Prompt: ${record.text.slice(0, 400)}`,
+      `Image: ${logo.url}`,
+    ].filter(Boolean);
+
+    const tagMetadata = {
+      kind: 'logo_tags' as const,
+      promptId,
+      logoId,
+      companyName: record.companyName,
+      industry: record.industry,
+      imageUrl: logo.url,
+    };
+
+    try {
+      if (body.workedTags?.length) {
+        await designBrain.ingestFeedback({
+          signalType: 'APPROVE',
+          score: 7,
+          context: [
+            'Logo worked feedback',
+            ...baseContext,
+            `Worked: ${body.workedTags.join(', ')}`,
+          ].join('\n'),
+          metadata: {
+            ...tagMetadata,
+            tagPolarity: 'worked',
+            workedTags: body.workedTags,
+          },
+        });
+      }
+
+      if (body.missedTags?.length) {
+        await designBrain.ingestFeedback({
+          signalType: 'REJECT',
+          score: 6,
+          context: [
+            'Logo missed feedback',
+            ...baseContext,
+            `Missed: ${body.missedTags.join(', ')}`,
+          ].join('\n'),
+          metadata: {
+            ...tagMetadata,
+            tagPolarity: 'missed',
+            missedTags: body.missedTags,
+          },
+        });
+      }
+    } catch (error) {
+      console.warn('Brain ingest failed for logo tags', promptId, logoId, error);
     }
 
     const savedLogo = updated.logos.find((item) => item.id === logoId);

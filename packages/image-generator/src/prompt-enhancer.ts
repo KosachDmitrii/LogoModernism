@@ -35,6 +35,11 @@ const CONSTRUCTED_SUFFIX =
 const ANTI_LITERAL_SUFFIX =
   ' Industry cues through abstract form language only — no literal clipart, stock icons, or photoreal objects.';
 
+const SYMBOL_ONLY_SUFFIX =
+  ' Professional abstract symbol logo, standalone iconic mark with no text, no lettering, no initials, ' +
+  'flat vector style, clean white background, strong geometric silhouette, ' +
+  'no gradients, no shadows, no photorealism, centered composition.';
+
 const WORDMARK_SUFFIX =
   ' Professional typographic wordmark logo, letters spelling the brand name are the entire logo, ' +
   'typography only, no icon, no symbol, no emblem, no pictorial mark above or beside the text, ' +
@@ -107,6 +112,7 @@ function renderSuffixForPrompt(
   markType: LogoMarkType | undefined,
   detailed: boolean,
   request: ImageGenerationRequest,
+  brandName?: string,
 ): string {
   const style = stylePreferenceOverrides(request);
   const renderBase = [
@@ -120,16 +126,24 @@ function renderSuffixForPrompt(
     .filter(Boolean)
     .join(', ');
   const compactSuffix = ` ${renderBase}.`;
+  const artDirection = buildImageArtDirectionSuffix({
+    markType,
+    companyName: brandName,
+  });
+
+  if (!brandName) {
+    return `${compactSuffix}${artDirection}${SYMBOL_ONLY_SUFFIX}`;
+  }
 
   if (detailed) {
-    if (isCombinationMark(markType)) {
-      return `${compactSuffix}${buildImageArtDirectionSuffix({ markType })}${ANTI_LITERAL_SUFFIX}`;
+    if (isCombinationMark(markType, brandName)) {
+      return `${compactSuffix}${artDirection}${ANTI_LITERAL_SUFFIX}`;
     }
     return compactSuffix;
   }
 
-  if (isCombinationMark(markType)) {
-    return `${compactSuffix}${buildImageArtDirectionSuffix({ markType })}${ANTI_LITERAL_SUFFIX}`;
+  if (isCombinationMark(markType, brandName)) {
+    return `${compactSuffix}${artDirection}${ANTI_LITERAL_SUFFIX}`;
   }
 
   return compactSuffix;
@@ -171,15 +185,18 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
     base.toLowerCase().includes('constructed typographic');
 
   if (!brandName) {
-    const suffix = renderSuffixForPrompt(base, markType, detailed, request);
+    const suffix = renderSuffixForPrompt(base, undefined, detailed, request, brandName);
     const text = base.toLowerCase().includes('logo')
       ? `${base}. ${suffix} ${NO_BRAND_TEXT_INSTRUCTION}`
-      : `Minimal geometric logo: ${base}. ${suffix} ${NO_BRAND_TEXT_INSTRUCTION}`;
-    return applyImageStyleOverrides(text, request);
+      : `Abstract symbol-only logo: ${base}. ${suffix} ${NO_BRAND_TEXT_INSTRUCTION}`;
+    return applyImageStyleOverrides(
+      polishLogoPrompt(text, { companyName: brandName, colorPalette: request.colorPalette, maxLength: 3600 }),
+      request,
+    );
   }
 
   if (isConstructed) {
-    const suffix = detailed ? renderSuffixForPrompt(base, markType, detailed, request) : CONSTRUCTED_SUFFIX;
+    const suffix = detailed ? renderSuffixForPrompt(base, markType, detailed, request, brandName) : CONSTRUCTED_SUFFIX;
     const text = base.toLowerCase().includes('constructed')
       ? `${base}${company}. ${suffix}`
       : `Constructed typography logo${company}: ${base}. ${suffix}`;
@@ -195,7 +212,7 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
 
   if (markType === 'wordmark') {
     const suffix = detailed
-      ? `${renderSuffixForPrompt(base, markType, detailed, request)}${buildImageArtDirectionSuffix({ markType: 'wordmark' })}`
+      ? `${renderSuffixForPrompt(base, markType, detailed, request, brandName)}${buildImageArtDirectionSuffix({ markType: 'wordmark', companyName: brandName })}`
       : WORDMARK_SUFFIX;
     const text = base.toLowerCase().includes('wordmark')
       ? `${base}${company}. ${suffix}`
@@ -203,7 +220,7 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
     return applyImageStyleOverrides(withExactSpelling(text, brandName, 'wordmark'), request);
   }
 
-  const suffix = renderSuffixForPrompt(base, markType, detailed, request);
+  const suffix = renderSuffixForPrompt(base, markType, detailed, request, brandName);
 
   if (base.toLowerCase().includes('logo')) {
     return applyImageStyleOverrides(

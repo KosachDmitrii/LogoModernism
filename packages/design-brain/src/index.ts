@@ -22,4 +22,13 @@ export { expandResearchQueries } from './research/query-expander';
 export { runBrainPromptPipeline, type BrainPipelineResult } from './reasoning/brain-prompt-pipeline';
 export { reasonDesignDecision } from './reasoning/brain-reasoning';
 export { runBriefInterview, buildBrainArchitecture } from './reasoning/brain-architecture';
+export {
+  parsePrinciples,
+  dedupePrinciples,
+  rankFallback,
+  extractPrinciplesFromText,
+  summarizeText,
+  type ExtractedPrinciple,
+} from './ingest/principle-extractor';
+export { parseDecisionJson } from './reasoning/brain-reasoning';
 export { generateWithCritiqueLoop, storeGenerationExperience } from './generation/critique-loop';

@@ -41,6 +41,50 @@ export const NO_BRAND_TEXT_FRAGMENT =
 export const NO_BRAND_TEXT_INSTRUCTION =
   'CRITICAL: Do not include any readable text, brand name, letters, words, or initials in the logo.';
 
+const TEXTUAL_MARK_PATTERNS = [
+  /\b(?:as a |featuring a |using a )?lettermark\b/gi,
+  /\bwordmark\b/gi,
+  /\bmonogram\b/gi,
+  /\bgeometric sans(?:\s+typography)?\b/gi,
+  /\bbold initials\b/gi,
+  /\bstandalone initial letters\b/gi,
+  /\btypographic logotype\b/gi,
+  /\bsymbol and wordmark\b/gi,
+  /\bcombination mark\b/gi,
+  /\bcustom modified wordmark\b/gi,
+  /\btypography:\s*[^.]+\./gi,
+];
+
+export function isSymbolOnlyLogo(
+  companyName?: string | null,
+  markType?: LogoMarkType,
+): boolean {
+  return !hasExplicitBrandName(companyName) && !markType;
+}
+
+export function stripTextualMarkLanguage(text: string): string {
+  const placeholder = '__NO_BRAND_TEXT_FRAGMENT__';
+  let working = text.includes(NO_BRAND_TEXT_FRAGMENT)
+    ? text.replace(NO_BRAND_TEXT_FRAGMENT, placeholder)
+    : text;
+
+  for (const pattern of TEXTUAL_MARK_PATTERNS) {
+    working = working.replace(pattern, 'abstract symbol mark');
+  }
+
+  return working
+    .replace(placeholder, NO_BRAND_TEXT_FRAGMENT)
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\.\s*\./g, '.')
+    .trim();
+}
+
+export function ensureSymbolOnlyDirectives(text: string): string {
+  if (text.toLowerCase().includes('abstract symbol mark only')) return text;
+  const trimmed = text.replace(/\.\s*$/, '');
+  return `${trimmed}. ${NO_BRAND_TEXT_FRAGMENT}`;
+}
+
 /**
  * Instruction block appended to image/prompt text when a brand name must appear verbatim in the logo.
  */

@@ -11,6 +11,8 @@ import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
 import { useComposePrompts } from '../hooks/useComposePrompts';
 import { useAppStore } from '../store';
+import { StartOverButton } from '../components/prompts/StartOverButton';
+import { StartOverDialog } from '../components/prompts/StartOverDialog';
 
 const STEP_META: Record<PromptWizardStep, { title: string; subtitle: string }> = {
   1: {
@@ -32,8 +34,10 @@ export function PromptsPage() {
   const industry = useAppStore((s) => s.industry);
   const selectedPromptId = useAppStore((s) => s.selectedPromptId);
   const selectPrompt = useAppStore((s) => s.selectPrompt);
+  const resetWizard = useAppStore((s) => s.resetWizard);
 
   const [activeStep, setActiveStep] = useState<PromptWizardStep>(prompts.length > 0 ? 3 : 1);
+  const [startOverOpen, setStartOverOpen] = useState(false);
 
   const compose = useComposePrompts();
 
@@ -51,10 +55,19 @@ export function PromptsPage() {
     });
   };
 
+  const handleStartOver = () => setStartOverOpen(true);
+
+  const confirmStartOver = () => {
+    resetWizard();
+    setActiveStep(1);
+    setStartOverOpen(false);
+  };
+
   const meta = STEP_META[activeStep];
 
   return (
-    <PageContainer>
+    <>
+      <PageContainer>
       <PageHeader
         page="prompts"
         subtitle={meta.subtitle}
@@ -116,6 +129,7 @@ export function PromptsPage() {
                   )}
                   Regenerate prompts
                 </button>
+                <StartOverButton onClick={handleStartOver} disabled={compose.isPending} />
               </div>
             </div>
           )}
@@ -134,6 +148,7 @@ export function PromptsPage() {
             <BriefWorkflowPanel
               onCompose={handleCompose}
               onBack={() => setActiveStep(1)}
+              onStartOver={handleStartOver}
               isComposing={compose.isPending}
               canCompose={Boolean(industry.trim())}
             />
@@ -146,6 +161,12 @@ export function PromptsPage() {
           )}
         </div>
       )}
-    </PageContainer>
+      </PageContainer>
+      <StartOverDialog
+        open={startOverOpen}
+        onConfirm={confirmStartOver}
+        onCancel={() => setStartOverOpen(false)}
+      />
+    </>
   );
 }

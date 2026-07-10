@@ -16,11 +16,12 @@ export interface ImageGenerationRequest extends StylePreferenceInput {
 }
 
 export interface LogoFeedback {
-  score: number;
-  emoji: string;
+  score?: number;
+  emoji?: string;
   workedTags?: string[];
   missedTags?: string[];
   submittedAt: string;
+  tagsUpdatedAt?: string;
 }
 
 export interface GeneratedImage {

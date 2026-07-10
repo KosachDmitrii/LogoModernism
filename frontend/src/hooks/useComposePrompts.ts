@@ -40,7 +40,12 @@ export function useComposePrompts() {
         markType ?? designBrief.markType,
         brandName,
       );
-      const briefContext = designBriefToBriefContext(designBrief);
+      const briefContext = (() => {
+        const ctx = designBriefToBriefContext(designBrief);
+        if (!ctx || brandName) return ctx;
+        const { typography: _typography, ...symbolOnlyContext } = ctx;
+        return Object.keys(symbolOnlyContext).length > 0 ? symbolOnlyContext : undefined;
+      })();
 
       return generatePrompts({
         industry: industry.trim(),

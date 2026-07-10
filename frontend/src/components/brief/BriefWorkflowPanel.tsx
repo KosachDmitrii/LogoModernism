@@ -7,17 +7,25 @@ import { DesignBriefPanel } from '../DesignBriefPanel';
 import { BriefBuildPanel } from './BriefBuildPanel';
 import { BriefCoverageMap } from './BriefCoverageMap';
 import { BriefChecklist } from './BriefChecklist';
+import { StartOverButton } from '../prompts/StartOverButton';
 
 type BriefSubTab = 'build' | 'review';
 
 interface BriefWorkflowPanelProps {
   onCompose: () => void;
   onBack?: () => void;
+  onStartOver?: () => void;
   isComposing: boolean;
   canCompose: boolean;
 }
 
-export function BriefWorkflowPanel({ onCompose, onBack, isComposing, canCompose }: BriefWorkflowPanelProps) {
+export function BriefWorkflowPanel({
+  onCompose,
+  onBack,
+  onStartOver,
+  isComposing,
+  canCompose,
+}: BriefWorkflowPanelProps) {
   const designBrief = useAppStore((s) => s.designBrief);
   const readiness = getBriefReadiness(designBrief);
   const [subTab, setSubTab] = useState<BriefSubTab>('build');
@@ -66,7 +74,11 @@ export function BriefWorkflowPanel({ onCompose, onBack, isComposing, canCompose 
       </div>
 
       {subTab === 'build' ? (
-        <BriefBuildPanel onGoToReview={() => setSubTab('review')} onBack={onBack} />
+        <BriefBuildPanel
+          onGoToReview={() => setSubTab('review')}
+          onBack={onBack}
+          onStartOver={onStartOver}
+        />
       ) : (
         <div className="space-y-4">
           <div className="p-3 rounded-xl bg-zinc-900/40 border border-zinc-800">
@@ -115,6 +127,9 @@ export function BriefWorkflowPanel({ onCompose, onBack, isComposing, canCompose 
               )}
               Compose Prompts
             </button>
+            {onStartOver && (
+              <StartOverButton onClick={onStartOver} disabled={isComposing} />
+            )}
           </div>
 
           {designBrief.sources.length === 0 && (

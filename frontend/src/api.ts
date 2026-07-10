@@ -202,8 +202,6 @@ export async function submitLogoFeedback(
   body: {
     score: number;
     emoji: string;
-    workedTags?: string[];
-    missedTags?: string[];
   },
 ): Promise<{ promptId: string; logoId: string; feedback?: LogoFeedback; logos: GeneratedImage[] }> {
   const res = await fetch(
@@ -215,6 +213,26 @@ export async function submitLogoFeedback(
     },
   );
   if (!res.ok) await parseApiError(res, 'Logo feedback failed');
+  return res.json();
+}
+
+export async function submitLogoTags(
+  promptId: string,
+  logoId: string,
+  body: {
+    workedTags?: string[];
+    missedTags?: string[];
+  },
+): Promise<{ promptId: string; logoId: string; feedback?: LogoFeedback; logos: GeneratedImage[] }> {
+  const res = await fetch(
+    `${API_BASE}/prompts/${encodeURIComponent(promptId)}/logos/${encodeURIComponent(logoId)}/tags`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) await parseApiError(res, 'Logo tags failed');
   return res.json();
 }
 

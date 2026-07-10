@@ -7,10 +7,12 @@ import {
   exactBrandSpellingFragment,
   normalizeBrandName,
   hasExplicitBrandName,
+  isSymbolOnlyLogo,
   resolveMarkTypeForBrand,
   resolveTypographyStyleForBrand,
   NO_BRAND_TEXT_FRAGMENT,
   buildArtDirectionFragments,
+  buildSymbolOnlyArtDirectionFragments,
   isCombinationMark,
   stylePreferenceOverrides,
   finalizeLogoPromptText,
@@ -145,6 +147,8 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     fragments.push('Modernist typographic wordmark logo design');
   } else if (isLettermark) {
     fragments.push('Modernist lettermark monogram logo design');
+  } else if (isSymbolOnlyLogo(brandName, markType)) {
+    fragments.push('Abstract symbol-only logo design');
   } else {
     fragments.push('Minimal geometric logo design');
   }
@@ -234,8 +238,10 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     fragments.push('Letters are the entire logo. No separate icon, no pictorial symbol, no emblem, no badge, no industry imagery');
   }
 
-  if (isCombinationMark(markType)) {
-    fragments.push(...buildArtDirectionFragments({ markType, industry: input.industry }));
+  if (isCombinationMark(markType, brandName)) {
+    fragments.push(...buildArtDirectionFragments({ markType, industry: input.industry, companyName: brandName }));
+  } else if (isSymbolOnlyLogo(brandName, markType)) {
+    fragments.push(...buildSymbolOnlyArtDirectionFragments({ industry: input.industry }));
   } else if (isWordmark || isLettermark) {
     fragments.push(...buildArtDirectionFragments({ markType }));
   }

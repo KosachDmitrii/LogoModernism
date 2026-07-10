@@ -75,7 +75,7 @@ export async function searchExperienceEmbeddings(
 
   if (sourceType) {
     return prisma.$queryRawUnsafe<VectorSearchRow[]>(
-      `SELECT e.experience_id, 1 - (emb.embedding <=> $1::vector) AS similarity
+      `SELECT emb.experience_id, 1 - (emb.embedding <=> $1::vector) AS similarity
        FROM brain_experience_embeddings emb
        JOIN "BrainExperience" e ON e.id = emb.experience_id
        WHERE e."sourceType" = $3::"BrainSourceType"

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Loader2, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
 import type { GeneratedImage, LogoFeedback } from '../types';
-import { submitLogoFeedback } from '../api';
+import { submitLogoFeedback, submitLogoTags } from '../api';
 import {
   LOGO_MISSED_TAGS,
   LOGO_WORKED_TAGS,
@@ -23,11 +23,12 @@ function toggleTag(tags: string[], tag: string, max = 3): string[] {
   return [...tags, tag];
 }
 
-const tagButtonClass = (active: boolean) =>
+const tagButtonClass = (active: boolean, saving: boolean) =>
   clsx(
     'px-2 py-0.5 rounded-lg text-[9px] border transition-colors',
+    saving && 'opacity-60',
     active
-      ? 'border-zinc-500 bg-zinc-800 text-zinc-200'
+      ? 'border-zinc-400 bg-zinc-700 text-zinc-100'
       : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300',
   );
 
@@ -35,52 +36,95 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
   const existing = logo.feedback;
   const [workedTags, setWorkedTags] = useState<string[]>(existing?.workedTags ?? []);
   const [missedTags, setMissedTags] = useState<string[]>(existing?.missedTags ?? []);
-  const selectedStars = existing ? scoreToStars(existing.score) : 0;
+  const [savingTag, setSavingTag] = useState<string | null>(null);
+  const [pulseStar, setPulseStar] = useState(1);
+  const selectedStars = scoreToStars(existing?.score);
 
-  const submit = useMutation({
-    mutationFn: (body: { score: number; emoji: string; workedTags?: string[]; missedTags?: string[] }) =>
+  useEffect(() => {
+    setWorkedTags(existing?.workedTags ?? []);
+    setMissedTags(existing?.missedTags ?? []);
+  }, [logo.id, existing?.tagsUpdatedAt, existing?.submittedAt]);
+
+  const onSaved = (result: { feedback?: LogoFeedback }) => {
+    if (result.feedback) onUpdated?.(result.feedback);
+  };
+
+  const rateLogo = useMutation({
+    mutationFn: (body: { score: number; emoji: string }) =>
       submitLogoFeedback(promptId, logo.id, body),
-    onSuccess: (result) => {
-      if (result.feedback) onUpdated?.(result.feedback);
-    },
+    onSuccess: onSaved,
   });
+
+  const saveTags = useMutation({
+    mutationFn: (body: { workedTags?: string[]; missedTags?: string[] }) =>
+      submitLogoTags(promptId, logo.id, body),
+    onSuccess: onSaved,
+  });
+
+  useEffect(() => {
+    if (!rateLogo.isPending) return;
+    setPulseStar(1);
+    const id = window.setInterval(() => {
+      setPulseStar((prev) => (prev % 5) + 1);
+    }, 140);
+    return () => window.clearInterval(id);
+  }, [rateLogo.isPending]);
 
   const handleRate = (stars: number) => {
     const level = starsToScore(stars);
-    submit.mutate({
-      score: level.score,
-      emoji: `${stars}/5`,
-      workedTags: workedTags.length ? workedTags : undefined,
-      missedTags: missedTags.length ? missedTags : undefined,
-    });
+    rateLogo.mutate({ score: level.score, emoji: `${stars}/5` });
+  };
+
+  const persistTags = (nextWorked: string[], nextMissed: string[], clickedTag: string) => {
+    setSavingTag(clickedTag);
+    saveTags.mutate(
+      {
+        workedTags: nextWorked.length ? nextWorked : undefined,
+        missedTags: nextMissed.length ? nextMissed : undefined,
+      },
+      { onSettled: () => setSavingTag(null) },
+    );
+  };
+
+  const handleWorkedTag = (tag: string) => {
+    const next = toggleTag(workedTags, tag);
+    setWorkedTags(next);
+    persistTags(next, missedTags, tag);
+  };
+
+  const handleMissedTag = (tag: string) => {
+    const next = toggleTag(missedTags, tag);
+    setMissedTags(next);
+    persistTags(workedTags, next, tag);
   };
 
   return (
     <div className="space-y-2 pt-2 border-t border-zinc-800" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-[10px] text-zinc-500 uppercase tracking-wide">Feedback</span>
-        <div className="flex items-center gap-1">
-          {submit.isPending && <Loader2 size={12} className="animate-spin text-zinc-500 mr-1" />}
-          {[1, 2, 3, 4, 5].map((stars) => (
-            <button
-              key={stars}
-              type="button"
-              title={starsToScore(stars).label}
-              disabled={submit.isPending}
-              onClick={() => handleRate(stars)}
-              className={clsx(
-                'p-1 rounded-lg transition-colors disabled:opacity-50',
-                selectedStars >= stars
-                  ? 'text-zinc-200'
-                  : 'text-zinc-600 hover:text-zinc-400',
-              )}
-            >
-              <Star
-                size={13}
-                className={clsx(selectedStars >= stars && 'fill-current')}
-              />
-            </button>
-          ))}
+        <div className="flex items-center gap-0">
+          {[1, 2, 3, 4, 5].map((stars) => {
+            const filled = rateLogo.isPending ? stars === pulseStar : selectedStars >= stars;
+            return (
+              <button
+                key={stars}
+                type="button"
+                title={starsToScore(stars).label}
+                disabled={rateLogo.isPending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRate(stars);
+                }}
+                className={clsx(
+                  'p-1 rounded-lg transition-colors duration-100',
+                  rateLogo.isPending ? 'cursor-wait' : 'hover:text-zinc-400',
+                  filled ? 'text-zinc-200' : 'text-zinc-600',
+                )}
+              >
+                <Star size={13} className={clsx(filled && 'fill-current')} />
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -92,8 +136,12 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
               <button
                 key={tag}
                 type="button"
-                onClick={() => setWorkedTags((prev) => toggleTag(prev, tag))}
-                className={tagButtonClass(workedTags.includes(tag))}
+                disabled={savingTag === tag}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleWorkedTag(tag);
+                }}
+                className={tagButtonClass(workedTags.includes(tag), savingTag === tag)}
               >
                 {tag}
               </button>
@@ -107,8 +155,12 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
               <button
                 key={tag}
                 type="button"
-                onClick={() => setMissedTags((prev) => toggleTag(prev, tag))}
-                className={tagButtonClass(missedTags.includes(tag))}
+                disabled={savingTag === tag}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMissedTag(tag);
+                }}
+                className={tagButtonClass(missedTags.includes(tag), savingTag === tag)}
               >
                 {tag}
               </button>

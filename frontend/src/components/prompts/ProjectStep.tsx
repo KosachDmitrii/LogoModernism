@@ -132,9 +132,9 @@ export function ProjectStep({ onContinue }: ProjectStepProps) {
           onChange={(e) => setVariationCount(Number(e.target.value))}
           className="w-full px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:border-zinc-600"
         >
-          {[3, 5, 10, 20, 50, 100].map((n) => (
+          {[1].map((n) => (
             <option key={n} value={n}>
-              {n} prompts
+              {`${n} ${n === 1 ? "prompt" : "prompts"}`}
             </option>
           ))}
         </select>

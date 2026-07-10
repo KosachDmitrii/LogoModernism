@@ -68,6 +68,7 @@ interface AppState {
   setMinimalismLevel: (v: number) => void;
   updateDesignBrief: (patch: Partial<DesignBrief>) => void;
   clearDesignBrief: () => void;
+  resetWizard: () => void;
   applyBrandDNA: (companyName: string, industry: string, result: Parameters<typeof applyBrandDNAToBrief>[1]) => void;
   applyGeometry: (industry: string, result: Parameters<typeof applyGeometryToBrief>[1]) => void;
   applyKnowledgeGraph: (result: Parameters<typeof applyKnowledgeGraphToBrief>[1]) => void;
@@ -91,7 +92,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       industry: '',
       companyName: '',
-      variationCount: 5,
+      variationCount: 1,
       inspirationMode: '',
       preferredEra: '',
       minimalismLevel: 8,
@@ -143,6 +144,18 @@ export const useAppStore = create<AppState>()(
           designBrief: { ...EMPTY_DESIGN_BRIEF },
           preferredEra: '',
           inspirationMode: '',
+          ...clearPromptResults(),
+        }),
+      resetWizard: () =>
+        set({
+          industry: '',
+          companyName: '',
+          variationCount: 5,
+          inspirationMode: '',
+          preferredEra: '',
+          minimalismLevel: 8,
+          designBrief: { ...EMPTY_DESIGN_BRIEF },
+          activeProjectId: null,
           ...clearPromptResults(),
         }),
       applyBrandDNA: (companyName, industry, result) => {

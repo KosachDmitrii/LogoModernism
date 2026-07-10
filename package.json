@@ -23,6 +23,12 @@
     "db:prompts-setup": "npm run db:prompts-setup -w @logo-platform/database",
     "db:supabase-check": "npm run db:supabase-check -w @logo-platform/database",
     "brain:consolidate": "npm run consolidate -w @logo-platform/design-brain",
+    "test": "npm run test:brain && npm run test:brain:eval && npm run test:backend:e2e",
+    "test:brain": "npm run test -w @logo-platform/design-brain",
+    "test:brain:unit": "npm run test:unit -w @logo-platform/design-brain",
+    "test:brain:integration": "npm run test:integration -w @logo-platform/design-brain",
+    "test:brain:eval": "npm run test:eval -w @logo-platform/design-brain",
+    "test:backend:e2e": "npm run test:e2e -w @logo-platform/backend",
     "dev:backend": "npm run dev -w @logo-platform/backend",
     "dev:frontend": "npm run dev -w @logo-platform/frontend"
   },
