@@ -10,3 +10,4 @@ export * from './client-visual-intent';
 export * from './industry-graph';
 export * from './design-strategy';
 export * from './brain-architecture';
+export * from './brain-partner';

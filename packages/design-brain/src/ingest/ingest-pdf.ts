@@ -14,6 +14,8 @@ import {
   hashPdfContent,
   normalizeBookTitle,
 } from './pdf-dedup';
+import { setPdfIngestProgress } from './pdf-ingest-progress';
+import type { BrainPdfIngestProgress } from '@logo-platform/shared';
 
 const MIN_CHUNK_LENGTH = 120;
 const MAX_CHUNK_LENGTH = 3500;
@@ -22,6 +24,18 @@ export interface IngestPdfOptions {
   buffer: Buffer;
   originalName: string;
   title: string;
+  jobId?: string;
+  onProgress?: (progress: BrainPdfIngestProgress) => void;
+}
+
+function reportProgress(
+  options: IngestPdfOptions,
+  progress: BrainPdfIngestProgress,
+): void {
+  if (options.jobId) {
+    setPdfIngestProgress(options.jobId, progress);
+  }
+  options.onProgress?.(progress);
 }
 
 function chunkText(pages: string[]): string[] {
@@ -85,6 +99,11 @@ export async function ingestPdf(
   const savedPath = join(getBrainUploadsDir(), savedName);
   writeFileSync(savedPath, options.buffer);
 
+  reportProgress(options, {
+    phase: 'parsing',
+    message: 'Extracting text from PDF…',
+  });
+
   const { pages, pageCount, ocrUsed, ocrPages: ocrPageCount } = await extractPdfTextWithOcr(
     options.buffer,
   );
@@ -96,6 +115,13 @@ export async function ingestPdf(
 
   const ingestCheck = await checkPdfIngestStatus(prisma, title, contentHash, chunks.length);
   if (ingestCheck.alreadyIngested) {
+    reportProgress(options, {
+      phase: 'done',
+      pageCount,
+      totalChunks: chunks.length,
+      processedChunks: chunks.length,
+      message: ingestCheck.message,
+    });
     return {
       experienceId: '',
       sourceType: 'PDF',
@@ -116,9 +142,24 @@ export async function ingestPdf(
   let skippedChunks = 0;
   let firstExperienceId = '';
 
+  reportProgress(options, {
+    phase: 'processing',
+    pageCount,
+    totalChunks: chunks.length,
+    processedChunks: 0,
+    message: `Processing 0/${chunks.length} chunks…`,
+  });
+
   for (let index = 0; index < chunks.length; index++) {
     if (existingIndexes.has(index)) {
       skippedChunks += 1;
+      reportProgress(options, {
+        phase: 'processing',
+        pageCount,
+        totalChunks: chunks.length,
+        processedChunks: index + 1,
+        message: `Skipped chunk ${index + 1}/${chunks.length} (already stored)…`,
+      });
       continue;
     }
 
@@ -169,6 +210,14 @@ export async function ingestPdf(
     }
 
     chunksStored += 1;
+
+    reportProgress(options, {
+      phase: 'processing',
+      pageCount,
+      totalChunks: chunks.length,
+      processedChunks: index + 1,
+      message: `Processing chunk ${index + 1}/${chunks.length} (LLM + embeddings)…`,
+    });
   }
 
   const summaryParts: string[] = [];
@@ -185,6 +234,16 @@ export async function ingestPdf(
     summaryParts.push(ingestCheck.message);
   }
 
+  const summary = summaryParts.join('; ') || ingestCheck.message;
+
+  reportProgress(options, {
+    phase: 'done',
+    pageCount,
+    totalChunks: chunks.length,
+    processedChunks: chunks.length,
+    message: summary,
+  });
+
   return {
     experienceId: firstExperienceId,
     sourceType: 'PDF',
@@ -195,7 +254,7 @@ export async function ingestPdf(
     skippedChunks: skippedChunks > 0 ? skippedChunks : undefined,
     alreadyIngested: chunksStored === 0 && skippedChunks === chunks.length,
     contentHash,
-    summary: summaryParts.join('; ') || ingestCheck.message,
+    summary,
   };
 }
 

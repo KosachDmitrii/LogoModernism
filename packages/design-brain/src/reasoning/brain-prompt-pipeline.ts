@@ -3,7 +3,10 @@ import type {
   BrainExperienceRecord,
   BrainGenerateRequest,
   BrainArchitecture,
+  CatalogIntelligenceResult,
   ComposedPrompt,
+  ConstraintReport,
+  CreativeTerritory,
   DesignDecision,
   DesignRule,
   Era,
@@ -11,6 +14,7 @@ import type {
   Recommendation,
   TasteProfile,
 } from '@logo-platform/shared';
+import type { DesignCriticResult } from '@logo-platform/shared';
 import {
   appendArtDirectionFragments,
   appendStylePreferenceFragments,
@@ -41,6 +45,13 @@ export interface BrainPipelineResult {
   tasteProfile: TasteProfile;
   brainArchitecture: BrainArchitecture;
   brainPowered: true;
+  partnerMode?: boolean;
+  creativeTerritories?: CreativeTerritory[];
+  selectedTerritoryId?: string;
+  constraintReport?: ConstraintReport;
+  critique?: DesignCriticResult;
+  catalogIntelligence?: CatalogIntelligenceResult;
+  partnerAttempts?: number;
 }
 
 function buildRetrievalQuery(request: BrainGenerateRequest): string {

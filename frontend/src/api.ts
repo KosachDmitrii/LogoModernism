@@ -6,6 +6,7 @@ import type {
   BrainConsolidateResult,
   BrainIngestResult,
   BrainPdfIngestCheck,
+  BrainPdfIngestProgress,
   BrainResearchCandidate,
   BrainResearchRunResult,
   BrainStats,
@@ -18,17 +19,9 @@ import type {
   BriefInterviewResponse,
   ComposedPrompt,
 } from './types';
+import { parseApiError } from './lib/api-error';
 
 const API_BASE = '/api';
-
-async function parseApiError(res: Response, fallback: string): Promise<never> {
-  const detail = await res.text().catch(() => '');
-  throw new Error(
-    detail
-      ? `${fallback} (${res.status}): ${detail.slice(0, 300)}`
-      : `${fallback} (${res.status})`,
-  );
-}
 
 export async function generatePrompts(body: {
   industry: string;
@@ -44,37 +37,38 @@ export async function generatePrompts(body: {
   typographyStyle?: 'standard' | 'constructed';
   briefContext?: BriefContextPayload;
   useBrain?: boolean;
+  preferredTerritoryId?: 'territory-primary' | 'territory-construction' | 'territory-typography';
 }): Promise<GenerateResponse> {
   const res = await fetch(`${API_BASE}/prompts/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) await parseApiError(res, 'Generation failed');
+  if (!res.ok) await parseApiError(res, 'common.generationFailed');
   return res.json();
 }
 
 export async function getRecommendations(industry: string): Promise<RecommendResponse> {
   const res = await fetch(`${API_BASE}/prompts/recommend/${encodeURIComponent(industry)}`);
-  if (!res.ok) await parseApiError(res, 'Failed to get recommendations');
+  if (!res.ok) await parseApiError(res, 'errors.api.recommendationsFailed');
   return res.json();
 }
 
 export async function getPrinciplesOverview(): Promise<{ total: number; categories: string[] }> {
   const res = await fetch(`${API_BASE}/principles`);
-  if (!res.ok) await parseApiError(res, 'Failed to load principles');
+  if (!res.ok) await parseApiError(res, 'errors.api.principlesLoadFailed');
   return res.json();
 }
 
 export async function getCatalogStats() {
   const res = await fetch(`${API_BASE}/principles/catalog/stats`);
-  if (!res.ok) await parseApiError(res, 'Failed to load catalog stats');
+  if (!res.ok) await parseApiError(res, 'errors.api.catalogStatsFailed');
   return res.json();
 }
 
 export async function getCatalogTaxonomy() {
   const res = await fetch(`${API_BASE}/principles/catalog/taxonomy`);
-  if (!res.ok) await parseApiError(res, 'Failed to load catalog taxonomy');
+  if (!res.ok) await parseApiError(res, 'errors.api.catalogTaxonomyFailed');
   return res.json();
 }
 
@@ -84,7 +78,7 @@ export async function searchCatalog(params: Record<string, string | undefined>) 
     if (v) qs.set(k, v);
   }
   const res = await fetch(`${API_BASE}/principles/catalog/search?${qs}`);
-  if (!res.ok) await parseApiError(res, 'Failed to search catalog');
+  if (!res.ok) await parseApiError(res, 'errors.api.catalogSearchFailed');
   return res.json();
 }
 
@@ -100,13 +94,13 @@ export async function getCatalogRecommendations(params: {
   if (params.era) qs.set('era', params.era);
   if (params.limit != null) qs.set('limit', String(params.limit));
   const res = await fetch(`${API_BASE}/principles/catalog/recommend?${qs}`);
-  if (!res.ok) await parseApiError(res, 'Failed to load catalog recommendations');
+  if (!res.ok) await parseApiError(res, 'errors.api.catalogRecommendFailed');
   return res.json();
 }
 
 export async function getCatalogEntry(id: string) {
   const res = await fetch(`${API_BASE}/principles/catalog/${encodeURIComponent(id)}`);
-  if (!res.ok) await parseApiError(res, 'Failed to load catalog entry');
+  if (!res.ok) await parseApiError(res, 'errors.api.catalogEntryFailed');
   return res.json();
 }
 
@@ -121,7 +115,7 @@ export async function analyzeBrandDNA(body: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) await parseApiError(res, 'Brand DNA analysis failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.brandDnaFailed');
   return res.json();
 }
 
@@ -131,7 +125,7 @@ export async function analyzeGeometry(body: { industry: string; complexity?: str
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) await parseApiError(res, 'Geometry analysis failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.geometryFailed');
   return res.json();
 }
 
@@ -145,19 +139,19 @@ export async function analyzeComposition(body: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) await parseApiError(res, 'Composition analysis failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.compositionFailed');
   return res.json();
 }
 
 export async function getPrimitives() {
   const res = await fetch(`${API_BASE}/engines/primitives`);
-  if (!res.ok) await parseApiError(res, 'Failed to load primitives');
+  if (!res.ok) await parseApiError(res, 'errors.api.primitivesLoadFailed');
   return res.json();
 }
 
 export async function getKnowledgeGraphStats() {
   const res = await fetch(`${API_BASE}/engines/knowledge-graph`);
-  if (!res.ok) await parseApiError(res, 'Failed to load knowledge graph');
+  if (!res.ok) await parseApiError(res, 'errors.api.knowledgeGraphFailed');
   return res.json();
 }
 
@@ -167,19 +161,19 @@ export async function runFullPipeline(body: { companyName?: string; industry: st
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) await parseApiError(res, 'Pipeline failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.pipelineFailed');
   return res.json();
 }
 
 export async function getImageProviders(): Promise<{ providers: ImageProviderInfo[] }> {
   const res = await fetch(`${API_BASE}/images/providers`);
-  if (!res.ok) await parseApiError(res, 'Failed to load image providers');
+  if (!res.ok) await parseApiError(res, 'errors.api.imageProvidersFailed');
   return res.json();
 }
 
 export async function listSavedPrompts(): Promise<{ prompts: ComposedPrompt[]; total: number }> {
   const res = await fetch(`${API_BASE}/prompts/saved`);
-  if (!res.ok) await parseApiError(res, 'Failed to load saved prompts');
+  if (!res.ok) await parseApiError(res, 'common.failedToLoadSavedPrompts');
   return res.json();
 }
 
@@ -192,7 +186,7 @@ export async function togglePromptSave(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ saved }),
   });
-  if (!res.ok) await parseApiError(res, 'Save failed');
+  if (!res.ok) await parseApiError(res, 'common.failedToSavePrompt');
   return res.json();
 }
 
@@ -212,7 +206,7 @@ export async function submitLogoFeedback(
       body: JSON.stringify(body),
     },
   );
-  if (!res.ok) await parseApiError(res, 'Logo feedback failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.logoFeedbackFailed');
   return res.json();
 }
 
@@ -232,7 +226,7 @@ export async function submitLogoTags(
       body: JSON.stringify(body),
     },
   );
-  if (!res.ok) await parseApiError(res, 'Logo tags failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.logoTagsFailed');
   return res.json();
 }
 
@@ -246,7 +240,7 @@ export async function submitPromptFeedback(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ signalType }),
   });
-  if (!res.ok) await parseApiError(res, 'Feedback failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.feedbackFailed');
   return res.json();
 }
 
@@ -271,7 +265,7 @@ export async function generatePromptLogo(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) await parseApiError(res, 'Logo generation failed');
+  if (!res.ok) await parseApiError(res, 'common.imageGenerationFailed');
   return res.json();
 }
 
@@ -288,7 +282,7 @@ export async function generateImageFromPrompt(body: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) await parseApiError(res, 'Image generation failed');
+  if (!res.ok) await parseApiError(res, 'common.imageGenerationFailed');
   return res.json();
 }
 
@@ -303,37 +297,37 @@ export async function runBriefInterview(body: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) await parseApiError(res, 'Brief interview failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.briefInterviewFailed');
   return res.json();
 }
 
 export async function getBrainHealth(): Promise<BrainCapabilities> {
   const res = await fetch(`${API_BASE}/brain/health`);
-  if (!res.ok) await parseApiError(res, 'Brain health check failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.brainHealthFailed');
   return res.json();
 }
 
 export async function getBrainStats(): Promise<BrainStats> {
   const res = await fetch(`${API_BASE}/brain/stats`);
-  if (!res.ok) await parseApiError(res, 'Failed to load brain stats');
+  if (!res.ok) await parseApiError(res, 'errors.api.brainStatsFailed');
   return res.json();
 }
 
 export async function getBrainTasteProfile(): Promise<TasteProfile> {
   const res = await fetch(`${API_BASE}/brain/taste-profile`);
-  if (!res.ok) await parseApiError(res, 'Failed to load taste profile');
+  if (!res.ok) await parseApiError(res, 'errors.api.tasteProfileFailed');
   return res.json();
 }
 
 export async function consolidateBrain(): Promise<BrainConsolidateResult> {
   const res = await fetch(`${API_BASE}/brain/consolidate`, { method: 'POST' });
-  if (!res.ok) await parseApiError(res, 'Consolidate failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.consolidateFailed');
   return res.json();
 }
 
 export async function listBrainPrinciples(limit = 50): Promise<LearnedPrincipleRecord[]> {
   const res = await fetch(`${API_BASE}/brain/principles?limit=${limit}`);
-  if (!res.ok) await parseApiError(res, 'Failed to load principles');
+  if (!res.ok) await parseApiError(res, 'errors.api.principlesLoadFailed');
   return res.json();
 }
 
@@ -343,16 +337,27 @@ export async function checkBrainPdfIngest(title: string, contentHash: string): P
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, contentHash }),
   });
-  if (!res.ok) await parseApiError(res, 'PDF check failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.pdfCheckFailed');
   return res.json();
 }
 
-export async function ingestBrainPdf(file: File, title: string): Promise<BrainIngestResult> {
+export async function getBrainPdfIngestProgress(jobId: string): Promise<BrainPdfIngestProgress> {
+  const res = await fetch(`${API_BASE}/brain/ingest/pdf/progress/${encodeURIComponent(jobId)}`);
+  if (!res.ok) await parseApiError(res, 'errors.api.progressCheckFailed');
+  return res.json();
+}
+
+export async function ingestBrainPdf(
+  file: File,
+  title: string,
+  jobId: string,
+): Promise<BrainIngestResult> {
   const form = new FormData();
   form.append('file', file);
   form.append('title', title);
+  form.append('jobId', jobId);
   const res = await fetch(`${API_BASE}/brain/ingest/pdf`, { method: 'POST', body: form });
-  if (!res.ok) await parseApiError(res, 'PDF ingest failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.pdfIngestFailed');
   return res.json();
 }
 
@@ -367,7 +372,7 @@ export async function ingestBrainFeedback(body: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) await parseApiError(res, 'Feedback failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.feedbackFailed');
   return res.json();
 }
 
@@ -377,7 +382,7 @@ export async function runBrainResearch(body: { query: string; maxSources?: numbe
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) await parseApiError(res, 'Research run failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.researchRunFailed');
   return res.json();
 }
 
@@ -387,25 +392,25 @@ export async function previewBrainResearch(body: { query: string; url: string })
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) await parseApiError(res, 'Research preview failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.researchPreviewFailed');
   return res.json();
 }
 
 export async function listBrainResearchCandidates(status?: 'pending' | 'approved' | 'rejected'): Promise<BrainResearchCandidate[]> {
   const qs = status ? `?status=${encodeURIComponent(status)}` : '';
   const res = await fetch(`${API_BASE}/brain/research/candidates${qs}`);
-  if (!res.ok) await parseApiError(res, 'Failed to load research candidates');
+  if (!res.ok) await parseApiError(res, 'errors.api.researchCandidatesFailed');
   return res.json();
 }
 
 export async function approveBrainResearch(id: string) {
   const res = await fetch(`${API_BASE}/brain/research/candidates/${encodeURIComponent(id)}/approve`, { method: 'POST' });
-  if (!res.ok) await parseApiError(res, 'Approve failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.approveFailed');
   return res.json() as Promise<{ candidate: BrainResearchCandidate; ingest: BrainIngestResult }>;
 }
 
 export async function rejectBrainResearch(id: string) {
   const res = await fetch(`${API_BASE}/brain/research/candidates/${encodeURIComponent(id)}/reject`, { method: 'POST' });
-  if (!res.ok) await parseApiError(res, 'Reject failed');
+  if (!res.ok) await parseApiError(res, 'errors.api.rejectFailed');
   return res.json() as Promise<BrainResearchCandidate>;
 }

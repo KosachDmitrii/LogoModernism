@@ -1,11 +1,13 @@
 import { Brain } from 'lucide-react';
 import type { ComposedPrompt } from '../../types';
+import { useT } from '../../i18n';
 
 interface BrainExplainabilityProps {
   prompt: ComposedPrompt;
 }
 
 export function BrainExplainability({ prompt }: BrainExplainabilityProps) {
+  const t = useT();
   const arch = prompt.metadata?.brainArchitecture;
   if (!arch) return null;
 
@@ -13,16 +15,16 @@ export function BrainExplainability({ prompt }: BrainExplainabilityProps) {
 
   return (
     <div className="space-y-2 pt-2 border-t border-zinc-800">
-      <p className="text-[10px] text-zinc-500 uppercase tracking-wide flex items-center gap-1">
+      <p className="text-xs text-zinc-500 uppercase tracking-wide flex items-center gap-1">
         <Brain size={11} />
-        Design Brain
+        {t('prompts.card.designBrain')}
       </p>
 
       {clientIntent && (
-        <div className="text-[10px] text-zinc-500 space-y-0.5">
+        <div className="text-xs text-zinc-500 space-y-0.5">
           <p>
-            <span className="text-zinc-400">Intent:</span> {clientIntent.abstractionLevel} ·{' '}
-            {clientIntent.industryDomain}
+            <span className="text-zinc-400">{t('prompts.explain.intent')}:</span>{' '}
+            {clientIntent.abstractionLevel} · {clientIntent.industryDomain}
           </p>
           {clientIntent.desiredMotifs.length > 0 && (
             <p>
@@ -38,8 +40,8 @@ export function BrainExplainability({ prompt }: BrainExplainabilityProps) {
       )}
 
       {designStrategy && (
-        <p className="text-[10px] text-zinc-500 leading-relaxed">
-          <span className="text-zinc-400">Strategy:</span> {designStrategy.symbolLogic}
+        <p className="text-xs text-zinc-500 leading-relaxed">
+          <span className="text-zinc-400">{t('prompts.explain.strategy')}:</span> {designStrategy.symbolLogic}
         </p>
       )}
 
@@ -49,7 +51,7 @@ export function BrainExplainability({ prompt }: BrainExplainabilityProps) {
             <span
               key={agent.role}
               title={agent.summary}
-              className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 capitalize"
+              className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 capitalize"
             >
               {agent.role.replace('-', ' ')}
             </span>
@@ -58,11 +60,11 @@ export function BrainExplainability({ prompt }: BrainExplainabilityProps) {
       )}
 
       {arch.projectMemorySummary && (
-        <p className="text-[9px] text-zinc-600 italic">{arch.projectMemorySummary}</p>
+        <p className="text-[11px] text-zinc-600 italic">{arch.projectMemorySummary}</p>
       )}
 
       {prompt.metadata?.reasoning && (
-        <p className="text-[9px] text-zinc-600 leading-relaxed">{prompt.metadata.reasoning}</p>
+        <p className="text-[11px] text-zinc-600 leading-relaxed">{prompt.metadata.reasoning}</p>
       )}
     </div>
   );

@@ -30,10 +30,11 @@ export class PromptsService {
           typographyStyle: request.typographyStyle,
           analysisPrincipleIds: request.analysisPrincipleIds,
           catalogReferenceIds: request.catalogReferenceIds,
-          catalogNarrative: request.catalogNarrative,
-          briefContext: request.briefContext,
-          useBrain: true,
-        });
+      catalogNarrative: request.catalogNarrative,
+      briefContext: request.briefContext,
+      useBrain: true,
+      preferredTerritoryId: request.preferredTerritoryId,
+    });
       } catch (error) {
         if (request.useBrain === true) throw error;
         console.warn('Brain prompt pipeline failed, falling back to rules:', error);

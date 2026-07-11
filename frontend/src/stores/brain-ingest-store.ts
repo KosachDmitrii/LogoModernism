@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { BrainIngestResult, BrainPdfIngestCheck } from '../types';
 import { checkBrainPdfIngest, ingestBrainPdf } from '../api';
+import { ApiError } from '../lib/api-error';
+import type { MessageKey } from '../i18n';
 
 export type BrainIngestJobStatus =
   | 'checking'
@@ -19,6 +21,7 @@ export interface BrainIngestJob {
   contentHash: string;
   status: BrainIngestJobStatus;
   message?: string;
+  messageKey?: MessageKey;
   startedAt: string;
   finishedAt?: string;
   result?: BrainIngestResult;
@@ -57,7 +60,7 @@ export const useBrainIngestStore = create<BrainIngestState>()(
       startPdfIngest: async (file, title) => {
         const trimmedTitle = title.trim();
         if (!trimmedTitle) {
-          throw new Error('Title is required');
+          throw new ApiError('brain.upload.titleRequired');
         }
 
         const id = `pdf-${Date.now()}`;
@@ -114,25 +117,17 @@ export const useBrainIngestStore = create<BrainIngestState>()(
           set((state) => ({
             jobs: updateJob(state.jobs, id, {
               status: 'uploading',
-              message: check.existingChunks > 0
-                ? `Uploading — will skip ${check.existingChunks} existing chunks`
-                : 'Uploading PDF…',
+              messageKey: 'common.uploadingPdf',
             }),
           }));
 
-          set((state) => ({
-            jobs: updateJob(state.jobs, id, {
-              status: 'processing',
-              message: 'Processing chunks (LLM + embeddings)…',
-            }),
-          }));
-
-          const result = await ingestBrainPdf(file, trimmedTitle);
+          const result = await ingestBrainPdf(file, trimmedTitle, id);
           const finished: Partial<BrainIngestJob> = {
             status: result.alreadyIngested || result.skipped ? 'skipped' : 'done',
             finishedAt: new Date().toISOString(),
             result,
-            message: result.summary ?? 'Ingest complete',
+            message: result.summary,
+            messageKey: result.summary ? undefined : 'brain.ingestComplete',
           };
 
           set((state) => ({
@@ -142,12 +137,18 @@ export const useBrainIngestStore = create<BrainIngestState>()(
 
           return { ...job, ...finished, contentHash, check } as BrainIngestJob;
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = error instanceof ApiError
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error);
+          const messageKey = error instanceof ApiError ? error.messageKey : undefined;
           set((state) => ({
             jobs: updateJob(state.jobs, id, {
               status: 'error',
               error: message,
               message,
+              messageKey,
               finishedAt: new Date().toISOString(),
             }),
             activeJobId: state.activeJobId === id ? null : state.activeJobId,
@@ -193,4 +194,14 @@ export function useIsBrainIngesting(): boolean {
         job.status === 'processing',
     ),
   );
+}
+
+export function useActivePdfResumeRatio(): number | null {
+  return useBrainIngestStore((s) => {
+    if (!s.activeJobId) return null;
+    const job = s.jobs.find((j) => j.id === s.activeJobId);
+    const total = job?.check?.totalChunks;
+    if (total == null || total <= 0) return null;
+    return (job?.check?.existingChunks ?? 0) / total;
+  });
 }

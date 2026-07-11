@@ -3,8 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { BookOpen, ExternalLink } from 'lucide-react';
 import { getCatalogEntry } from '../../api';
 import { useAppStore } from '../../store';
+import { useT } from '../../i18n';
 
 export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: () => void }) {
+  const t = useT();
   const designBrief = useAppStore((s) => s.designBrief);
   const appliedIds = designBrief.catalogReferenceIds ?? [];
 
@@ -25,10 +27,7 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] text-zinc-500 leading-relaxed">
-        Pick logos from Müller Logo Modernism as visual inspiration. References feed geometry,
-        era, and principles into your brief.
-      </p>
+      <p className="text-[13px] text-zinc-500 leading-relaxed">{t('brief.references.intro')}</p>
 
       <Link
         to="/logo-catalog"
@@ -37,19 +36,21 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
         }}
         className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-violet-800/50 bg-violet-950/30 hover:bg-violet-900/30 text-xs font-medium text-violet-200 transition-colors"
       >
-        <BookOpen size={14} />
-        Open Logo Catalog
-        <ExternalLink size={12} className="opacity-60" />
+        <BookOpen size={16} />
+        {t('brief.references.openCatalog')}
+        <ExternalLink size={14} className="opacity-60" />
       </Link>
 
       {appliedIds.length > 0 ? (
         <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 space-y-2">
-          <p className="text-[10px] font-medium text-emerald-300">
-            {appliedIds.length} reference{appliedIds.length === 1 ? '' : 's'} applied
+          <p className="text-xs font-medium text-emerald-300">
+            {appliedIds.length === 1
+              ? t('brief.references.appliedCount', { count: appliedIds.length })
+              : t('brief.references.appliedCountPlural', { count: appliedIds.length })}
           </p>
           <ul className="space-y-1">
             {(appliedEntries ?? appliedIds.map((id) => ({ id, name: id }))).map((entry) => (
-              <li key={entry.id} className="text-[11px] text-emerald-100/90 truncate">
+              <li key={entry.id} className="text-[13px] text-emerald-100/90 truncate">
                 {entry.name}
               </li>
             ))}
@@ -59,13 +60,11 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
             onClick={onStepComplete}
             className="w-full mt-1 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-white text-xs font-medium"
           >
-            Continue to client brief
+            {t('brief.references.continueToClient')}
           </button>
         </div>
       ) : (
-        <p className="text-[10px] text-zinc-600 text-center">
-          No references yet — optional, but improves sector fit
-        </p>
+        <p className="text-xs text-zinc-600 text-center">{t('brief.references.empty')}</p>
       )}
     </div>
   );

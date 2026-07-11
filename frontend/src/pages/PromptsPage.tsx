@@ -9,28 +9,24 @@ import {
 } from '../components/prompts/PromptStepProgress';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
-import { useComposePrompts } from '../hooks/useComposePrompts';
+import { useComposePrompts, type ComposePromptsOptions } from '../hooks/useComposePrompts';
 import { useAppStore } from '../store';
 import { StartOverButton } from '../components/prompts/StartOverButton';
 import { StartOverDialog } from '../components/prompts/StartOverDialog';
+import { BrainPartnerPanel, type PartnerRegenerateAction } from '../components/prompts/BrainPartnerPanel';
+import { useT, type MessageKey } from '../i18n';
+import { formatError } from '../lib/api-error';
 
-const STEP_META: Record<PromptWizardStep, { title: string; subtitle: string }> = {
-  1: {
-    title: 'Project',
-    subtitle: 'Industry, company name, and generation settings.',
-  },
-  2: {
-    title: 'Brief',
-    subtitle: 'Optional — build a design brief for better prompts.',
-  },
-  3: {
-    title: 'Results',
-    subtitle: 'Review, copy, save favorites, and rate logo images.',
-  },
+const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
+  1: 'prompts.step.projectSubtitle',
+  2: 'prompts.step.briefSubtitle',
+  3: 'prompts.step.resultsSubtitle',
 };
 
 export function PromptsPage() {
+  const t = useT();
   const prompts = useAppStore((s) => s.prompts);
+  const brainPartner = useAppStore((s) => s.brainPartner);
   const industry = useAppStore((s) => s.industry);
   const selectedPromptId = useAppStore((s) => s.selectedPromptId);
   const selectPrompt = useAppStore((s) => s.selectPrompt);
@@ -38,6 +34,7 @@ export function PromptsPage() {
 
   const [activeStep, setActiveStep] = useState<PromptWizardStep>(prompts.length > 0 ? 3 : 1);
   const [startOverOpen, setStartOverOpen] = useState(false);
+  const [regeneratingAction, setRegeneratingAction] = useState<PartnerRegenerateAction | null>(null);
 
   const compose = useComposePrompts();
 
@@ -48,10 +45,15 @@ export function PromptsPage() {
     return false;
   };
 
-  const handleCompose = () => {
+  const handleCompose = (
+    options?: ComposePromptsOptions,
+    action?: PartnerRegenerateAction,
+  ) => {
     if (!industry.trim() || compose.isPending) return;
-    compose.mutate(undefined, {
+    if (action) setRegeneratingAction(action);
+    compose.mutate(options, {
       onSuccess: () => setActiveStep(3),
+      onSettled: () => setRegeneratingAction(null),
     });
   };
 
@@ -63,14 +65,12 @@ export function PromptsPage() {
     setStartOverOpen(false);
   };
 
-  const meta = STEP_META[activeStep];
-
   return (
     <>
       <PageContainer>
       <PageHeader
         page="prompts"
-        subtitle={meta.subtitle}
+        subtitle={t(STEP_SUBTITLE_KEYS[activeStep])}
       />
 
       <div className="mb-8">
@@ -84,19 +84,43 @@ export function PromptsPage() {
         <div>
           {prompts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center rounded-xl border border-dashed border-zinc-800">
-              <p className="text-sm text-zinc-500 mb-4">No prompts yet.</p>
+              <p className="text-sm text-zinc-500 mb-4">{t('prompts.results.empty')}</p>
               <button
                 type="button"
                 onClick={() => setActiveStep(2)}
                 className="text-sm text-violet-400 hover:text-violet-300"
               >
-                Go to Brief to compose →
+                {t('prompts.results.goToBrief')}
               </button>
             </div>
           ) : (
             <div className="max-w-2xl mx-auto w-full">
-              <p className="text-sm text-zinc-400 mb-4">{prompts.length} prompts ranked by quality</p>
-              <div className="space-y-4">
+              {brainPartner && (
+                <BrainPartnerPanel
+                  partner={brainPartner}
+                  regeneratingAction={compose.isPending ? regeneratingAction : null}
+                  onApplyTerritory={(territoryId) =>
+                    handleCompose({ preferredTerritoryId: territoryId }, 'apply')
+                  }
+                  onRegenerateAuto={() => handleCompose(undefined, 're-pick')}
+                  onNewVariations={() =>
+                    handleCompose(
+                      {
+                        preferredTerritoryId:
+                          brainPartner.selectedTerritoryId as ComposePromptsOptions['preferredTerritoryId'],
+                      },
+                      'new-variations',
+                    )
+                  }
+                />
+              )}
+              <p className="text-sm text-zinc-400 mb-1">
+                {t('prompts.results.rankedCount', { count: prompts.length })}
+              </p>
+              <p className="text-xs text-zinc-600 mb-4 leading-relaxed">
+                {t('prompts.results.stepHint')}
+              </p>
+              <div id="prompt-results" className="space-y-4 scroll-mt-6">
                 {prompts.map((prompt, i) => (
                   <PromptCard
                     key={prompt.id}
@@ -113,21 +137,21 @@ export function PromptsPage() {
                   onClick={() => setActiveStep(2)}
                   className="flex items-center gap-1.5 px-3 py-3.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-zinc-800 transition-colors shrink-0"
                 >
-                  <ArrowLeft size={14} />
-                  Back to Brief
+                  <ArrowLeft size={16} />
+                  {t('prompts.results.backToBrief')}
                 </button>
                 <button
                   type="button"
-                  onClick={handleCompose}
+                  onClick={() => handleCompose(undefined, 're-pick')}
                   disabled={compose.isPending}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-zinc-800 text-zinc-200 text-sm font-medium hover:bg-zinc-700 disabled:opacity-50"
                 >
-                  {compose.isPending ? (
-                    <Loader2 size={14} className="animate-spin" />
+                  {compose.isPending && regeneratingAction === 're-pick' ? (
+                    <Loader2 size={16} className="animate-spin" />
                   ) : (
-                    <Sparkles size={14} />
+                    <Sparkles size={16} />
                   )}
-                  Regenerate prompts
+                  {t('prompts.results.regenerateAuto')}
                 </button>
                 <StartOverButton onClick={handleStartOver} disabled={compose.isPending} />
               </div>
@@ -136,7 +160,7 @@ export function PromptsPage() {
 
           {compose.isError && (
             <p className="text-xs text-red-400 mt-4 text-center">
-              {compose.error instanceof Error ? compose.error.message : 'Generation failed'}
+              {formatError(compose.error, t)}
             </p>
           )}
         </div>
@@ -156,7 +180,7 @@ export function PromptsPage() {
 
           {compose.isError && activeStep === 2 && (
             <p className="text-xs text-red-400 mt-4">
-              {compose.error instanceof Error ? compose.error.message : 'Generation failed'}
+              {formatError(compose.error, t)}
             </p>
           )}
         </div>

@@ -21,6 +21,7 @@ import { BriefStyleSection } from './BriefStyleSection';
 import { BriefClientSection } from './BriefClientSection';
 import { BriefAnalyzeSection } from './BriefAnalyzeSection';
 import { StartOverButton } from '../prompts/StartOverButton';
+import { useT, type MessageKey } from '../../i18n';
 
 export type BuildSection = 'typography' | 'shapes' | 'style' | 'references' | 'client' | 'analyze';
 
@@ -97,6 +98,7 @@ function sectionStatus(
 }
 
 export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuildPanelProps) {
+  const t = useT();
   const designBrief = useAppStore((s) => s.designBrief);
   const [openSection, setOpenSection] = useState<BuildSection | null>(readInitialSection);
 
@@ -122,52 +124,52 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
   const sections: Array<{
     id: BuildSection;
     step: number;
-    label: string;
-    description: string;
+    labelKey: MessageKey;
+    descriptionKey: MessageKey;
     icon: typeof Type;
   }> = [
     {
       id: 'typography',
       step: 1,
-      label: 'Typography',
-      description: companyName.trim()
-        ? 'Mark type and letterforms for your brand name'
-        : 'Mark style — logo will be symbol-only, no text',
+      labelKey: 'brief.build.section.typography',
+      descriptionKey: companyName.trim()
+        ? 'brief.build.section.typographyWithName'
+        : 'brief.build.section.typographySymbolOnly',
       icon: Type,
     },
     {
       id: 'shapes',
       step: 2,
-      label: 'Shapes',
-      description: 'Geometry, primitives, grid and symmetry',
+      labelKey: 'brief.build.section.shapes',
+      descriptionKey: 'brief.build.section.shapesDescription',
       icon: Shapes,
     },
     {
       id: 'style',
       step: 3,
-      label: 'Style',
-      description: 'Color palette and composition layout',
+      labelKey: 'brief.build.section.style',
+      descriptionKey: 'brief.build.section.styleDescription',
       icon: Palette,
     },
     {
       id: 'references',
       step: 4,
-      label: 'References',
-      description: 'Logo Catalog — Müller modernism inspiration',
+      labelKey: 'brief.build.section.references',
+      descriptionKey: 'brief.build.section.referencesDescription',
       icon: BookOpen,
     },
     {
       id: 'client',
       step: 5,
-      label: 'Client brief',
-      description: 'Client preferences and details',
+      labelKey: 'brief.build.section.client',
+      descriptionKey: 'brief.build.section.clientDescription',
       icon: MessageCircle,
     },
     {
       id: 'analyze',
       step: 6,
-      label: 'Analyze brief',
-      description: 'Brain checks gaps and asks what is missing',
+      labelKey: 'brief.build.section.analyze',
+      descriptionKey: 'brief.build.section.analyzeDescription',
       icon: Sparkles,
     },
   ];
@@ -177,15 +179,11 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
       <BriefProjectSummary />
 
       <div className="p-3 rounded-xl bg-zinc-900/40 border border-zinc-800">
-        <p className="text-[11px] text-zinc-400 leading-relaxed">
-          Steps 1–4 build the design brief, step 5 captures client notes, and step 6{' '}
-          <span className="text-zinc-300">Analyze brief</span> lets Brain check what is missing before
-          generation.
-        </p>
+        <p className="text-[13px] text-zinc-400 leading-relaxed">{t('brief.build.stepsIntro')}</p>
       </div>
 
       <div className="space-y-2">
-        {sections.map(({ id, step, label, description, icon: Icon }) => {
+        {sections.map(({ id, step, labelKey, descriptionKey, icon: Icon }) => {
           const isOpen = openSection === id;
           const status = sectionStatus(designBrief, id);
 
@@ -196,21 +194,21 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
                 onClick={() => toggle(id)}
                 className="w-full flex items-center gap-3 px-3 py-3 bg-zinc-900/60 hover:bg-zinc-900 text-left"
               >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-medium text-zinc-400">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-400">
                   {step}
                 </span>
                 <span className="flex-1 min-w-0">
                   <span className="flex items-center gap-2">
-                    <Icon size={13} className="text-zinc-500 shrink-0" />
-                    <span className="text-xs font-medium text-zinc-200">{label}</span>
+                    <Icon size={15} className="text-zinc-500 shrink-0" />
+                    <span className="text-xs font-medium text-zinc-200">{t(labelKey)}</span>
                     <StatusBadge status={status} />
                   </span>
-                  <span className="block text-[10px] text-zinc-500 mt-0.5 truncate">
-                    {description}
+                  <span className="block text-xs text-zinc-500 mt-0.5 truncate">
+                    {t(descriptionKey)}
                   </span>
                 </span>
                 <ChevronDown
-                  size={14}
+                  size={16}
                   className={clsx('text-zinc-500 shrink-0 transition-transform', isOpen && 'rotate-180')}
                 />
               </button>
@@ -248,8 +246,8 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
             onClick={onBack}
             className="flex items-center gap-1.5 px-3 py-3.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-zinc-800 transition-colors shrink-0"
           >
-            <ArrowLeft size={14} />
-            Project
+            <ArrowLeft size={16} />
+            {t('brief.backToProject')}
           </button>
         )}
         <button
@@ -257,8 +255,8 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
           onClick={onGoToReview}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-zinc-100 text-zinc-900 font-medium text-sm hover:bg-white transition-colors"
         >
-          Review brief
-          <ArrowRight size={14} />
+          {t('brief.build.reviewBrief')}
+          <ArrowRight size={16} />
         </button>
         {onStartOver && <StartOverButton onClick={onStartOver} />}
       </div>
@@ -267,23 +265,25 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
 }
 
 function StatusBadge({ status }: { status: 'done' | 'pending' | 'optional' }) {
+  const t = useT();
+
   if (status === 'done') {
     return (
-      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400">
-        done
+      <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400">
+        {t('brief.build.status.done')}
       </span>
     );
   }
   if (status === 'optional') {
     return (
-      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-500">
-        optional
+      <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-500">
+        {t('common.optional')}
       </span>
     );
   }
   return (
-    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-500">
-      pending
+    <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-500">
+      {t('brief.build.status.pending')}
     </span>
   );
 }

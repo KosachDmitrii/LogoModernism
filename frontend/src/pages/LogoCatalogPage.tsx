@@ -14,6 +14,8 @@ import { advanceBriefBuildSection } from '../components/brief/BriefBuildPanel';
 import { ApplyToPromptsButton } from '../components/ApplyToPromptsButton';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
+import { useT, type MessageKey } from '../i18n';
+import { industryLabel, markTypeLabel } from '../lib/translate-labels';
 
 interface CatalogEntry {
   id: string;
@@ -46,7 +48,18 @@ const ERA_OPTIONS = [
   'mid_century',
 ] as const;
 
+const ERA_LABEL_KEYS: Record<(typeof ERA_OPTIONS)[number], MessageKey> = {
+  swiss: 'prompts.era.swissInternational',
+  bauhaus: 'prompts.era.bauhaus',
+  international_style: 'prompts.era.internationalTypographic',
+  corporate_identity: 'prompts.era.corporateIdentity',
+  '1960s': 'prompts.era.1960s',
+  '1970s': 'prompts.era.1970s',
+  mid_century: 'prompts.era.midCentury',
+};
+
 export function LogoCatalogPage() {
+  const t = useT();
   const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
   const designBrief = useAppStore((s) => s.designBrief);
   const projectIndustry = useAppStore((s) => s.industry);
@@ -163,12 +176,15 @@ export function LogoCatalogPage() {
     selectedIndustryScore != null && selectedIndustryScore < 0.35 && Boolean(projectIndustry?.trim());
 
   const statsSubtitle = [
-    `Müller Logo Modernism — ${stats?.total ?? '…'} references`,
+    t('catalog.subtitle', { total: stats?.total ?? '…' }),
     stats?.imported != null && stats.imported > 0
-      ? `(${stats.curated ?? 111} curated + ${stats.imported} imported)`
+      ? t('catalog.subtitleCurated', {
+          curated: stats.curated ?? 111,
+          imported: stats.imported,
+        })
       : null,
-    `across ${stats?.sections ?? 28} book sections`,
-    projectIndustry ? `sorted for ${projectIndustry}` : null,
+    t('catalog.subtitleSections', { sections: stats?.sections ?? 28 }),
+    projectIndustry ? t('catalog.subtitleSortedFor', { industry: industryLabel(projectIndustry, t) }) : null,
   ]
     .filter(Boolean)
     .join(' ');
@@ -179,7 +195,7 @@ export function LogoCatalogPage() {
 
       <div className="grid lg:grid-cols-[220px_1fr_320px] gap-6">
         <aside className="space-y-4">
-          <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Chapters</p>
+          <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{t('catalog.chapters')}</p>
           <div className="space-y-1">
             <button
               type="button"
@@ -192,7 +208,7 @@ export function LogoCatalogPage() {
                 !chapter ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-900',
               )}
             >
-              All ({stats?.total ?? '…'})
+              {t('catalog.all')} ({stats?.total ?? '…'})
             </button>
             {taxonomy?.map((ch: { id: string; label: string; sections: { id: string; label: string }[] }) => (
               <div key={ch.id}>
@@ -231,11 +247,11 @@ export function LogoCatalogPage() {
           </div>
 
           <div className="pt-4 border-t border-zinc-800 space-y-2">
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Featured</p>
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{t('catalog.featured')}</p>
             {[
-              { kind: 'case_study', label: 'Case Studies' },
-              { kind: 'designer_profile', label: 'Designers' },
-            ].map(({ kind, label }) => (
+              { kind: 'case_study', labelKey: 'catalog.caseStudies' as MessageKey },
+              { kind: 'designer_profile', labelKey: 'catalog.designers' as MessageKey },
+            ].map(({ kind, labelKey }) => (
               <button
                 key={kind}
                 type="button"
@@ -249,7 +265,7 @@ export function LogoCatalogPage() {
                   entryKind === kind ? 'bg-emerald-900/40 text-emerald-300' : 'text-zinc-400 hover:bg-zinc-900',
                 )}
               >
-                {label}
+                {t(labelKey)}
               </button>
             ))}
             {entryKind && (
@@ -258,7 +274,7 @@ export function LogoCatalogPage() {
                 onClick={() => setEntryKind('')}
                 className="text-xs text-zinc-500 hover:text-zinc-300 px-3"
               >
-                Clear filter
+                {t('catalog.clearFilter')}
               </button>
             )}
           </div>
@@ -268,7 +284,7 @@ export function LogoCatalogPage() {
           {projectIndustry && (recommendations as CatalogEntry[] | undefined)?.length ? (
             <div className="mb-5 p-4 rounded-xl bg-amber-950/20 border border-amber-800/30">
               <p className="text-xs font-medium text-amber-300 uppercase tracking-wider mb-2">
-                Recommended for {projectIndustry}
+                {t('catalog.recommendedFor', { industry: industryLabel(projectIndustry, t) })}
               </p>
               <div className="flex flex-wrap gap-2">
                 {(recommendations as CatalogEntry[]).map((entry) => (
@@ -292,11 +308,11 @@ export function LogoCatalogPage() {
 
           <div className="flex gap-2 mb-4">
             <div className="relative flex-1">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search logos, designers, geometry…"
+                placeholder={t('catalog.searchPlaceholder')}
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:border-zinc-600"
               />
             </div>
@@ -305,10 +321,10 @@ export function LogoCatalogPage() {
               onChange={(e) => setEra(e.target.value)}
               className="px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none"
             >
-              <option value="">All eras</option>
+              <option value="">{t('catalog.allEras')}</option>
               {ERA_OPTIONS.map((e) => (
                 <option key={e} value={e}>
-                  {e.replace(/_/g, ' ')}
+                  {t(ERA_LABEL_KEYS[e])}
                 </option>
               ))}
             </select>
@@ -316,12 +332,12 @@ export function LogoCatalogPage() {
 
           {activeChapter && (
             <p className="text-xs text-zinc-500 mb-3 flex items-center gap-1">
-              <Filter size={12} />
+              <Filter size={14} />
               {activeChapter.label}
               {section
                 ? ` → ${activeChapter.sections.find((s: { id: string }) => s.id === section)?.label}`
                 : ''}
-              {isFetching && ' · loading…'}
+              {isFetching && ` · ${t('catalog.loading')}`}
             </p>
           )}
 
@@ -351,8 +367,8 @@ export function LogoCatalogPage() {
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <h3 className="text-sm font-medium text-zinc-200">{entry.name}</h3>
                   {entry.entryKind && entry.entryKind !== 'logo' && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 shrink-0">
-                      {entry.entryKind === 'case_study' ? 'Case' : 'Designer'}
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 shrink-0">
+                      {entry.entryKind === 'case_study' ? t('catalog.entryCase') : t('catalog.entryDesigner')}
                     </span>
                   )}
                 </div>
@@ -363,11 +379,11 @@ export function LogoCatalogPage() {
                   </p>
                 )}
                 <div className="flex flex-wrap gap-1 mt-2">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 capitalize">
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 capitalize">
                     {entry.catalogSection?.replace(/-/g, ' ')}
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
-                    Q {entry.minimalismLevel.toFixed(0)}
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                    {t('catalog.qualityScore', { score: entry.minimalismLevel.toFixed(0) })}
                   </span>
                 </div>
               </button>
@@ -405,21 +421,24 @@ export function LogoCatalogPage() {
 
               {selectedIndustryMismatch && (
                 <p className="text-xs text-amber-300/90 p-2.5 rounded-lg bg-amber-950/30 border border-amber-800/40">
-                  Industry mismatch: {selected.name} is tagged «{selected.industry}», project is «
-                  {projectIndustry}». Prefer references from the recommended list for stronger sector fit.
+                  {t('catalog.industryMismatch', {
+                    name: selected.name,
+                    entryIndustry: selected.industry,
+                    projectIndustry: industryLabel(projectIndustry ?? '', t),
+                  })}
                 </p>
               )}
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <Meta label="Chapter" value={selected.catalogChapter} />
-                <Meta label="Section" value={selected.catalogSection?.replace(/-/g, ' ')} />
-                <Meta label="Era" value={selected.era.replace(/_/g, ' ')} />
-                <Meta label="Industry" value={selected.industry} />
-                <Meta label="Mark" value={selected.markType} />
+                <Meta labelKey="catalog.meta.chapter" value={selected.catalogChapter} />
+                <Meta labelKey="catalog.meta.section" value={selected.catalogSection?.replace(/-/g, ' ')} />
+                <Meta labelKey="catalog.meta.era" value={selected.era.replace(/_/g, ' ')} />
+                <Meta labelKey="catalog.meta.industry" value={industryLabel(selected.industry, t)} />
+                <Meta labelKey="catalog.meta.mark" value={selected.markType ? markTypeLabel(selected.markType, t) : undefined} />
               </div>
 
               <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Geometry</p>
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1.5">{t('catalog.meta.geometry')}</p>
                 <div className="flex flex-wrap gap-1">
                   {selected.geometry.map((g) => (
                     <span key={g} className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">
@@ -430,12 +449,12 @@ export function LogoCatalogPage() {
               </div>
 
               <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">
-                  Principles ({selected.principleIds.length})
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1.5">
+                  {t('catalog.principlesCount', { count: selected.principleIds.length })}
                 </p>
                 <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                   {selected.principleIds.map((p) => (
-                    <span key={p} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
+                    <span key={p} className="text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
                       {p}
                     </span>
                   ))}
@@ -448,8 +467,8 @@ export function LogoCatalogPage() {
                   onClick={() => removeApplied(selected.id)}
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-800/60 bg-red-950/40 hover:bg-red-900/40 text-red-300 text-sm font-medium transition-colors"
                 >
-                  Remove from Brief
-                  <X size={14} />
+                  {t('catalog.removeFromBrief')}
+                  <X size={16} />
                 </button>
               ) : (
                 <ApplyToPromptsButton onApply={applySelected} />
@@ -457,20 +476,22 @@ export function LogoCatalogPage() {
             </div>
           ) : (
             <div className="p-8 rounded-xl border border-dashed border-zinc-800 text-center">
-              <p className="text-sm text-zinc-500">Select a logo to view analysis and apply to Brief</p>
+              <p className="text-sm text-zinc-500">{t('catalog.selectLogo')}</p>
             </div>
           )}
 
           {appliedIds.length > 0 && (
             <div className="mt-4 p-4 rounded-xl bg-emerald-900/20 border border-emerald-800/40">
               <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="text-xs text-emerald-300 font-medium">Applied to Brief ({appliedIds.length})</p>
+                <p className="text-xs text-emerald-300 font-medium">
+                  {t('catalog.appliedToBrief', { count: appliedIds.length })}
+                </p>
                 <button
                   type="button"
                   onClick={clearApplied}
-                  className="text-[10px] text-emerald-400/80 hover:text-emerald-200 uppercase tracking-wide"
+                  className="text-xs text-emerald-400/80 hover:text-emerald-200 uppercase tracking-wide"
                 >
-                  Clear all
+                  {t('catalog.clearAll')}
                 </button>
               </div>
               <ul className="space-y-1.5">
@@ -490,9 +511,9 @@ export function LogoCatalogPage() {
                       type="button"
                       onClick={() => removeApplied(entry.id)}
                       className="shrink-0 p-1 rounded hover:bg-emerald-900/60 text-emerald-400 hover:text-red-300 transition-colors"
-                      aria-label={`Remove ${entry.name} from brief`}
+                      aria-label={`${t('common.remove')} ${entry.name}`}
                     >
-                      <X size={14} />
+                      <X size={16} />
                     </button>
                   </li>
                 ))}
@@ -505,11 +526,12 @@ export function LogoCatalogPage() {
   );
 }
 
-function Meta({ label, value }: { label: string; value?: string }) {
+function Meta({ labelKey, value }: { labelKey: MessageKey; value?: string }) {
+  const t = useT();
   if (!value) return null;
   return (
     <div className="p-2 rounded-lg bg-zinc-950 border border-zinc-800">
-      <p className="text-zinc-600">{label}</p>
+      <p className="text-zinc-600">{t(labelKey)}</p>
       <p className="text-zinc-300 capitalize mt-0.5">{value}</p>
     </div>
   );

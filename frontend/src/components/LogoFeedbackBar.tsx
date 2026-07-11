@@ -6,10 +6,13 @@ import type { GeneratedImage, LogoFeedback } from '../types';
 import { submitLogoFeedback, submitLogoTags } from '../api';
 import {
   LOGO_MISSED_TAGS,
+  LOGO_MISSED_TAG_KEYS,
   LOGO_WORKED_TAGS,
+  LOGO_WORKED_TAG_KEYS,
   scoreToStars,
   starsToScore,
 } from '../lib/logo-feedback';
+import { useT } from '../i18n';
 
 interface LogoFeedbackBarProps {
   promptId: string;
@@ -25,7 +28,7 @@ function toggleTag(tags: string[], tag: string, max = 3): string[] {
 
 const tagButtonClass = (active: boolean, saving: boolean) =>
   clsx(
-    'px-2 py-0.5 rounded-lg text-[9px] border transition-colors',
+    'px-2 py-0.5 rounded-lg text-[11px] border transition-colors',
     saving && 'opacity-60',
     active
       ? 'border-zinc-400 bg-zinc-700 text-zinc-100'
@@ -33,6 +36,7 @@ const tagButtonClass = (active: boolean, saving: boolean) =>
   );
 
 export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarProps) {
+  const t = useT();
   const existing = logo.feedback;
   const [workedTags, setWorkedTags] = useState<string[]>(existing?.workedTags ?? []);
   const [missedTags, setMissedTags] = useState<string[]>(existing?.missedTags ?? []);
@@ -101,7 +105,7 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
   return (
     <div className="space-y-2 pt-2 border-t border-zinc-800" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] text-zinc-500 uppercase tracking-wide">Feedback</span>
+        <span className="text-xs text-zinc-500 uppercase tracking-wide">{t('feedback.title')}</span>
         <div className="flex items-center gap-0">
           {[1, 2, 3, 4, 5].map((stars) => {
             const filled = rateLogo.isPending ? stars === pulseStar : selectedStars >= stars;
@@ -109,7 +113,7 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
               <button
                 key={stars}
                 type="button"
-                title={starsToScore(stars).label}
+                title={t(starsToScore(stars).labelKey)}
                 disabled={rateLogo.isPending}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -121,7 +125,7 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
                   filled ? 'text-zinc-200' : 'text-zinc-600',
                 )}
               >
-                <Star size={13} className={clsx(filled && 'fill-current')} />
+                <Star size={15} className={clsx(filled && 'fill-current')} />
               </button>
             );
           })}
@@ -130,7 +134,9 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
 
       <div className="space-y-1.5">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[9px] text-zinc-600 uppercase tracking-wide shrink-0">Worked</span>
+          <span className="text-[11px] text-zinc-600 uppercase tracking-wide shrink-0">
+            {t('feedback.worked')}
+          </span>
           <div className="flex flex-wrap gap-1">
             {LOGO_WORKED_TAGS.map((tag) => (
               <button
@@ -143,13 +149,15 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
                 }}
                 className={tagButtonClass(workedTags.includes(tag), savingTag === tag)}
               >
-                {tag}
+                {t(LOGO_WORKED_TAG_KEYS[tag])}
               </button>
             ))}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[9px] text-zinc-600 uppercase tracking-wide shrink-0">Missed</span>
+          <span className="text-[11px] text-zinc-600 uppercase tracking-wide shrink-0">
+            {t('feedback.missed')}
+          </span>
           <div className="flex flex-wrap gap-1">
             {LOGO_MISSED_TAGS.map((tag) => (
               <button
@@ -162,7 +170,7 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
                 }}
                 className={tagButtonClass(missedTags.includes(tag), savingTag === tag)}
               >
-                {tag}
+                {t(LOGO_MISSED_TAG_KEYS[tag])}
               </button>
             ))}
           </div>

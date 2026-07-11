@@ -6,7 +6,10 @@ import type {
   GeneratedImage,
   Recommendation,
   SavedProject,
+  BrainPartnerState,
+  PromptCountOption,
 } from './types';
+import { normalizePromptCount } from './components/prompts/PromptCountPicker';
 import { EMPTY_DESIGN_BRIEF } from './types';
 import {
   applyBrandDNAToBrief,
@@ -21,6 +24,7 @@ function clearPromptResults() {
     recommendations: [] as Recommendation[],
     selectedPromptId: null as string | null,
     generatingPromptIds: new Set<string>(),
+    brainPartner: null as BrainPartnerState | null,
   };
 }
 
@@ -43,13 +47,14 @@ function projectSnapshot(state: AppState): Omit<SavedProject, 'id' | 'name' | 'u
     prompts: state.prompts,
     recommendations: state.recommendations,
     selectedPromptId: state.selectedPromptId,
+    brainPartner: state.brainPartner,
   };
 }
 
 interface AppState {
   industry: string;
   companyName: string;
-  variationCount: number;
+  variationCount: PromptCountOption;
   inspirationMode: string;
   preferredEra: string;
   minimalismLevel: number;
@@ -58,11 +63,12 @@ interface AppState {
   recommendations: Recommendation[];
   selectedPromptId: string | null;
   generatingPromptIds: Set<string>;
+  brainPartner: BrainPartnerState | null;
   projects: SavedProject[];
   activeProjectId: string | null;
   setIndustry: (v: string) => void;
   setCompanyName: (v: string) => void;
-  setVariationCount: (v: number) => void;
+  setVariationCount: (v: PromptCountOption) => void;
   setInspirationMode: (v: string) => void;
   setPreferredEra: (v: string) => void;
   setMinimalismLevel: (v: number) => void;
@@ -73,7 +79,11 @@ interface AppState {
   applyGeometry: (industry: string, result: Parameters<typeof applyGeometryToBrief>[1]) => void;
   applyKnowledgeGraph: (result: Parameters<typeof applyKnowledgeGraphToBrief>[1]) => void;
   applyPipeline: (companyName: string, industry: string, result: Parameters<typeof applyPipelineToBrief>[1]) => void;
-  setResults: (prompts: ComposedPrompt[], recommendations: Recommendation[]) => void;
+  setResults: (
+    prompts: ComposedPrompt[],
+    recommendations: Recommendation[],
+    brainPartner?: BrainPartnerState | null,
+  ) => void;
   selectPrompt: (id: string) => void;
   startGenerating: (promptId: string) => void;
   stopGenerating: (promptId: string) => void;
@@ -92,7 +102,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       industry: '',
       companyName: '',
-      variationCount: 1,
+      variationCount: 3,
       inspirationMode: '',
       preferredEra: '',
       minimalismLevel: 8,
@@ -101,6 +111,7 @@ export const useAppStore = create<AppState>()(
       recommendations: [],
       selectedPromptId: null,
       generatingPromptIds: new Set<string>(),
+      brainPartner: null,
       projects: [],
       activeProjectId: null,
       setIndustry: (industry) =>
@@ -113,7 +124,8 @@ export const useAppStore = create<AppState>()(
             ? { companyName }
             : { companyName, ...clearPromptResults() },
         ),
-      setVariationCount: (variationCount) => set({ variationCount }),
+      setVariationCount: (variationCount) =>
+        set({ variationCount: normalizePromptCount(variationCount) }),
       setInspirationMode: (inspirationMode) => set({ inspirationMode }),
       setPreferredEra: (preferredEra) =>
         set((state) =>
@@ -150,7 +162,7 @@ export const useAppStore = create<AppState>()(
         set({
           industry: '',
           companyName: '',
-          variationCount: 5,
+          variationCount: 3,
           inspirationMode: '',
           preferredEra: '',
           minimalismLevel: 8,
@@ -200,12 +212,13 @@ export const useAppStore = create<AppState>()(
         });
         get().syncActiveProject();
       },
-      setResults: (prompts, recommendations) => {
+      setResults: (prompts, recommendations, brainPartner = null) => {
         set({
           prompts,
           recommendations,
           selectedPromptId: prompts[0]?.id ?? null,
           generatingPromptIds: new Set<string>(),
+          brainPartner: brainPartner ?? null,
         });
         get().syncActiveProject();
       },
@@ -289,7 +302,7 @@ export const useAppStore = create<AppState>()(
           activeProjectId: id,
           industry,
           companyName,
-          variationCount: 5,
+          variationCount: 3,
           inspirationMode: '',
           preferredEra: '',
           minimalismLevel: 8,
@@ -302,7 +315,7 @@ export const useAppStore = create<AppState>()(
               industry,
               companyName,
               updatedAt: Date.now(),
-              variationCount: 5,
+              variationCount: 3,
               inspirationMode: '',
               preferredEra: '',
               minimalismLevel: 8,
@@ -310,6 +323,7 @@ export const useAppStore = create<AppState>()(
               prompts: [],
               recommendations: [],
               selectedPromptId: null,
+              brainPartner: null,
             },
             ...get().projects,
           ],
@@ -323,7 +337,7 @@ export const useAppStore = create<AppState>()(
           activeProjectId: id,
           industry: project.industry,
           companyName: project.companyName,
-          variationCount: project.variationCount,
+          variationCount: normalizePromptCount(project.variationCount),
           inspirationMode: project.inspirationMode,
           preferredEra: project.preferredEra,
           minimalismLevel: project.minimalismLevel,
@@ -331,6 +345,7 @@ export const useAppStore = create<AppState>()(
           prompts: project.prompts,
           recommendations: project.recommendations,
           selectedPromptId: project.selectedPromptId,
+          brainPartner: project.brainPartner ?? null,
           generatingPromptIds: new Set<string>(),
         });
       },
@@ -350,7 +365,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'logo-platform-session',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => sessionStorage),
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<AppState>;
@@ -358,8 +373,12 @@ export const useAppStore = create<AppState>()(
           ...current,
           ...saved,
           preferredEra: saved.preferredEra ?? '',
+          variationCount: normalizePromptCount(saved.variationCount ?? current.variationCount),
           designBrief: { ...EMPTY_DESIGN_BRIEF, ...saved.designBrief },
-          projects: saved.projects ?? [],
+          projects: (saved.projects ?? []).map((project) => ({
+            ...project,
+            variationCount: normalizePromptCount(project.variationCount),
+          })),
           activeProjectId: saved.activeProjectId ?? null,
         };
       },
@@ -374,6 +393,7 @@ export const useAppStore = create<AppState>()(
         prompts: state.prompts,
         recommendations: state.recommendations,
         selectedPromptId: state.selectedPromptId,
+        brainPartner: state.brainPartner,
         projects: state.projects,
         activeProjectId: state.activeProjectId,
       }),

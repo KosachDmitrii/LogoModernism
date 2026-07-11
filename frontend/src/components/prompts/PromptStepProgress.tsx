@@ -1,11 +1,12 @@
 import clsx from 'clsx';
+import { useT, type MessageKey } from '../../i18n';
 
 export type PromptWizardStep = 1 | 2 | 3;
 
-const STEPS: Array<{ n: PromptWizardStep; label: string }> = [
-  { n: 1, label: 'Project' },
-  { n: 2, label: 'Brief' },
-  { n: 3, label: 'Prompts' },
+const STEPS: Array<{ n: PromptWizardStep; labelKey: MessageKey }> = [
+  { n: 1, labelKey: 'prompts.step.project' },
+  { n: 2, labelKey: 'prompts.step.brief' },
+  { n: 3, labelKey: 'prompts.step.prompts' },
 ];
 
 interface PromptStepProgressProps {
@@ -15,11 +16,13 @@ interface PromptStepProgressProps {
 
 function Step({
   step,
+  label,
   reachable,
   isActive,
   isComplete,
 }: {
   step: (typeof STEPS)[number];
+  label: string;
   reachable: boolean;
   isActive: boolean;
   isComplete: boolean;
@@ -57,13 +60,15 @@ function Step({
                 : 'text-zinc-600',
         )}
       >
-        {step.label}
+        {label}
       </span>
     </div>
   );
 }
 
 export function PromptStepProgress({ activeStep, canGoToStep }: PromptStepProgressProps) {
+  const t = useT();
+
   return (
     <div className="flex w-full items-start">
       {STEPS.map((step, i) => {
@@ -75,6 +80,7 @@ export function PromptStepProgress({ activeStep, canGoToStep }: PromptStepProgre
           <div key={step.n} className="contents">
             <Step
               step={step}
+              label={t(step.labelKey)}
               reachable={reachable}
               isActive={isActive}
               isComplete={isComplete}

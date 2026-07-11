@@ -2,11 +2,12 @@ import { Check, Circle } from 'lucide-react';
 import clsx from 'clsx';
 import { useAppStore } from '../../store';
 import type { DesignBrief } from '../../types';
+import { useT, type MessageKey } from '../../i18n';
 
 interface CheckItem {
   id: string;
-  label: string;
-  hint: string;
+  labelKey: MessageKey;
+  hintKey: MessageKey;
   done: boolean;
   optional?: boolean;
 }
@@ -32,60 +33,60 @@ function buildItems(
   return [
     {
       id: 'industry',
-      label: 'Industry',
-      hint: 'Set on Project step',
+      labelKey: 'brief.checklist.industry',
+      hintKey: 'brief.checklist.industryHint',
       done: Boolean(industry.trim()),
     },
     {
       id: 'brand',
-      label: 'Company name',
-      hint: companyName.trim() ? 'Text in logo' : 'Symbol-only logo',
+      labelKey: 'brief.checklist.companyName',
+      hintKey: companyName.trim() ? 'brief.checklist.companyNameText' : 'brief.checklist.companyNameSymbol',
       done: true,
       optional: true,
     },
     {
       id: 'era',
-      label: 'Era / movement',
-      hint: 'Project or from analysis',
+      labelKey: 'brief.checklist.era',
+      hintKey: 'brief.checklist.eraHint',
       done: hasEra,
     },
     {
       id: 'inspiration',
-      label: 'Inspiration',
-      hint: 'Project preset or derived from era',
+      labelKey: 'brief.checklist.inspiration',
+      hintKey: 'brief.checklist.inspirationHint',
       done: hasInspiration,
       optional: true,
     },
     {
       id: 'typography',
-      label: 'Typography',
-      hint: 'Mark type & type analysis',
+      labelKey: 'brief.checklist.typography',
+      hintKey: 'brief.checklist.typographyHint',
       done: hasTypography,
     },
     {
       id: 'shapes',
-      label: 'Shapes',
-      hint: 'Geometry & primitives',
+      labelKey: 'brief.checklist.shapes',
+      hintKey: 'brief.checklist.shapesHint',
       done: hasShapes,
     },
     {
       id: 'color',
-      label: 'Color palette',
-      hint: 'Optional style preference',
+      labelKey: 'brief.checklist.color',
+      hintKey: 'brief.checklist.colorHint',
       done: hasColor,
       optional: true,
     },
     {
       id: 'client',
-      label: 'Client notes',
-      hint: 'Step 5 on Build',
+      labelKey: 'brief.checklist.clientNotes',
+      hintKey: 'brief.checklist.clientNotesHint',
       done: Boolean(brief.clientNotes.trim()),
       optional: true,
     },
     {
       id: 'references',
-      label: 'Catalog references',
-      hint: 'Logo Catalog inspiration',
+      labelKey: 'brief.checklist.references',
+      hintKey: 'brief.checklist.referencesHint',
       done: (brief.catalogReferenceIds?.length ?? 0) > 0,
       optional: true,
     },
@@ -93,6 +94,7 @@ function buildItems(
 }
 
 export function BriefChecklist() {
+  const t = useT();
   const industry = useAppStore((s) => s.industry);
   const companyName = useAppStore((s) => s.companyName);
   const preferredEra = useAppStore((s) => s.preferredEra);
@@ -107,12 +109,12 @@ export function BriefChecklist() {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-          Brief checklist
+        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+          {t('brief.checklist.title')}
         </p>
-        <span className="text-[10px] text-zinc-500">
-          {requiredDone}/{required.length} core
-          {optionalDone > 0 ? ` · ${optionalDone} optional` : ''}
+        <span className="text-xs text-zinc-500">
+          {t('brief.checklist.coreProgress', { done: requiredDone, total: required.length })}
+          {optionalDone > 0 ? ` ${t('brief.checklist.optionalProgress', { count: optionalDone })}` : ''}
         </span>
       </div>
       <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
@@ -120,23 +122,23 @@ export function BriefChecklist() {
           <li
             key={item.id}
             className={clsx(
-              'flex items-start gap-2 px-2 py-1.5 rounded-lg text-[11px]',
+              'flex items-start gap-2 px-2 py-1.5 rounded-lg text-[13px]',
               item.done ? 'text-zinc-300' : 'text-zinc-500',
             )}
           >
             {item.done ? (
-              <Check size={12} className="text-emerald-400 shrink-0 mt-0.5" />
+              <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
             ) : (
-              <Circle size={12} className="text-zinc-600 shrink-0 mt-0.5" />
+              <Circle size={14} className="text-zinc-600 shrink-0 mt-0.5" />
             )}
             <span className="flex-1 min-w-0">
               <span className="font-medium">
-                {item.label}
+                {t(item.labelKey)}
                 {item.optional && (
-                  <span className="text-zinc-600 font-normal"> · optional</span>
+                  <span className="text-zinc-600 font-normal"> · {t('common.optional')}</span>
                 )}
               </span>
-              <span className="block text-[10px] text-zinc-600 truncate">{item.hint}</span>
+              <span className="block text-xs text-zinc-600 truncate">{t(item.hintKey)}</span>
             </span>
           </li>
         ))}

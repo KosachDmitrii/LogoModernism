@@ -45,6 +45,16 @@ export interface BrainPdfIngestCheck {
   message: string;
 }
 
+export type BrainPdfIngestPhase = 'parsing' | 'processing' | 'done' | 'error';
+
+export interface BrainPdfIngestProgress {
+  phase: BrainPdfIngestPhase;
+  pageCount?: number;
+  totalChunks?: number;
+  processedChunks?: number;
+  message?: string;
+}
+
 export interface BrainIngestResult {
   experienceId: string;
   sourceType: BrainSourceType;
@@ -183,6 +193,8 @@ export interface BrainGenerateRequest {
   catalogNarrative?: string;
   briefContext?: BriefContext;
   useBrain?: boolean;
+  /** Force a creative territory instead of auto-selection */
+  preferredTerritoryId?: import('./brain-partner').CreativeTerritoryId;
 }
 
 export interface BrainConsolidateResult {

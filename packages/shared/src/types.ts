@@ -227,6 +227,9 @@ export interface ComposedPrompt {
     enrichedPromptLength?: number;
     stylePreferences?: import('./brain-types').BriefContext;
     brainArchitecture?: import('./brain-architecture').BrainArchitecture;
+    creativeTerritory?: import('./brain-partner').CreativeTerritory;
+    constraintReport?: import('./brain-partner').ConstraintReport;
+    partnerCritique?: DesignCriticResult;
   };
 }
 
@@ -251,6 +254,7 @@ export interface PromptGenerationRequest {
   briefContext?: import('./brain-types').BriefContext;
   /** When false, skip Brain and use rule-based pipeline only */
   useBrain?: boolean;
+  preferredTerritoryId?: import('./brain-partner').CreativeTerritoryId;
 }
 
 export type InspirationMode =

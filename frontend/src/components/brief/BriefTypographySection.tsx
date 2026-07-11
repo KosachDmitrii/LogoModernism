@@ -3,16 +3,19 @@ import { Loader2, Type } from 'lucide-react';
 import { analyzeBrandDNA } from '../../api';
 import { useAppStore } from '../../store';
 import type { DesignBrief } from '../../types';
+import { useT } from '../../i18n';
+import { formatError } from '../../lib/api-error';
+import { markTypeLabel } from '../../lib/translate-labels';
 
 const MARK_TYPES = [
-  { value: 'wordmark', label: 'Wordmark' },
-  { value: 'lettermark', label: 'Lettermark' },
-  { value: 'combination', label: 'Combination' },
+  { value: 'wordmark', labelKey: 'brief.typography.wordmark' },
+  { value: 'lettermark', labelKey: 'brief.typography.lettermark' },
+  { value: 'combination', labelKey: 'brief.typography.combination' },
 ] as const;
 
 const TYPOGRAPHY_STYLES = [
-  { value: 'standard', label: 'Standard' },
-  { value: 'constructed', label: 'Constructed' },
+  { value: 'standard', labelKey: 'brief.typography.standard' },
+  { value: 'constructed', labelKey: 'brief.typography.constructed' },
 ] as const;
 
 type MarkType = (typeof MARK_TYPES)[number]['value'];
@@ -23,6 +26,7 @@ interface BriefTypographySectionProps {
 }
 
 export function BriefTypographySection({ onStepComplete }: BriefTypographySectionProps) {
+  const t = useT();
   const companyName = useAppStore((s) => s.companyName);
   const industry = useAppStore((s) => s.industry);
   const designBrief = useAppStore((s) => s.designBrief);
@@ -44,7 +48,7 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
       const name = useAppStore.getState().companyName.trim();
 
       return analyzeBrandDNA({
-        companyName: name || undefined,
+        companyName: name,
         industry: industry.trim(),
         markType: name ? selectedMarkType : undefined,
         typographyStyle: name ? selectedTypographyStyle : undefined,
@@ -67,16 +71,16 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
   const canAnalyze = Boolean(industry.trim()) && (!requiresName || Boolean(brandName));
 
   const disabledReason = !industry.trim()
-    ? 'Set industry on the Project step first.'
+    ? t('brief.typography.setIndustryFirst')
     : requiresName && !brandName
-      ? 'Add Company Name on the Project step for wordmark, lettermark, or constructed type.'
+      ? t('brief.typography.addCompanyName')
       : null;
 
   return (
     <div className="space-y-3 relative z-10" onClick={(e) => e.stopPropagation()}>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-[10px] text-zinc-500 mb-1">Mark type</label>
+          <label className="block text-xs text-zinc-500 mb-1">{t('brief.typography.markType')}</label>
           <select
             value={markType}
             onChange={(e) =>
@@ -86,13 +90,13 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
           >
             {MARK_TYPES.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-[10px] text-zinc-500 mb-1">Typography style</label>
+          <label className="block text-xs text-zinc-500 mb-1">{t('brief.typography.typographyStyle')}</label>
           <select
             value={typographyStyle}
             onChange={(e) =>
@@ -104,7 +108,7 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
           >
             {TYPOGRAPHY_STYLES.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </option>
             ))}
           </select>
@@ -117,17 +121,17 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
         onClick={() => analysis.mutate()}
         className="w-full px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {analysis.isPending && <Loader2 size={12} className="animate-spin" />}
-        Analyze Typography
+        {analysis.isPending && <Loader2 size={14} className="animate-spin" />}
+        {t('brief.typography.analyze')}
       </button>
 
       {disabledReason && (
-        <p className="text-[10px] text-amber-300/80">{disabledReason}</p>
+        <p className="text-xs text-amber-300/80">{disabledReason}</p>
       )}
 
       {analysis.isError && (
-        <p className="text-[10px] text-red-400">
-          {analysis.error instanceof Error ? analysis.error.message : 'Typography analysis failed'}
+        <p className="text-xs text-red-400">
+          {formatError(analysis.error, t)}
         </p>
       )}
 
@@ -136,12 +140,12 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
           <p className="text-xs text-zinc-400 line-clamp-3">{result.narrative}</p>
           <div className="flex flex-wrap gap-1">
             <Tag>{result.personality}</Tag>
-            <Tag>{result.markType}</Tag>
+            <Tag>{markTypeLabel(result.markType, t)}</Tag>
             <Tag>{result.psychologyProfile.primaryEmotion}</Tag>
           </div>
-          <p className="text-[10px] text-emerald-400/80">Applied to brief</p>
+          <p className="text-xs text-emerald-400/80">{t('brief.typography.applied')}</p>
           <div className="pt-1 border-t border-zinc-800">
-            <p className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
+            <p className="text-xs text-zinc-500 mb-1 flex items-center gap-1">
               <Type size={10} /> {result.typography.primaryRecommendation.name}
             </p>
           </div>
@@ -153,7 +157,7 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
 
 function Tag({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 capitalize">
+    <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 capitalize">
       {children}
     </span>
   );

@@ -3,6 +3,10 @@ import type { Prisma, PrismaClient } from '@logo-platform/database';
 import { embedText } from '../embedding/embedding.service';
 import { createExperience } from '../storage/experience.repository';
 import { upsertExperienceEmbedding } from '../storage/pgvector';
+import {
+  normalizeStructuredFeedback,
+  structuredFeedbackMetadata,
+} from '../learning/structured-feedback';
 
 function scoreDelta(signalType: BrainFeedbackInput['signalType'], score: number): number {
   switch (signalType) {
@@ -23,13 +27,19 @@ export async function ingestFeedback(
   prisma: PrismaClient,
   input: BrainFeedbackInput,
 ): Promise<BrainIngestResult> {
+  const structured = normalizeStructuredFeedback(input);
+  const normalizedMetadata = structuredFeedbackMetadata(
+    structured,
+    (input.metadata ?? {}) as Record<string, unknown>,
+  );
+
   const tasteSignal = await prisma.brainTasteSignal.create({
     data: {
       experienceId: input.experienceId,
       signalType: input.signalType,
       score: input.score,
       context: input.context,
-      metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
+      metadata: normalizedMetadata as Prisma.InputJsonValue,
     },
   });
 
@@ -43,7 +53,7 @@ export async function ingestFeedback(
       linkedExperienceId: input.experienceId,
       signalType: input.signalType,
       scoreDelta: scoreDelta(input.signalType, input.score),
-      ...input.metadata,
+      ...normalizedMetadata,
     },
   });
 

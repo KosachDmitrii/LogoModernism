@@ -31,11 +31,16 @@ import {
   useBrainIngestStore,
   useIsBrainIngesting,
   useActiveBrainIngestJob,
+  useActivePdfResumeRatio,
 } from '../stores/brain-ingest-store';
+import { useBrainPdfIngestProgress } from '../hooks/useBrainPdfIngestProgress';
+import { useT, type MessageKey } from '../i18n';
+import { formatError } from '../lib/api-error';
 
 type Tab = 'overview' | 'learn' | 'research';
 
 export function DesignBrainPage() {
+  const t = useT();
   const [tab, setTab] = useState<Tab>('overview');
   const queryClient = useQueryClient();
 
@@ -65,11 +70,20 @@ export function DesignBrainPage() {
   const ingestJobs = useBrainIngestStore((s) => s.jobs);
   const activePdfJob = useActiveBrainIngestJob();
   const isPdfIngesting = useIsBrainIngesting();
+  const resumeRatio = useActivePdfResumeRatio();
+  const liveProgress = useBrainPdfIngestProgress(activePdfJob?.id, isPdfIngesting, resumeRatio);
 
   const latestPdfJob = ingestJobs[0];
+  const displayPdfTitle = activePdfJob?.title ?? pdfTitle;
   const latestFinishedAt = ingestJobs.find(
     (j) => j.status === 'done' || j.status === 'skipped',
   )?.finishedAt;
+
+  useEffect(() => {
+    if (activePdfJob?.title && !pdfTitle.trim()) {
+      setPdfTitle(activePdfJob.title);
+    }
+  }, [activePdfJob?.title, pdfTitle]);
 
   useEffect(() => {
     if (!latestFinishedAt || latestFinishedAt === lastInvalidatedRef.current) return;
@@ -81,14 +95,14 @@ export function DesignBrainPage() {
   const handlePdfUpload = async (file: File) => {
     const title = pdfTitle.trim();
     if (!title) {
-      setPdfError('Title is required');
+      setPdfError(t('brain.upload.titleRequired'));
       return;
     }
     setPdfError(null);
     try {
       await startPdfIngest(file, title);
     } catch (error) {
-      setPdfError(error instanceof Error ? error.message : String(error));
+      setPdfError(formatError(error, t));
     }
   };
 
@@ -108,7 +122,7 @@ export function DesignBrainPage() {
       refetchPending();
       queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
     },
-    onError: (error) => setResearchError(String(error)),
+    onError: (error) => setResearchError(formatError(error, t)),
   });
 
   const researchPreview = useMutation({
@@ -120,7 +134,7 @@ export function DesignBrainPage() {
       refetchPending();
       queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
     },
-    onError: (error) => setResearchError(String(error)),
+    onError: (error) => setResearchError(formatError(error, t)),
   });
 
   const approveResearch = useMutation({
@@ -139,35 +153,40 @@ export function DesignBrainPage() {
     },
   });
 
-  const tabs: { id: Tab; label: string; icon: typeof Brain }[] = [
-    { id: 'overview', label: 'Analytics', icon: Database },
-    { id: 'learn', label: 'Upload', icon: Upload },
-    { id: 'research', label: 'Research', icon: Globe },
+  const tabs: Array<{ id: Tab; labelKey: MessageKey; icon: typeof Brain }> = [
+    { id: 'overview', labelKey: 'brain.tab.analytics', icon: Database },
+    { id: 'learn', labelKey: 'brain.tab.upload', icon: Upload },
+    { id: 'research', labelKey: 'brain.tab.research', icon: Globe },
   ];
 
   return (
     <PageContainer>
       <PageHeader
         page="brain"
-        subtitle="Central knowledge base — upload sources, research, taste signals. Applied automatically when composing prompts."
+        subtitle={t('brain.subtitle')}
       >
-        <div className="flex flex-wrap gap-2 mt-3 text-[10px]">
-          <StatusPill ok={health?.databaseConfigured} label="PostgreSQL" />
-          <StatusPill ok={health?.embeddingConfigured} label="Embeddings" />
-          <StatusPill ok={stats?.pgvectorEnabled} label="pgvector" />
-          <StatusPill ok={health?.tavilyConfigured} label="Tavily" optional />
-          <StatusPill ok={health?.braveConfigured} label="Brave" optional />
-          <StatusPill ok={health?.ocrConfigured} label="OCR" optional />
+        <div className="flex flex-wrap gap-2 mt-3 text-xs">
+          <StatusPill ok={health?.databaseConfigured} label={t('brain.status.postgresql')} />
+          <StatusPill ok={health?.embeddingConfigured} label={t('brain.status.embeddings')} />
+          <StatusPill ok={stats?.pgvectorEnabled} label={t('brain.status.pgvector')} />
+          <StatusPill ok={health?.tavilyConfigured} label={t('brain.status.tavily')} optional />
+          <StatusPill ok={health?.braveConfigured} label={t('brain.status.brave')} optional />
+          <StatusPill ok={health?.ocrConfigured} label={t('brain.status.ocr')} optional />
           {health?.nightlyResearch && (
-            <span className="px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-300 text-[10px]">
-              Nightly research
+            <span className="px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-300 text-xs">
+              {t('brain.status.nightlyResearch')}
             </span>
           )}
         </div>
       </PageHeader>
 
       <div className="flex gap-1 mb-8 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
-        {tabs.map(({ id, label, icon: Icon }) => (
+        {tabs.map(({ id, labelKey, icon: Icon }) => {
+          const isUploadTab = id === 'learn';
+          const tabLabel = isUploadTab && isPdfIngesting ? t('brain.tab.uploading') : t(labelKey);
+          const TabIcon = isUploadTab && isPdfIngesting ? Loader2 : Icon;
+
+          return (
           <button
             key={id}
             type="button"
@@ -178,31 +197,32 @@ export function DesignBrainPage() {
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            <Icon size={14} />
-            {label}
+            <TabIcon size={16} className={isUploadTab && isPdfIngesting ? 'animate-spin' : undefined} />
+            {tabLabel}
             {id === 'research' && (pendingResearch?.length ?? 0) > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-900/50 text-amber-200 text-[9px]">
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-900/50 text-amber-200 text-[11px]">
                 {pendingResearch!.length}
               </span>
             )}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 py-24 text-zinc-500">
-          <Loader2 size={18} className="animate-spin" />
-          Loading brain data…
+          <Loader2 size={20} className="animate-spin" />
+          {t('brain.loading')}
         </div>
       ) : (
         <>
       {tab === 'overview' && (
         <div className="space-y-6">
           <div className="grid sm:grid-cols-4 gap-4">
-            <StatCard label="Experiences" value={stats?.experiences ?? '—'} />
-            <StatCard label="Learned rules" value={stats?.learnedPrinciples ?? '—'} />
-            <StatCard label="Taste signals" value={stats?.tasteSignals ?? '—'} />
-            <StatCard label="Pending review" value={pendingResearch?.length ?? '—'} />
+            <StatCard label={t('brain.stat.experiences')} value={stats?.experiences ?? '—'} />
+            <StatCard label={t('brain.stat.learnedRules')} value={stats?.learnedPrinciples ?? '—'} />
+            <StatCard label={t('brain.stat.tasteSignals')} value={stats?.tasteSignals ?? '—'} />
+            <StatCard label={t('brain.stat.pendingReview')} value={pendingResearch?.length ?? '—'} />
           </div>
 
           {stats?.bySourceType && (() => {
@@ -220,12 +240,12 @@ export function DesignBrainPage() {
                       : 'sm:grid-cols-1';
             return (
               <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                <p className="text-xs font-medium text-zinc-400 mb-3">Knowledge by source</p>
+                <p className="text-xs font-medium text-zinc-400 mb-3">{t('brain.knowledgeBySource')}</p>
                 <div className={`grid gap-2 grid-cols-2 ${gridCols}`}>
                   {activeSources.map(([source, count]) => (
                     <div key={source} className="text-center p-2 rounded-lg bg-zinc-950/60">
                       <p className="text-lg font-semibold text-zinc-200">{count}</p>
-                      <p className="text-[10px] text-zinc-500">{source}</p>
+                      <p className="text-xs text-zinc-500">{source}</p>
                     </div>
                   ))}
                 </div>
@@ -235,26 +255,26 @@ export function DesignBrainPage() {
 
           {taste && (
             <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
-              <p className="text-xs font-medium text-zinc-400 mb-2">Taste profile</p>
+              <p className="text-xs font-medium text-zinc-400 mb-2">{t('brain.tasteProfile')}</p>
               <p className="text-sm text-zinc-300">{taste.summary}</p>
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {taste.preferredGeometry.map((g) => (
-                  <span key={g} className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/30 text-emerald-300">
+                  <span key={g} className="text-xs px-2 py-0.5 rounded-full bg-emerald-900/30 text-emerald-300">
                     +{g}
                   </span>
                 ))}
                 {(taste.preferredColors ?? []).map((c) => (
-                  <span key={c} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-300">
-                    color:{c}
+                  <span key={c} className="text-xs px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-300">
+                    {t('brain.taste.colorTag', { value: c })}
                   </span>
                 ))}
                 {(taste.preferredRendering ?? []).map((r) => (
-                  <span key={r} className="text-[10px] px-2 py-0.5 rounded-full bg-violet-900/30 text-violet-300">
-                    render:{r}
+                  <span key={r} className="text-xs px-2 py-0.5 rounded-full bg-violet-900/30 text-violet-300">
+                    {t('brain.taste.renderTag', { value: r })}
                   </span>
                 ))}
                 {taste.avoidedPatterns.map((a) => (
-                  <span key={a} className="text-[10px] px-2 py-0.5 rounded-full bg-red-900/20 text-red-300">
+                  <span key={a} className="text-xs px-2 py-0.5 rounded-full bg-red-900/20 text-red-300">
                     −{a}
                   </span>
                 ))}
@@ -264,7 +284,7 @@ export function DesignBrainPage() {
 
           {principles && principles.length > 0 && (
             <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
-              <p className="text-xs font-medium text-zinc-400 mb-3">Top learned principles</p>
+              <p className="text-xs font-medium text-zinc-400 mb-3">{t('brain.topPrinciples')}</p>
               <div className="space-y-2">
                 {principles.slice(0, 8).map((p) => (
                   <div key={p.id} className="flex items-start justify-between gap-3 text-xs">
@@ -277,7 +297,9 @@ export function DesignBrainPage() {
                         </p>
                       )}
                     </div>
-                    <span className="text-violet-400 shrink-0">w={p.weight.toFixed(1)}</span>
+                    <span className="text-violet-400 shrink-0">
+                      {t('brain.principleWeight', { weight: p.weight.toFixed(1) })}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -290,13 +312,16 @@ export function DesignBrainPage() {
             disabled={consolidate.isPending}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-800 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
           >
-            {consolidate.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Run consolidate
+            {consolidate.isPending ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {t('brain.runConsolidate')}
           </button>
           {consolidate.data && (
             <p className="text-xs text-zinc-500">
-              Merged {consolidate.data.mergedPrinciples}, pruned {consolidate.data.prunedPrinciples},
-              deduped {consolidate.data.deduplicatedExperiences} experiences
+              {t('brain.consolidateResult', {
+                merged: consolidate.data.mergedPrinciples,
+                pruned: consolidate.data.prunedPrinciples,
+                deduped: consolidate.data.deduplicatedExperiences,
+              })}
             </p>
           )}
         </div>
@@ -305,34 +330,37 @@ export function DesignBrainPage() {
       {tab === 'learn' && (
         <div className="space-y-8">
           <IngestSection
-            title="Upload PDF book"
-            description="Extract design principles from books (Logo Modernism, Peters, etc.)"
+            title={t('brain.uploadPdfTitle')}
+            description={t('brain.uploadPdfDescription')}
             icon={FileText}
           >
             <label className="block text-xs text-zinc-500 mb-1">
-              Title <span className="text-red-400">*</span>
+              {t('brain.uploadTitleLabel')} <span className="text-red-400">*</span>
             </label>
             <input
-              value={pdfTitle}
+              value={displayPdfTitle}
               onChange={(e) => {
                 setPdfTitle(e.target.value);
                 if (e.target.value.trim()) setPdfError(null);
               }}
-              placeholder="e.g. Logo Modernism"
-              className="w-full mb-1 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-sm"
+              placeholder={t('brain.uploadTitlePlaceholder')}
+              disabled={isPdfIngesting}
+              className="w-full mb-1 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-sm disabled:opacity-60"
             />
             <FileUpload
               accept=".pdf"
               loading={isPdfIngesting}
-              disabled={!pdfTitle.trim()}
+              disabled={!displayPdfTitle.trim() && !isPdfIngesting}
+              statusTitle={activePdfJob?.title}
+              progress={liveProgress}
               onFile={handlePdfUpload}
             />
-            {activePdfJob && (
-              <p className="text-xs text-violet-400 mt-2">{activePdfJob.message}</p>
-            )}
             {latestPdfJob?.status === 'done' && latestPdfJob.result && (
               <p className="text-xs text-emerald-400 mt-2">
-                Stored {latestPdfJob.result.chunksStored} chunks, {latestPdfJob.result.principlesExtracted} principles
+                {t('brain.uploadStoredResult', {
+                  chunks: latestPdfJob.result.chunksStored,
+                  principles: latestPdfJob.result.principlesExtracted,
+                })}
               </p>
             )}
             {pdfError && <p className="text-xs text-red-400 mt-2">{pdfError}</p>}
@@ -343,22 +371,20 @@ export function DesignBrainPage() {
       {tab === 'research' && (
         <div className="space-y-6">
           <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
-            <p className="text-sm text-zinc-300 font-medium">Autonomous research</p>
+            <p className="text-sm text-zinc-300 font-medium">{t('brain.research.title')}</p>
             <p className="text-xs text-zinc-500">
-              Enter a topic — Brain composes search phrases, searches Tavily + Wikipedia + Brave +
-              Internet Archive in parallel, extracts principles with citations, and waits for approval.
-              {!health?.tavilyConfigured && !health?.braveConfigured &&
-                ' Without API keys, Wikipedia + Archive are still used.'}
+              {t('brain.research.description')}
+              {!health?.tavilyConfigured && !health?.braveConfigured && t('brain.research.noApiKeys')}
             </p>
             {health?.trustedDomains && (
-              <p className="text-[10px] text-zinc-600">
-                Trusted: {health.trustedDomains.slice(0, 4).join(', ')}…
+              <p className="text-xs text-zinc-600">
+                {t('brain.research.trusted', { domains: health.trustedDomains.slice(0, 4).join(', ') })}
               </p>
             )}
             <input
               value={researchQuery}
               onChange={(e) => setResearchQuery(e.target.value)}
-              placeholder="Topic e.g. Swiss modernism, Paul Rand, aviation logos"
+              placeholder={t('brain.research.topicPlaceholder')}
               className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 text-sm"
               onKeyDown={(e) => e.key === 'Enter' && researchQuery.trim() && researchRun.mutate()}
             />
@@ -368,45 +394,50 @@ export function DesignBrainPage() {
               disabled={!researchQuery.trim() || researchRun.isPending}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 disabled:opacity-50"
             >
-              {researchRun.isPending ? <Loader2 size={14} className="animate-spin" /> : <Globe size={14} />}
-              {researchRun.isPending ? 'Researching…' : 'Start autonomous research'}
+              {researchRun.isPending ? <Loader2 size={16} className="animate-spin" /> : <Globe size={16} />}
+              {researchRun.isPending ? t('brain.research.researching') : t('brain.research.start')}
             </button>
           </div>
 
           {researchRun.data && researchRun.data.generatedQueries.length > 0 && (
             <div className="p-4 rounded-xl border border-violet-900/30 bg-violet-950/20 space-y-2">
               <p className="text-xs font-medium text-violet-300">
-                Topic: {researchRun.data.topic}
+                {t('brain.research.topicLabel', { topic: researchRun.data.topic })}
               </p>
-              <p className="text-[10px] text-zinc-600">
-                Brainstormed {researchRun.data.discoveredQueries?.length ?? researchRun.data.generatedQueries.length} phrases
-                → selected {researchRun.data.generatedQueries.length} most significant
+              <p className="text-xs text-zinc-600">
+                {t('brain.research.brainstormed', {
+                  discovered: researchRun.data.discoveredQueries?.length ?? researchRun.data.generatedQueries.length,
+                  selected: researchRun.data.generatedQueries.length,
+                })}
               </p>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Selected search phrases</p>
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">{t('brain.research.selectedPhrases')}</p>
               <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
                 {researchRun.data.generatedQueries.map((phrase) => (
                   <span
                     key={phrase}
-                    className="text-[10px] px-2 py-1 rounded-full bg-zinc-900 text-zinc-400 border border-zinc-800"
+                    className="text-xs px-2 py-1 rounded-full bg-zinc-900 text-zinc-400 border border-zinc-800"
                   >
                     {phrase}
                   </span>
                 ))}
               </div>
-              <p className="text-[10px] text-zinc-600">
-                Found {researchRun.data.hits.length} sources · {researchRun.data.candidates.length} new candidates
+              <p className="text-xs text-zinc-600">
+                {t('brain.research.foundSources', {
+                  hits: researchRun.data.hits.length,
+                  candidates: researchRun.data.candidates.length,
+                })}
                 {researchRun.data.skippedUrls.length > 0 &&
-                  ` · ${researchRun.data.skippedUrls.length} skipped`}
+                  ` ${t('brain.research.skippedUrls', { count: researchRun.data.skippedUrls.length })}`}
               </p>
             </div>
           )}
 
           <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-3">
-            <p className="text-xs font-medium text-zinc-400">Or preview a specific URL</p>
+            <p className="text-xs font-medium text-zinc-400">{t('brain.research.previewUrl')}</p>
             <input
               value={manualUrl}
               onChange={(e) => setManualUrl(e.target.value)}
-              placeholder="https://en.wikipedia.org/wiki/..."
+              placeholder={t('brain.research.urlPlaceholder')}
               className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 text-sm"
             />
             <button
@@ -415,7 +446,7 @@ export function DesignBrainPage() {
               disabled={!manualUrl.trim() || researchPreview.isPending}
               className="px-4 py-2 rounded-lg bg-zinc-800 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
             >
-              {researchPreview.isPending ? 'Fetching…' : 'Preview URL'}
+              {researchPreview.isPending ? t('brain.research.fetching') : t('brain.research.previewButton')}
             </button>
           </div>
 
@@ -423,13 +454,13 @@ export function DesignBrainPage() {
 
           {researchRun.data && researchRun.data.candidates.length === 0 && (
             <p className="text-xs text-amber-400">
-              No new candidates extracted. Try a different query or paste a Wikipedia URL directly.
+              {t('brain.research.noCandidates')}
             </p>
           )}
 
           <div className="space-y-4">
             <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
-              Pending approval ({pendingResearch?.length ?? 0})
+              {t('brain.research.pendingApproval', { count: pendingResearch?.length ?? 0 })}
             </p>
             {(pendingResearch ?? []).map((candidate) => (
               <ResearchCandidateCard
@@ -443,7 +474,7 @@ export function DesignBrainPage() {
             ))}
             {!pendingResearch?.length && (
               <p className="text-sm text-zinc-600 py-8 text-center">
-                No pending research. Run a search to discover knowledge from the open web.
+                {t('brain.research.emptyPending')}
               </p>
             )}
           </div>
@@ -468,15 +499,19 @@ function ResearchCandidateCard({
   isApproving: boolean;
   isRejecting: boolean;
 }) {
+  const t = useT();
+
   return (
     <div className="p-5 rounded-xl border border-amber-900/30 bg-amber-950/10 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm text-zinc-200 font-medium">{candidate.sourceTitle}</p>
-          <p className="text-[10px] text-zinc-500 mt-0.5">
-            Topic: {candidate.query}
+          <p className="text-xs text-zinc-500 mt-0.5">
+            {t('brain.research.topicPrefix', { query: candidate.query })}
             {typeof candidate.sourceScore === 'number' && (
-              <span className="text-violet-400"> · score {candidate.sourceScore.toFixed(2)}</span>
+              <span className="text-violet-400">
+                {t('brain.research.sourceScore', { score: candidate.sourceScore.toFixed(2) })}
+              </span>
             )}
           </p>
         </div>
@@ -486,13 +521,15 @@ function ResearchCandidateCard({
           rel="noopener noreferrer"
           className="text-zinc-500 hover:text-violet-400 shrink-0"
         >
-          <ExternalLink size={14} />
+          <ExternalLink size={16} />
         </a>
       </div>
       <p className="text-xs text-zinc-400">{candidate.summary}</p>
       {candidate.principles.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-[10px] text-zinc-500 uppercase">Extracted principles ({candidate.principles.length})</p>
+          <p className="text-xs text-zinc-500 uppercase">
+            {t('brain.research.extractedPrinciples', { count: candidate.principles.length })}
+          </p>
           {candidate.principles.map((p, i) => (
             <div key={i} className="text-xs p-2 rounded-lg bg-zinc-950/60">
               <span className="text-violet-400">[{p.category}]</span> {p.promptFragment}
@@ -511,8 +548,8 @@ function ResearchCandidateCard({
           disabled={isApproving || isRejecting}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-700 text-white text-xs font-medium hover:bg-emerald-600 disabled:opacity-50"
         >
-          {isApproving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-          Approve & learn
+          {isApproving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+          {t('brain.research.approveLearn')}
         </button>
         <button
           type="button"
@@ -520,8 +557,8 @@ function ResearchCandidateCard({
           disabled={isApproving || isRejecting}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700 disabled:opacity-50"
         >
-          {isRejecting ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-          Reject
+          {isRejecting ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+          {t('common.reject')}
         </button>
       </div>
     </div>
@@ -529,6 +566,8 @@ function ResearchCandidateCard({
 }
 
 function StatusPill({ ok, label, optional }: { ok?: boolean; label: string; optional?: boolean }) {
+  const t = useT();
+
   return (
     <span
       className={`px-2 py-0.5 rounded-full ${
@@ -539,7 +578,7 @@ function StatusPill({ ok, label, optional }: { ok?: boolean; label: string; opti
             : 'bg-red-900/30 text-red-300'
       }`}
     >
-      {label}: {ok ? 'OK' : optional ? 'fallback' : 'missing'}
+      {label}: {ok ? t('brain.status.ok') : optional ? t('brain.status.fallback') : t('brain.status.missing')}
     </span>
   );
 }
@@ -547,7 +586,7 @@ function StatusPill({ ok, label, optional }: { ok?: boolean; label: string; opti
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
-      <p className="text-[10px] text-zinc-500 uppercase tracking-wide">{label}</p>
+      <p className="text-xs text-zinc-500 uppercase tracking-wide">{label}</p>
       <p className="text-2xl font-semibold text-zinc-200 mt-1">{value}</p>
     </div>
   );
@@ -567,7 +606,7 @@ function IngestSection({
   return (
     <div className="p-5 rounded-xl border border-zinc-800 bg-zinc-900/40">
       <div className="flex items-center gap-2 mb-1">
-        <Icon size={16} className="text-violet-400" />
+        <Icon size={18} className="text-violet-400" />
         <h3 className="text-sm font-medium text-zinc-200">{title}</h3>
       </div>
       <p className="text-xs text-zinc-500 mb-4">{description}</p>
@@ -580,23 +619,74 @@ function FileUpload({
   accept,
   loading,
   disabled,
+  statusTitle,
+  progress,
   onFile,
 }: {
   accept: string;
   loading: boolean;
   disabled?: boolean;
+  statusTitle?: string;
+  progress?: {
+    pageCount?: number;
+    percent: number;
+    phase?: 'parsing' | 'processing' | 'done' | 'error' | 'waiting';
+  } | null;
   onFile: (file: File) => void;
 }) {
+  const t = useT();
+
+  const statusLine = progress?.pageCount
+    ? t('brain.pagesProcessing', { count: progress.pageCount })
+    : progress?.phase === 'parsing'
+      ? t('common.preparingPdf')
+      : loading
+        ? t('common.uploadingPdf')
+        : null;
+
+  const displayPercent = progress?.percent ?? null;
+
   return (
     <label
-      className={`flex flex-col items-center justify-center gap-2 p-8 rounded-xl border-2 border-dashed transition-colors ${
-        disabled
-          ? 'border-zinc-800 opacity-50 cursor-not-allowed'
-          : 'border-zinc-700 hover:border-violet-700 cursor-pointer'
+      className={`flex flex-col items-center justify-center gap-2 p-8 rounded-xl border-2 border-dashed transition-colors w-full ${
+        loading
+          ? 'border-violet-800/50 cursor-wait'
+          : disabled
+            ? 'border-zinc-800 opacity-50 cursor-not-allowed'
+            : 'border-zinc-700 hover:border-violet-700 cursor-pointer'
       }`}
     >
-      {loading ? <Loader2 size={24} className="animate-spin text-violet-400" /> : <Upload size={24} className="text-zinc-500" />}
-      <span className="text-xs text-zinc-500">{disabled ? 'Enter title first' : 'Click to upload'}</span>
+      {loading ? <Loader2 size={28} className="animate-spin text-violet-400" /> : <Upload size={28} className="text-zinc-500" />}
+      {loading ? (
+        statusTitle ? (
+          <>
+            <p className="text-xs text-zinc-200 text-center">
+              <span className="text-zinc-500">{t('brain.pdfLabel')}</span> {statusTitle}
+              <span className="text-violet-400 ml-1">{t('brain.ingest.inProgress')}</span>
+            </p>
+            {statusLine && (
+              <p className="text-xs text-zinc-500 text-center">{statusLine}</p>
+            )}
+            {displayPercent != null && (
+              <div className="w-full max-w-xs mt-1">
+                <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-violet-500 transition-all duration-300"
+                    style={{ width: `${displayPercent}%` }}
+                  />
+                </div>
+                <p className="text-xs text-violet-400 text-center mt-1">{displayPercent}%</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <span className="text-xs text-violet-400">{t('common.uploadingPdf')}</span>
+        )
+      ) : (
+        <span className="text-xs text-zinc-500">
+          {disabled ? t('common.enterTitleFirst') : t('common.clickToUpload')}
+        </span>
+      )}
       <input
         type="file"
         accept={accept}

@@ -235,17 +235,39 @@ export function designBriefToBriefContext(brief: {
   return Object.keys(ctx).length > 0 ? ctx : undefined;
 }
 
-/** Best-effort label for which Design Brief source set the era */
+/** Best-effort key for which Design Brief source set the era */
+export function getEraSourceKey(brief: {
+  sources: string[];
+  catalogReferenceIds?: string[];
+}): import('../i18n').MessageKey {
+  if ((brief.catalogReferenceIds?.length ?? 0) > 0 && brief.sources.includes('Logo Catalog')) {
+    return 'brief.source.logoCatalog';
+  }
+  if (brief.sources.includes('Brand DNA')) return 'brief.source.brandDna';
+  if (brief.sources.includes('Full Pipeline')) return 'brief.source.fullPipeline';
+  if (brief.sources.includes('Knowledge Graph')) return 'brief.source.knowledgeGraph';
+  if (brief.sources.includes('Geometry')) return 'brief.source.geometry';
+  if (brief.sources.includes('Style')) return 'brief.source.style';
+  if (brief.sources.includes('Client brief')) return 'brief.source.clientBrief';
+  if (brief.sources.includes('Brain interview')) return 'brief.source.brainInterview';
+  return 'brief.source.designBrief';
+}
+
+/** @deprecated use getEraSourceKey + t() */
 export function getEraSourceLabel(brief: {
   sources: string[];
   catalogReferenceIds?: string[];
 }): string {
-  if ((brief.catalogReferenceIds?.length ?? 0) > 0 && brief.sources.includes('Logo Catalog')) {
-    return 'Logo Catalog';
-  }
-  if (brief.sources.includes('Brand DNA')) return 'Brand DNA';
-  if (brief.sources.includes('Full Pipeline')) return 'Full Pipeline';
-  if (brief.sources.includes('Knowledge Graph')) return 'Knowledge Graph';
-  if (brief.sources.includes('Geometry')) return 'Geometry';
-  return brief.sources[0] ?? 'Design Brief';
+  const labels: Partial<Record<ReturnType<typeof getEraSourceKey>, string>> = {
+    'brief.source.logoCatalog': 'Logo Catalog',
+    'brief.source.brandDna': 'Brand DNA',
+    'brief.source.fullPipeline': 'Full Pipeline',
+    'brief.source.knowledgeGraph': 'Knowledge Graph',
+    'brief.source.geometry': 'Geometry',
+    'brief.source.style': 'Style',
+    'brief.source.clientBrief': 'Client brief',
+    'brief.source.brainInterview': 'Brain interview',
+    'brief.source.designBrief': 'Design Brief',
+  };
+  return labels[getEraSourceKey(brief)] ?? 'Design Brief';
 }

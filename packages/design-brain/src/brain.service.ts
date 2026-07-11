@@ -18,6 +18,11 @@ import { EMBEDDING_DIMENSIONS } from './storage/paths';
 import { ingestFeedback } from './ingest/ingest-feedback';
 import { ingestImage, type IngestImageOptions } from './ingest/ingest-image';
 import { ingestPdf, checkPdfIngest, type IngestPdfOptions } from './ingest/ingest-pdf';
+import {
+  clearPdfIngestProgress,
+  getPdfIngestProgress,
+  setPdfIngestProgress,
+} from './ingest/pdf-ingest-progress';
 import { ensureBrainSchema, isPgvectorEnabled } from './storage/pgvector';
 import {
   getExperienceById,
@@ -39,6 +44,7 @@ import {
   runWebResearch,
 } from './research/research.service';
 import { runBrainPromptPipeline, type BrainPipelineResult } from './reasoning/brain-prompt-pipeline';
+import { runBrainPartnerPipeline } from './reasoning/brain-partner-pipeline';
 import { runBriefInterview } from './reasoning/brain-architecture';
 import { generateWithCritiqueLoop } from './generation/critique-loop';
 
@@ -65,7 +71,26 @@ export class DesignBrainService {
 
   async ingestPdf(options: IngestPdfOptions): Promise<BrainIngestResult> {
     const client = await this.getClient();
-    return ingestPdf(client, options);
+    try {
+      return await ingestPdf(client, options);
+    } catch (error) {
+      if (options.jobId) {
+        setPdfIngestProgress(options.jobId, {
+          phase: 'error',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      throw error;
+    } finally {
+      // Keep progress available briefly so the client can read 100% before cleanup.
+      if (options.jobId) {
+        setTimeout(() => clearPdfIngestProgress(options.jobId!), 5000);
+      }
+    }
+  }
+
+  getPdfIngestProgress(jobId: string) {
+    return getPdfIngestProgress(jobId);
   }
 
   async checkPdfIngest(title: string, contentHash: string) {
@@ -148,7 +173,10 @@ export class DesignBrainService {
 
   async generate(request: BrainGenerateRequest): Promise<BrainPipelineResult> {
     const client = await this.getClient();
-    return runBrainPromptPipeline(client, request);
+    if (process.env.BRAIN_PARTNER_MODE === 'legacy') {
+      return runBrainPromptPipeline(client, request);
+    }
+    return runBrainPartnerPipeline(client, request);
   }
 
   async interviewBrief(input: {

@@ -8,6 +8,7 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -104,11 +105,21 @@ export class DesignBrainController {
     return this.service.checkPdfIngest(body.title, body.contentHash);
   }
 
+  @Get('ingest/pdf/progress/:jobId')
+  pdfIngestProgress(@Param('jobId') jobId: string) {
+    const progress = this.service.getPdfIngestProgress(jobId);
+    if (!progress) {
+      throw new NotFoundException('Progress not found');
+    }
+    return progress;
+  }
+
   @Post('ingest/pdf')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   ingestPdf(
     @UploadedFile() file: UploadedFile,
     @Body('title') title?: string,
+    @Body('jobId') jobId?: string,
   ) {
     if (!file?.buffer?.length) {
       throw new BadRequestException('PDF file is required (field name: file)');
@@ -116,7 +127,7 @@ export class DesignBrainController {
     if (!title?.trim()) {
       throw new BadRequestException('Title is required');
     }
-    return this.service.ingestPdf(file.buffer, file.originalname, title);
+    return this.service.ingestPdf(file.buffer, file.originalname, title, jobId?.trim());
   }
 
   @Post('ingest/image')

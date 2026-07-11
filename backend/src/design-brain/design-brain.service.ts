@@ -71,12 +71,12 @@ export class DesignBrainApiService {
     return designBrain.rejectResearch(id);
   }
 
-  ingestPdf(buffer: Buffer, originalName: string, title: string) {
+  ingestPdf(buffer: Buffer, originalName: string, title: string, jobId?: string) {
     const trimmed = title?.trim();
     if (!trimmed) {
       throw new BadRequestException('Title is required');
     }
-    return designBrain.ingestPdf({ buffer, originalName, title: trimmed }).catch((error) => {
+    return designBrain.ingestPdf({ buffer, originalName, title: trimmed, jobId }).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       if (
         message.includes('no extractable text') ||
@@ -105,6 +105,10 @@ export class DesignBrainApiService {
       throw new BadRequestException('contentHash is required');
     }
     return designBrain.checkPdfIngest(trimmed, contentHash.trim());
+  }
+
+  getPdfIngestProgress(jobId: string) {
+    return designBrain.getPdfIngestProgress(jobId);
   }
 
   ingestImage(buffer: Buffer, originalName: string, title?: string, mimeType?: string) {

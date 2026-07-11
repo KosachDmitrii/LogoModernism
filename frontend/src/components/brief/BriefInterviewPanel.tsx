@@ -6,8 +6,11 @@ import { useAppStore } from '../../store';
 import { runBriefInterview } from '../../api';
 import type { BriefInterviewResponse } from '../../types';
 import { designBriefToBriefContext, parseMarkTypeFromBrief } from '../../lib/brief-mappers';
+import { useT } from '../../i18n';
+import { formatError } from '../../lib/api-error';
 
 export function BriefInterviewPanel() {
+  const t = useT();
   const industry = useAppStore((s) => s.industry);
   const companyName = useAppStore((s) => s.companyName);
   const designBrief = useAppStore((s) => s.designBrief);
@@ -48,12 +51,10 @@ export function BriefInterviewPanel() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <MessageCircleQuestion size={14} />
-            Brain Brief Interview
+            <MessageCircleQuestion size={16} />
+            {t('brief.interview.title')}
           </p>
-          <p className="text-[10px] text-zinc-500 mt-1">
-            Design Brain asks targeted questions — only explicit client forbids go to Avoid.
-          </p>
+          <p className="text-xs text-zinc-500 mt-1">{t('brief.analyze.intro')}</p>
         </div>
         <button
           type="button"
@@ -61,21 +62,21 @@ export function BriefInterviewPanel() {
           disabled={interview.isPending || !industry.trim()}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-xs hover:bg-zinc-700 disabled:opacity-50"
         >
-          {interview.isPending ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-          Analyze brief
+          {interview.isPending ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          {t('brief.analyze.button')}
         </button>
       </div>
 
       {interview.isError && (
-        <p className="text-[10px] text-red-400">
-          {interview.error instanceof Error ? interview.error.message : 'Interview failed'}
+        <p className="text-xs text-red-400">
+          {formatError(interview.error, t)}
         </p>
       )}
 
       {result && (
         <div className="space-y-3 pt-2 border-t border-zinc-800">
-          <div className="flex items-center justify-between text-[10px]">
-            <span className="text-zinc-500">Readiness</span>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-zinc-500">{t('brief.analyze.readiness')}</span>
             <span
               className={clsx(
                 'font-mono',
@@ -89,23 +90,23 @@ export function BriefInterviewPanel() {
               {result.readinessScore}%
             </span>
           </div>
-          <p className="text-[10px] text-zinc-400 leading-relaxed">{result.summary}</p>
+          <p className="text-xs text-zinc-400 leading-relaxed">{result.summary}</p>
 
           {result.clientIntent && (
-            <div className="p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-[10px] text-zinc-500 space-y-1">
+            <div className="p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-500 space-y-1">
               <p>
-                <span className="text-zinc-400">Abstraction:</span>{' '}
+                <span className="text-zinc-400">{t('brief.analyze.abstraction')}:</span>{' '}
                 {result.clientIntent.abstractionLevel}
               </p>
               {result.clientIntent.desiredMotifs.length > 0 && (
                 <p>
-                  <span className="text-zinc-400">Desired:</span>{' '}
+                  <span className="text-zinc-400">{t('brief.analyze.desired')}:</span>{' '}
                   {result.clientIntent.desiredMotifs.join(', ')}
                 </p>
               )}
               {result.clientIntent.forbiddenMotifs.length > 0 && (
                 <p>
-                  <span className="text-zinc-400">Forbidden:</span>{' '}
+                  <span className="text-zinc-400">{t('brief.analyze.forbidden')}:</span>{' '}
                   {result.clientIntent.forbiddenMotifs.join(', ')}
                 </p>
               )}
@@ -113,13 +114,13 @@ export function BriefInterviewPanel() {
           )}
 
           {result.questions.length === 0 ? (
-            <p className="text-[10px] text-emerald-400">Brief is complete — ready for generation.</p>
+            <p className="text-xs text-emerald-400">{t('brief.analyze.complete')}</p>
           ) : (
             <ul className="space-y-3">
               {result.questions.map((q) => (
                 <li key={q.id} className="space-y-1.5">
                   <p className="text-xs text-zinc-300">{q.prompt}</p>
-                  <p className="text-[9px] text-zinc-600">{q.why}</p>
+                  <p className="text-[11px] text-zinc-600">{q.why}</p>
                   {q.options ? (
                     <div className="flex flex-wrap gap-1.5">
                       {q.options.map((opt) => (
@@ -128,7 +129,7 @@ export function BriefInterviewPanel() {
                           type="button"
                           onClick={() => applyAnswer(q.id, q.field, opt)}
                           className={clsx(
-                            'px-2 py-1 rounded text-[10px] border transition-colors',
+                            'px-2 py-1 rounded text-xs border transition-colors',
                             answers[q.id] === opt
                               ? 'border-zinc-500 bg-zinc-800 text-zinc-200'
                               : 'border-zinc-800 text-zinc-500 hover:border-zinc-700',
@@ -141,7 +142,7 @@ export function BriefInterviewPanel() {
                   ) : (
                     <input
                       type="text"
-                      placeholder="Your answer…"
+                      placeholder={t('common.yourAnswer')}
                       value={answers[q.id] ?? ''}
                       onChange={(e) => applyAnswer(q.id, q.field, e.target.value)}
                       className="w-full px-2 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 placeholder:text-zinc-600"

@@ -6,8 +6,11 @@ import { useAppStore } from '../../store';
 import { runBriefInterview } from '../../api';
 import type { BriefInterviewResponse } from '../../types';
 import { designBriefToBriefContext, parseMarkTypeFromBrief } from '../../lib/brief-mappers';
+import { useT } from '../../i18n';
+import { formatError } from '../../lib/api-error';
 
 export function BriefAnalyzeSection() {
+  const t = useT();
   const industry = useAppStore((s) => s.industry);
   const companyName = useAppStore((s) => s.companyName);
   const designBrief = useAppStore((s) => s.designBrief);
@@ -55,10 +58,9 @@ export function BriefAnalyzeSection() {
 
   return (
     <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-      <p className="text-[10px] text-zinc-500 leading-relaxed flex items-start gap-1.5">
+      <p className="text-xs text-zinc-500 leading-relaxed flex items-start gap-1.5">
         <MessageCircleQuestion size={11} className="shrink-0 mt-0.5" />
-        Brain reads the whole brief, finds gaps, and asks only what is missing — explicit forbids go to
-        Avoid.
+        {t('brief.analyze.intro')}
       </p>
 
       <button
@@ -68,27 +70,27 @@ export function BriefAnalyzeSection() {
         className="w-full px-3 py-2 rounded-lg bg-violet-900/50 hover:bg-violet-900/70 border border-violet-800/50 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {interview.isPending ? (
-          <Loader2 size={12} className="animate-spin" />
+          <Loader2 size={14} className="animate-spin" />
         ) : (
-          <Sparkles size={12} />
+          <Sparkles size={14} />
         )}
-        Analyze brief
+        {t('brief.analyze.button')}
       </button>
 
       {!canAnalyze && (
-        <p className="text-[10px] text-amber-300/80">Set industry on the Project step first.</p>
+        <p className="text-xs text-amber-300/80">{t('brief.typography.setIndustryFirst')}</p>
       )}
 
       {interview.isError && (
-        <p className="text-[10px] text-red-400">
-          {interview.error instanceof Error ? interview.error.message : 'Analyze brief failed'}
+        <p className="text-xs text-red-400">
+          {formatError(interview.error, t)}
         </p>
       )}
 
       {result && (
         <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
-          <div className="flex items-center justify-between text-[10px]">
-            <span className="text-zinc-500">Readiness</span>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-zinc-500">{t('brief.analyze.readiness')}</span>
             <span
               className={clsx(
                 'font-mono',
@@ -102,12 +104,12 @@ export function BriefAnalyzeSection() {
               {result.readinessScore}%
             </span>
           </div>
-          <p className="text-[10px] text-zinc-400">{result.summary}</p>
+          <p className="text-xs text-zinc-400">{result.summary}</p>
 
           {result.clientIntent && (
-            <div className="text-[10px] text-zinc-500 space-y-0.5 pt-1 border-t border-zinc-800">
+            <div className="text-xs text-zinc-500 space-y-0.5 pt-1 border-t border-zinc-800">
               <p>
-                <span className="text-zinc-400">Abstraction:</span>{' '}
+                <span className="text-zinc-400">{t('brief.analyze.abstraction')}</span>{' '}
                 {result.clientIntent.abstractionLevel}
               </p>
               {result.clientIntent.desiredMotifs.length > 0 && (
@@ -126,13 +128,13 @@ export function BriefAnalyzeSection() {
           )}
 
           {result.questions.length === 0 ? (
-            <p className="text-[10px] text-emerald-400 pt-1">Brief is complete — ready to generate.</p>
+            <p className="text-xs text-emerald-400 pt-1">{t('brief.analyze.complete')}</p>
           ) : (
             <ul className="space-y-2 pt-1">
               {result.questions.map((q) => (
                 <li key={q.id} className="space-y-1">
-                  <p className="text-[11px] text-zinc-300">{q.prompt}</p>
-                  <p className="text-[9px] text-zinc-600">{q.why}</p>
+                  <p className="text-[13px] text-zinc-300">{q.prompt}</p>
+                  <p className="text-[11px] text-zinc-600">{q.why}</p>
                   {q.options ? (
                     <div className="flex flex-wrap gap-1">
                       {q.options.map((opt) => (
@@ -141,7 +143,7 @@ export function BriefAnalyzeSection() {
                           type="button"
                           onClick={() => applyAnswer(q.id, q.field, opt)}
                           className={clsx(
-                            'px-2 py-0.5 rounded text-[9px] border transition-colors',
+                            'px-2 py-0.5 rounded text-[11px] border transition-colors',
                             answers[q.id] === opt
                               ? 'border-zinc-500 bg-zinc-800 text-zinc-200'
                               : 'border-zinc-800 text-zinc-500 hover:border-zinc-600',
@@ -154,10 +156,10 @@ export function BriefAnalyzeSection() {
                   ) : (
                     <input
                       type="text"
-                      placeholder="Your answer…"
+                      placeholder={t('common.yourAnswer')}
                       value={answers[q.id] ?? ''}
                       onChange={(e) => applyAnswer(q.id, q.field, e.target.value)}
-                      className="w-full px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-300"
+                      className="w-full px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-300"
                     />
                   )}
                 </li>

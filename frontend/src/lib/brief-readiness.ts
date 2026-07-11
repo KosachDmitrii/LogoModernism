@@ -1,21 +1,22 @@
+import type { MessageKey } from '../i18n';
 import type { DesignBrief } from '../types';
 
 export interface BriefReadiness {
   score: number;
-  label: string;
+  labelKey: MessageKey;
   filled: number;
   total: number;
-  hints: string[];
+  hintKeys: MessageKey[];
 }
 
-const CHECKS: Array<{ label: string; check: (b: DesignBrief) => boolean }> = [
-  { label: 'Brief source', check: (b) => b.sources.length > 0 },
-  { label: 'Era', check: (b) => Boolean(b.era.trim()) },
-  { label: 'Mark type', check: (b) => Boolean(b.markType) },
-  { label: 'Typography', check: (b) => Boolean(b.typography.trim()) },
-  { label: 'Geometry', check: (b) => Boolean(b.geometry.trim() || b.preferredShapes.trim()) },
-  { label: 'Narrative', check: (b) => Boolean(b.narrative.trim()) },
-  { label: 'Color palette', check: (b) => Boolean(b.colorPalette && b.colorPalette !== 'auto') },
+const CHECKS: Array<{ labelKey: MessageKey; check: (b: DesignBrief) => boolean }> = [
+  { labelKey: 'brief.readiness.check.briefSource', check: (b) => b.sources.length > 0 },
+  { labelKey: 'brief.readiness.check.era', check: (b) => Boolean(b.era.trim()) },
+  { labelKey: 'brief.readiness.check.markType', check: (b) => Boolean(b.markType) },
+  { labelKey: 'brief.readiness.check.typography', check: (b) => Boolean(b.typography.trim()) },
+  { labelKey: 'brief.readiness.check.geometry', check: (b) => Boolean(b.geometry.trim() || b.preferredShapes.trim()) },
+  { labelKey: 'brief.readiness.check.narrative', check: (b) => Boolean(b.narrative.trim()) },
+  { labelKey: 'brief.readiness.check.colorPalette', check: (b) => Boolean(b.colorPalette && b.colorPalette !== 'auto') },
 ];
 
 export function getBriefReadiness(brief: DesignBrief): BriefReadiness {
@@ -23,21 +24,21 @@ export function getBriefReadiness(brief: DesignBrief): BriefReadiness {
   const total = CHECKS.length;
   const score = Math.round((filled / total) * 100);
 
-  const hints: string[] = [];
+  const hintKeys: MessageKey[] = [];
   if (brief.sources.length === 0) {
-    hints.push('Run Typography, Shapes, or Style on the Build tab');
+    hintKeys.push('brief.readiness.hint.runBuild');
   }
   if (!brief.geometry.trim() && !brief.preferredShapes.trim() && brief.sources.length > 0) {
-    hints.push('Add shapes in step 2 or references in step 4 (Logo Catalog)');
+    hintKeys.push('brief.readiness.hint.addShapes');
   }
   if ((brief.catalogReferenceIds?.length ?? 0) === 0 && brief.sources.length > 0) {
-    hints.push('Optional: add references in step 4 — References');
+    hintKeys.push('brief.readiness.hint.addReferences');
   }
 
-  let label = 'Empty';
-  if (score >= 80) label = 'Ready';
-  else if (score >= 50) label = 'Partial';
-  else if (score > 0) label = 'Started';
+  let labelKey: MessageKey = 'brief.readiness.empty';
+  if (score >= 80) labelKey = 'brief.readiness.ready';
+  else if (score >= 50) labelKey = 'brief.readiness.partial';
+  else if (score > 0) labelKey = 'brief.readiness.started';
 
-  return { score, label, filled, total, hints };
+  return { score, labelKey, filled, total, hintKeys };
 }

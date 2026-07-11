@@ -5,16 +5,19 @@ import { useAppStore } from '../../store';
 import { applyStyleToBrief } from '../../lib/apply-brief';
 import type { DesignBrief } from '../../types';
 import { parseMarkTypeFromBrief } from '../../lib/brief-mappers';
+import { useT, type MessageKey } from '../../i18n';
+import { formatError } from '../../lib/api-error';
 
-const COLOR_OPTIONS: Array<{ value: DesignBrief['colorPalette']; label: string }> = [
-  { value: '', label: 'Auto (from rules)' },
-  { value: 'black_white', label: 'Black & white only' },
-  { value: 'monochrome', label: 'Monochrome' },
-  { value: 'two_color', label: 'Two-color max' },
-  { value: 'limited', label: 'Limited palette' },
+const COLOR_OPTIONS: Array<{ value: DesignBrief['colorPalette']; labelKey: MessageKey }> = [
+  { value: '', labelKey: 'brief.style.autoFromRules' },
+  { value: 'black_white', labelKey: 'brief.style.blackWhite' },
+  { value: 'monochrome', labelKey: 'brief.style.monochrome' },
+  { value: 'two_color', labelKey: 'brief.style.twoColor' },
+  { value: 'limited', labelKey: 'brief.style.limited' },
 ];
 
 export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => void }) {
+  const t = useT();
   const industry = useAppStore((s) => s.industry);
   const designBrief = useAppStore((s) => s.designBrief);
   const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
@@ -41,7 +44,7 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-[10px] font-medium text-zinc-500 mb-1">Color palette</label>
+        <label className="block text-xs font-medium text-zinc-500 mb-1">{t('brief.style.colorPalette')}</label>
         <select
           value={designBrief.colorPalette}
           onChange={(e) =>
@@ -56,7 +59,7 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
         >
           {COLOR_OPTIONS.map((option) => (
             <option key={option.value || 'empty'} value={option.value}>
-              {option.label}
+              {t(option.labelKey)}
             </option>
           ))}
         </select>
@@ -72,32 +75,32 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
         className="w-full px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium disabled:opacity-40 flex items-center justify-center gap-2"
       >
         {analysis.isPending ? (
-          <Loader2 size={12} className="animate-spin" />
+          <Loader2 size={14} className="animate-spin" />
         ) : (
-          <Palette size={12} />
+          <Palette size={14} />
         )}
-        Apply style to brief
+        {t('brief.style.apply')}
       </button>
 
       {!industry.trim() && (
-        <p className="text-[10px] text-zinc-600">Set industry on the Project step first.</p>
+        <p className="text-xs text-zinc-600">{t('brief.typography.setIndustryFirst')}</p>
       )}
       {industry.trim() && !designBrief.colorPalette && (
-        <p className="text-[10px] text-zinc-600">Choose a color palette, then apply.</p>
+        <p className="text-xs text-zinc-600">{t('brief.style.choosePalette')}</p>
       )}
 
       {analysis.isError && (
-        <p className="text-[10px] text-red-400">
-          {analysis.error instanceof Error ? analysis.error.message : 'Style analysis failed'}
+        <p className="text-xs text-red-400">
+          {formatError(analysis.error, t)}
         </p>
       )}
 
       {analysis.data && (
         <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1">
-          <p className="text-[10px] text-emerald-400/80">Style applied to brief</p>
+          <p className="text-xs text-emerald-400/80">{t('brief.style.applied')}</p>
           {analysis.data.recommendedLayout?.name && (
-            <p className="text-[10px] text-zinc-500">
-              Layout: {analysis.data.recommendedLayout.name}
+            <p className="text-xs text-zinc-500">
+              {t('brief.style.layoutLabel')}: {analysis.data.recommendedLayout.name}
             </p>
           )}
         </div>

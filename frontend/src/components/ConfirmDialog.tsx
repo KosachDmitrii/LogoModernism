@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { X } from 'lucide-react';
+import { useT } from '../i18n';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -19,13 +20,16 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
   icon,
   tone = 'default',
 }: ConfirmDialogProps) {
+  const t = useT();
+  const resolvedConfirmLabel = confirmLabel ?? t('common.confirm');
+  const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
   const titleId = useId();
   const descriptionId = useId();
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -54,7 +58,7 @@ export function ConfirmDialog({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <button
         type="button"
-        aria-label="Close dialog"
+        aria-label={t('common.closeDialog')}
         className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
         onClick={onCancel}
       />
@@ -84,9 +88,10 @@ export function ConfirmDialog({
             <button
               type="button"
               onClick={onCancel}
+              aria-label={t('common.closeDialog')}
               className="shrink-0 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
             >
-              <X size={16} />
+              <X size={18} />
             </button>
           </div>
         </div>
@@ -97,7 +102,7 @@ export function ConfirmDialog({
             onClick={onCancel}
             className="px-4 py-2.5 rounded-xl text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-zinc-800 transition-colors"
           >
-            {cancelLabel}
+            {resolvedCancelLabel}
           </button>
           <button
             ref={confirmRef}
@@ -110,7 +115,7 @@ export function ConfirmDialog({
                 : 'bg-zinc-100 text-zinc-900 hover:bg-white',
             )}
           >
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </button>
         </div>
       </div>

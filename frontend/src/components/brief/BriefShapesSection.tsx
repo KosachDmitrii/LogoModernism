@@ -4,6 +4,8 @@ import { Loader2, Plus, X } from 'lucide-react';
 import clsx from 'clsx';
 import { analyzeGeometry, getPrimitives } from '../../api';
 import { useAppStore } from '../../store';
+import { useT } from '../../i18n';
+import { formatError } from '../../lib/api-error';
 
 interface GeometryRec {
   primitiveId: string;
@@ -20,6 +22,7 @@ interface Primitive {
 }
 
 export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => void }) {
+  const t = useT();
   const industry = useAppStore((s) => s.industry);
   const applyGeometry = useAppStore((s) => s.applyGeometry);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -66,7 +69,7 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
       const prim = primById.get(id);
       return {
         name: prim?.name ?? id,
-        reason: 'Added from primitive library',
+        reason: t('brief.shapes.addedFromLibrary'),
       };
     });
 
@@ -78,6 +81,7 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
   };
 
   const canAnalyze = Boolean(industry.trim());
+  const primitiveCount = (primitives as Primitive[] | undefined)?.length ?? 0;
 
   return (
     <div className="space-y-3 relative z-10" onClick={(e) => e.stopPropagation()}>
@@ -87,24 +91,26 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
         disabled={!canAnalyze || analysis.isPending}
         className="w-full px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {analysis.isPending && <Loader2 size={12} className="animate-spin" />}
-        Analyze Shapes
+        {analysis.isPending && <Loader2 size={14} className="animate-spin" />}
+        {t('brief.shapes.analyze')}
       </button>
 
       {!canAnalyze && (
-        <p className="text-[10px] text-amber-300/80">Set industry on the Project step first.</p>
+        <p className="text-xs text-amber-300/80">{t('brief.typography.setIndustryFirst')}</p>
       )}
 
       {analysis.isError && (
-        <p className="text-[10px] text-red-400">
-          {analysis.error instanceof Error ? analysis.error.message : 'Shapes analysis failed'}
+        <p className="text-xs text-red-400">
+          {formatError(analysis.error, t)}
         </p>
       )}
 
       {analysis.data && recommendations.length > 0 && (
         <>
-          <p className="text-[10px] text-zinc-500">
-            Selected {selectedIds.length} shape{selectedIds.length === 1 ? '' : 's'}
+          <p className="text-xs text-zinc-500">
+            {selectedIds.length === 1
+              ? t('brief.shapes.selectedCount', { count: selectedIds.length })
+              : t('brief.shapes.selectedCountPlural', { count: selectedIds.length })}
           </p>
           <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
             {recommendations.map((rec) => {
@@ -122,8 +128,8 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
                   )}
                 >
                   <div className="flex justify-between items-start mb-1 pr-4">
-                    <span className="text-[10px] font-medium truncate">{rec.name}</span>
-                    <span className="text-[10px] text-zinc-500">{rec.score}/10</span>
+                    <span className="text-xs font-medium truncate">{rec.name}</span>
+                    <span className="text-xs text-zinc-500">{rec.score}/10</span>
                   </div>
                   <svg viewBox="0 0 100 100" className="w-full h-10 stroke-zinc-300 fill-none">
                     <path d={rec.svgPreview} strokeWidth="2" />
@@ -144,7 +150,7 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
             onClick={handleApply}
             className="w-full px-3 py-2 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-xs font-medium disabled:opacity-40"
           >
-            Apply shapes to brief
+            {t('brief.shapes.apply')}
           </button>
 
           {primitives && (
@@ -152,9 +158,10 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
               <button
                 type="button"
                 onClick={() => setExpanded((v) => !v)}
-                className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                className="text-xs text-zinc-500 hover:text-zinc-300"
               >
-                {expanded ? 'Hide' : 'Show'} primitive library ({(primitives as Primitive[]).length})
+                {expanded ? t('brief.shapes.hideLibrary') : t('brief.shapes.showLibrary')}{' '}
+                {t('brief.shapes.primitiveLibrary', { count: primitiveCount })}
               </button>
               {expanded && (
                 <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto">
@@ -175,7 +182,7 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
                         <svg viewBox="0 0 100 100" className="w-full h-8 stroke-zinc-400 fill-none">
                           <path d={p.svgPath} strokeWidth="2" />
                         </svg>
-                        <p className="text-[9px] text-zinc-500 truncate">{p.name}</p>
+                        <p className="text-[11px] text-zinc-500 truncate">{p.name}</p>
                       </button>
                     );
                   })}

@@ -17,6 +17,10 @@
   scrollbar-color: #3f3f46 var(--color-surface);
 }
 
+html {
+  font-size: 106.25%; /* 17px — slightly larger UI type & rem-based Tailwind */
+}
+
 body {
   margin: 0;
   min-height: 100vh;

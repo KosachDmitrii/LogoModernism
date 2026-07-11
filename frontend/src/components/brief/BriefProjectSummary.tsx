@@ -1,20 +1,23 @@
 import { useAppStore } from '../../store';
 import { eraToInspiration } from '../../lib/brief-mappers';
+import { industryLabel } from '../../lib/translate-labels';
+import { useT, type MessageKey } from '../../i18n';
 
-const INSPIRATION_LABELS: Record<string, string> = {
-  swiss: 'Swiss',
-  bauhaus: 'Bauhaus',
-  ibm: 'IBM',
-  nasa: 'NASA',
-  lufthansa: 'Lufthansa',
-  braun: 'Braun',
-  cbs: 'CBS',
-  abc: 'ABC',
-  olivetti: 'Olivetti',
-  westinghouse: 'Westinghouse',
+const INSPIRATION_LABEL_KEYS: Record<string, MessageKey> = {
+  swiss: 'prompts.inspiration.swiss',
+  bauhaus: 'prompts.inspiration.bauhaus',
+  ibm: 'prompts.inspiration.ibm',
+  nasa: 'prompts.inspiration.nasa',
+  lufthansa: 'prompts.inspiration.lufthansa',
+  braun: 'prompts.inspiration.braun',
+  cbs: 'prompts.inspiration.cbs',
+  abc: 'prompts.inspiration.abc',
+  olivetti: 'prompts.inspiration.olivetti',
+  westinghouse: 'prompts.inspiration.westinghouse',
 };
 
 export function BriefProjectSummary() {
+  const t = useT();
   const industry = useAppStore((s) => s.industry);
   const companyName = useAppStore((s) => s.companyName);
   const preferredEra = useAppStore((s) => s.preferredEra);
@@ -25,25 +28,28 @@ export function BriefProjectSummary() {
   const inspiration =
     inspirationMode ||
     (designBrief.era.trim() ? eraToInspiration(designBrief.era) : '');
-  const brandLabel = companyName.trim() ? companyName.trim() : 'Symbol only (no name)';
+  const brandLabel = companyName.trim()
+    ? companyName.trim()
+    : t('brief.projectSummary.symbolOnly');
+
+  const inspirationLabel = inspiration
+    ? INSPIRATION_LABEL_KEYS[inspiration]
+      ? t(INSPIRATION_LABEL_KEYS[inspiration])
+      : inspiration.replace(/_/g, ' ')
+    : '';
 
   return (
     <div className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800 space-y-2">
-      <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-        From Project
+      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+        {t('brief.projectSummary.title')}
       </p>
       <div className="flex flex-wrap gap-1.5">
-        {industry.trim() && <Chip label={industry} />}
+        {industry.trim() && <Chip label={industryLabel(industry, t)} />}
         <Chip label={brandLabel} muted={!companyName.trim()} />
         {era && <Chip label={era} />}
-        {inspiration && (
-          <Chip label={INSPIRATION_LABELS[inspiration] ?? inspiration.replace(/_/g, ' ')} />
-        )}
+        {inspirationLabel && <Chip label={inspirationLabel} />}
       </div>
-      <p className="text-[10px] text-zinc-600">
-        Change industry, name, or era on the{' '}
-        <span className="text-zinc-500">Project</span> step.
-      </p>
+      <p className="text-xs text-zinc-600">{t('brief.projectSummary.changeOnProject')}</p>
     </div>
   );
 }
@@ -51,7 +57,7 @@ export function BriefProjectSummary() {
 function Chip({ label, muted }: { label: string; muted?: boolean }) {
   return (
     <span
-      className={`text-[10px] px-2 py-0.5 rounded-full border capitalize ${
+      className={`text-xs px-2 py-0.5 rounded-full border capitalize ${
         muted
           ? 'border-zinc-700 bg-zinc-900 text-zinc-400'
           : 'border-zinc-700 bg-zinc-800/60 text-zinc-300'

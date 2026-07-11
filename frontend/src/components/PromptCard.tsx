@@ -11,6 +11,9 @@ import { LogoFeedbackBar } from './LogoFeedbackBar';
 import { useAppStore, useIsGenerating, usePromptImages } from '../store';
 import { generatePromptLogo, togglePromptSave } from '../api';
 import { parseLogoMarkType, parseTypographyStyle } from '../lib/brief-mappers';
+import { useT } from '../i18n';
+import { formatError } from '../lib/api-error';
+import { imageProviderLabel } from '../lib/translate-labels';
 
 const MAX_LOGOS = 3;
 
@@ -31,6 +34,7 @@ export function PromptCard({
   standalone = false,
   onStateChange,
 }: PromptCardProps) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const companyName = useAppStore((s) => s.companyName);
   const designBrief = useAppStore((s) => s.designBrief);
@@ -90,7 +94,7 @@ export function PromptCard({
       }
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : 'Image generation failed');
+      alert(formatError(err, t));
     } finally {
       stopGenerating(prompt.id);
     }
@@ -120,7 +124,7 @@ export function PromptCard({
             <span className="text-xs font-mono text-zinc-500">#{rank}</span>
           )}
           <span className="text-xs font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">
-            Q {(prompt.scores?.promptQuality ?? 0).toFixed(1)}
+            {t('prompts.card.qualityPrefix')} {(prompt.scores?.promptQuality ?? 0).toFixed(1)}
           </span>
           <span className="text-xs text-zinc-500">{prompt.metadata?.era}</span>
         </div>
@@ -131,10 +135,10 @@ export function PromptCard({
               e.stopPropagation();
               copy();
             }}
-            title="Copy prompt"
+            title={t('common.copyPrompt')}
             className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? <Check size={16} /> : <Copy size={16} />}
           </button>
           <button
             type="button"
@@ -143,7 +147,7 @@ export function PromptCard({
               e.stopPropagation();
               toggleSave.mutate();
             }}
-            title={saved ? 'Remove from saved' : 'Save prompt'}
+            title={saved ? t('common.removeFromSaved') : t('common.savePrompt')}
             className={clsx(
               'p-1.5 rounded-lg transition-colors disabled:opacity-50',
               saved
@@ -152,9 +156,9 @@ export function PromptCard({
             )}
           >
             {toggleSave.isPending ? (
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin" />
             ) : (
-              <Heart size={14} className={saved ? 'fill-current' : undefined} />
+              <Heart size={16} className={saved ? 'fill-current' : undefined} />
             )}
           </button>
         </div>
@@ -167,12 +171,12 @@ export function PromptCard({
           disabled={isGenerating || atLogoLimit}
           className="mb-4 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-medium hover:bg-zinc-700 disabled:opacity-50"
         >
-          {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+          {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
           {isGenerating
-            ? 'Generating…'
+            ? t('common.generating')
             : atLogoLimit
-              ? `Maximum ${MAX_LOGOS} logos`
-              : `Generate Logo Image (${logos.length}/${MAX_LOGOS})`}
+              ? t('prompts.card.maximumLogos', { max: MAX_LOGOS })
+              : t('prompts.card.generateLogoImage', { current: logos.length, max: MAX_LOGOS })}
         </button>
       )}
 
@@ -192,13 +196,13 @@ export function PromptCard({
               <div className="rounded-lg overflow-hidden border-b border-zinc-800 bg-white">
                 <img
                   src={image.url}
-                  alt={`Generated logo ${index + 1}`}
+                  alt={t('prompts.card.generatedLogoAlt', { index: index + 1 })}
                   className="w-full aspect-square object-contain bg-white"
                 />
               </div>
               <div className="px-2 py-1.5 flex items-center justify-between bg-zinc-950">
-                <span className="text-[9px] text-zinc-500 uppercase tracking-wide truncate">
-                  {image.provider === 'openai' ? image.model ?? 'OpenAI' : 'Mock'}
+                <span className="text-[11px] text-zinc-500 uppercase tracking-wide truncate">
+                  {imageProviderLabel(image.provider, image.model, t)}
                 </span>
                 <a
                   href={image.url}
@@ -206,7 +210,7 @@ export function PromptCard({
                   onClick={(e) => e.stopPropagation()}
                   className="text-zinc-400 hover:text-zinc-200 shrink-0"
                 >
-                  <Download size={12} />
+                  <Download size={14} />
                 </a>
               </div>
               <div className="px-2 pb-2">
@@ -231,10 +235,10 @@ export function PromptCard({
           animate={{ opacity: 1, height: 'auto' }}
           className="space-y-2 pt-3 border-t border-zinc-800"
         >
-          <ScoreBar label="Modernism" value={prompt.scores?.modernismScore ?? 0} />
-          <ScoreBar label="Swiss" value={prompt.scores?.swissScore ?? 0} />
-          <ScoreBar label="Minimalism" value={prompt.scores?.minimalismScore ?? 0} />
-          <ScoreBar label="Geometry" value={prompt.scores?.geometryScore ?? 0} />
+          <ScoreBar label={t('prompts.card.scoreModernism')} value={prompt.scores?.modernismScore ?? 0} />
+          <ScoreBar label={t('prompts.card.scoreSwiss')} value={prompt.scores?.swissScore ?? 0} />
+          <ScoreBar label={t('prompts.card.scoreMinimalism')} value={prompt.scores?.minimalismScore ?? 0} />
+          <ScoreBar label={t('prompts.card.scoreGeometry')} value={prompt.scores?.geometryScore ?? 0} />
           {prompt.metadata.briefCoverage && prompt.metadata.briefCoverage.length > 0 && (
             <BriefCoverageMap
               designBrief={designBrief}
@@ -247,7 +251,7 @@ export function PromptCard({
             {prompt.selectedPrinciples?.slice(0, 8).map((p) => (
               <span
                 key={p.id}
-                className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400"
+                className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400"
               >
                 {p.name}
               </span>
@@ -257,7 +261,7 @@ export function PromptCard({
       )}
 
       {toggleSave.isError && (
-        <p className="text-[10px] text-red-400 mt-1">Failed to save prompt</p>
+        <p className="text-xs text-red-400 mt-1">{t('common.failedToSavePrompt')}</p>
       )}
     </article>
   );

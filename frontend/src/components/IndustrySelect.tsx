@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useT, type MessageKey } from '../i18n';
+import { en } from '../i18n/en';
 
 /** Curated industries backed by knowledge-base industry principles */
 export const INDUSTRY_OPTIONS = [
@@ -38,6 +40,11 @@ export const INDUSTRY_OPTIONS = [
 
 const ANOTHER = '__another__';
 
+function industryLabelKey(opt: string): MessageKey | null {
+  const key = `industries.${opt}` as MessageKey;
+  return key in en ? key : null;
+}
+
 interface IndustrySelectProps {
   value: string;
   onChange: (value: string) => void;
@@ -45,9 +52,15 @@ interface IndustrySelectProps {
 }
 
 export function IndustrySelect({ value, onChange, className }: IndustrySelectProps) {
+  const t = useT();
   const isKnown = INDUSTRY_OPTIONS.includes(value);
   const [customMode, setCustomMode] = useState(() => value !== '' && !isKnown);
   const showCustom = customMode || (value !== '' && !isKnown);
+
+  const displayLabel = (opt: string) => {
+    const key = industryLabelKey(opt);
+    return key ? t(key) : opt;
+  };
 
   return (
     <div className={className ? `space-y-2 ${className}` : 'space-y-2'}>
@@ -65,14 +78,14 @@ export function IndustrySelect({ value, onChange, className }: IndustrySelectPro
         className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:border-zinc-600"
       >
         <option value="" disabled>
-          Select industry…
+          {t('industries.selectPlaceholder')}
         </option>
         {INDUSTRY_OPTIONS.map((opt) => (
           <option key={opt} value={opt}>
-            {opt}
+            {displayLabel(opt)}
           </option>
         ))}
-        <option value={ANOTHER}>Another…</option>
+        <option value={ANOTHER}>{t('industries.another')}</option>
       </select>
       {showCustom && (
         <input
@@ -80,7 +93,7 @@ export function IndustrySelect({ value, onChange, className }: IndustrySelectPro
           autoFocus
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Type your industry…"
+          placeholder={t('industries.customPlaceholder')}
           className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:border-zinc-600 placeholder:text-zinc-600"
         />
       )}

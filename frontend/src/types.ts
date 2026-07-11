@@ -30,6 +30,66 @@ export interface LogoDNA {
   harmony: string[];
 }
 
+export interface CreativeTerritory {
+  id: string;
+  name: string;
+  thesis: string;
+  markArchitecture: string;
+  constructionFocus: string;
+  typographyFocus: string;
+  colorApproach: string;
+  confidence: number;
+  tradeoffs: string[];
+}
+
+export type CreativeTerritoryId =
+  | 'territory-primary'
+  | 'territory-construction'
+  | 'territory-typography';
+
+export type PromptCountOption = 1 | 3 | 5;
+
+export interface ConstraintReport {
+  passed: boolean;
+  score: number;
+  violations: Array<{
+    code: string;
+    severity: 'error' | 'warning';
+    message: string;
+    suggestion?: string;
+  }>;
+}
+
+export interface CatalogIntelligenceResult {
+  referenceIds: string[];
+  recommendations: Array<{ id: string; name: string; industryScore: number }>;
+  narrative: string;
+  autoSelected: boolean;
+}
+
+export interface DesignCriticResult {
+  recognizability: number;
+  scalability: number;
+  balance: number;
+  contrast: number;
+  simplicity: number;
+  modernity: number;
+  registrability: number;
+  overallScore: number;
+  feedback: string[];
+}
+
+export interface BrainPartnerState {
+  partnerMode: true;
+  creativeTerritories: CreativeTerritory[];
+  selectedTerritoryId: string;
+  constraintReport: ConstraintReport;
+  critique?: DesignCriticResult;
+  catalogIntelligence: CatalogIntelligenceResult;
+  partnerAttempts: number;
+  territorySelectionMode: 'auto' | 'manual';
+}
+
 export interface ComposedPrompt {
   id: string;
   text: string;
@@ -56,6 +116,9 @@ export interface ComposedPrompt {
     reasoning?: string;
     confidence?: number;
     brainArchitecture?: BrainArchitecture;
+    creativeTerritory?: CreativeTerritory;
+    constraintReport?: ConstraintReport;
+    partnerCritique?: DesignCriticResult;
   };
 }
 
@@ -155,6 +218,14 @@ export interface GenerateResponse {
   prompts: ComposedPrompt[];
   recommendations: Recommendation[];
   bestPrompt: ComposedPrompt;
+  brainPowered?: boolean;
+  partnerMode?: boolean;
+  creativeTerritories?: CreativeTerritory[];
+  selectedTerritoryId?: string;
+  constraintReport?: ConstraintReport;
+  critique?: DesignCriticResult;
+  catalogIntelligence?: CatalogIntelligenceResult;
+  partnerAttempts?: number;
 }
 
 export interface RecommendResponse {
@@ -233,7 +304,7 @@ export interface SavedProject {
   industry: string;
   companyName: string;
   updatedAt: number;
-  variationCount: number;
+  variationCount: PromptCountOption;
   inspirationMode: string;
   preferredEra: string;
   minimalismLevel: number;
@@ -241,6 +312,7 @@ export interface SavedProject {
   prompts: ComposedPrompt[];
   recommendations: Recommendation[];
   selectedPromptId: string | null;
+  brainPartner: BrainPartnerState | null;
 }
 
 export const EMPTY_DESIGN_BRIEF: DesignBrief = {
@@ -336,6 +408,16 @@ export interface BrainPdfIngestCheck {
   contentHash: string;
   bookTitle: string;
   message: string;
+}
+
+export type BrainPdfIngestPhase = 'parsing' | 'processing' | 'done' | 'error';
+
+export interface BrainPdfIngestProgress {
+  phase: BrainPdfIngestPhase;
+  pageCount?: number;
+  totalChunks?: number;
+  processedChunks?: number;
+  message?: string;
 }
 
 export interface BrainIngestResult {

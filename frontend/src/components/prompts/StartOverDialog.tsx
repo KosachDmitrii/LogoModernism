@@ -1,5 +1,6 @@
 import { RotateCcw } from 'lucide-react';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { useT } from '../../i18n';
 
 interface StartOverDialogProps {
   open: boolean;
@@ -8,17 +9,19 @@ interface StartOverDialogProps {
 }
 
 export function StartOverDialog({ open, onConfirm, onCancel }: StartOverDialogProps) {
+  const t = useT();
+
   return (
     <ConfirmDialog
       open={open}
-      title="Start over?"
-      description="This clears your current session: industry, company name, design brief, and generated prompts. Saved favorites and Brain feedback are kept."
-      confirmLabel="Start over"
-      cancelLabel="Keep working"
+      title={t('prompts.startOver.title')}
+      description={t('prompts.startOver.description')}
+      confirmLabel={t('prompts.startOver.confirm')}
+      cancelLabel={t('prompts.startOver.cancel')}
       tone="danger"
       onConfirm={onConfirm}
       onCancel={onCancel}
-      icon={<RotateCcw size={18} />}
+      icon={<RotateCcw size={20} />}
     />
   );
 }

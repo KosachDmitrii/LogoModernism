@@ -35,6 +35,7 @@ export class PromptsController {
       typographyStyle: dto.typographyStyle,
       briefContext: dto.briefContext,
       useBrain: dto.useBrain,
+      preferredTerritoryId: dto.preferredTerritoryId,
     };
 
     const { result, promptsWithLogos } = await this.promptsService.generateAndPersist(request);
@@ -59,6 +60,17 @@ export class PromptsController {
         decision: brainResult.decision,
         tasteProfile: brainResult.tasteProfile,
         retrievedExperiences: brainResult.retrievedExperiences,
+        ...(brainResult.partnerMode
+          ? {
+              partnerMode: true,
+              creativeTerritories: brainResult.creativeTerritories,
+              selectedTerritoryId: brainResult.selectedTerritoryId,
+              constraintReport: brainResult.constraintReport,
+              critique: brainResult.critique,
+              catalogIntelligence: brainResult.catalogIntelligence,
+              partnerAttempts: brainResult.partnerAttempts,
+            }
+          : {}),
       };
     }
 

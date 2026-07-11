@@ -61,6 +61,10 @@ export class GeneratePromptDto {
   @IsOptional()
   @IsBoolean()
   useBrain?: boolean;
+
+  @IsOptional()
+  @IsIn(['territory-primary', 'territory-construction', 'territory-typography'])
+  preferredTerritoryId?: 'territory-primary' | 'territory-construction' | 'territory-typography';
 }
 
 export class SearchPrinciplesDto {
