@@ -8,6 +8,7 @@ import type {
 import {
   buildDesignStrategy,
   buildClientAvoidFragments,
+  isStyleAntiPatternMotif,
 } from '@logo-platform/shared';
 import { analyzeClientIntent } from './client-intent-analyzer';
 import { solveConstraints } from './constraint-solver';
@@ -32,7 +33,12 @@ export async function buildBrainArchitecture(
     clientIntent = {
       ...clientIntent,
       desiredMotifs: [...new Set([...clientIntent.desiredMotifs, ...projectMemory.likedMotifs])],
-      forbiddenMotifs: [...new Set([...clientIntent.forbiddenMotifs, ...projectMemory.dislikedMotifs])],
+      forbiddenMotifs: [
+        ...new Set([
+          ...clientIntent.forbiddenMotifs,
+          ...projectMemory.dislikedMotifs.filter((motif) => !isStyleAntiPatternMotif(motif)),
+        ]),
+      ],
     };
   }
 

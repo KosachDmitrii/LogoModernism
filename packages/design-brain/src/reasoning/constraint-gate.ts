@@ -8,6 +8,7 @@ import type {
 } from '@logo-platform/shared';
 import {
   hasExplicitBrandName,
+  isStyleAntiPatternMotif,
   normalizeBrandName,
   stylePreferenceOverrides,
 } from '@logo-platform/shared';
@@ -134,8 +135,11 @@ export function evaluateConstraintCompliance(
   }
 
   for (const forbidden of architecture.clientIntent.forbiddenMotifs) {
-    const token = forbidden.toLowerCase().split(/\s+/)[0] ?? forbidden;
-    if (token.length > 3 && recommends(lower, token)) {
+    if (isStyleAntiPatternMotif(forbidden)) continue;
+    const motif = forbidden.trim();
+    if (motif.length <= 3) continue;
+    // Prefer full phrase so "literal reference" does not match every "literal …"
+    if (recommends(lower, motif.toLowerCase())) {
       pushViolation(
         violations,
         ctx,

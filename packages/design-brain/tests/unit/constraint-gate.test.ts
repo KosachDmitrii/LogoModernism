@@ -131,6 +131,47 @@ describe('evaluateConstraintCompliance', () => {
     expect(report.violations.some((v) => v.code === 'photoreal_forbidden')).toBe(false);
   });
 
+  it('does not treat style anti-patterns as client motif conflicts', () => {
+    const architecture = {
+      ...baseArchitecture,
+      clientIntent: {
+        ...baseArchitecture.clientIntent,
+        forbiddenMotifs: ['photoreal', 'literal reference', 'mascot'],
+      },
+    };
+    const report = evaluateConstraintCompliance(
+      baseDecision,
+      prompt(
+        'Minimal geometric wordmark for NovaPay. Flat vector Swiss modernism. Avoid: photorealism, mockups. Without literal reference.',
+      ),
+      architecture,
+      request,
+    );
+    expect(report.violations.some((v) => v.code === 'forbidden_motif' && v.message.includes('photoreal'))).toBe(
+      false,
+    );
+    expect(
+      report.violations.some((v) => v.code === 'forbidden_motif' && v.message.includes('literal reference')),
+    ).toBe(false);
+  });
+
+  it('still flags real forbidden motifs when positively recommended', () => {
+    const architecture = {
+      ...baseArchitecture,
+      clientIntent: {
+        ...baseArchitecture.clientIntent,
+        forbiddenMotifs: ['mascot'],
+      },
+    };
+    const report = evaluateConstraintCompliance(
+      baseDecision,
+      prompt('NovaPay logo with a friendly mascot character as the hero mark.'),
+      architecture,
+      request,
+    );
+    expect(report.violations.some((v) => v.code === 'forbidden_motif')).toBe(true);
+  });
+
   it('flags forbidden motifs from client intent', () => {
     const report = evaluateConstraintCompliance(
       baseDecision,

@@ -119,7 +119,9 @@ export function buildViolationResolutions(
         briefSide: briefSide('forbiddenMotifs', motif),
         outputSide: outputSide('promptText', `Uses "${motif}"`, excerptAround(promptText, motif.split(/\s+/)[0] ?? motif)),
         resolutions: [
-          keepBriefRecompose(`Hard constraint — never use ${motif}. Remove entirely from the prompt.`),
+          keepBriefRecompose(
+            `Hard constraint — remove ${motif} entirely from the prompt and avoid list wording that recommends it.`,
+          ),
           {
             id: 'allow_motif',
             briefPatch: {
@@ -132,7 +134,7 @@ export function buildViolationResolutions(
             id: 'territory_typography',
             compose: {
               preferredTerritoryId: 'territory-typography',
-              appendConstraints: `Avoid ${motif} entirely — typography-led direction without emblem or badge structure.`,
+              appendConstraints: `Typography-led direction without emblem or badge structure; remove ${motif} from the mark.`,
             },
           },
         ],
@@ -159,7 +161,9 @@ export function buildViolationResolutions(
         briefSide: briefSide('allowPhotoreal', 'Flat vector required'),
         outputSide: outputSide('promptText', `Mentions "${term}"`, excerptAround(promptText, term)),
         resolutions: [
-          keepBriefRecompose('Flat vector logo only — no photoreal, 3D render, or mockup language.'),
+          keepBriefRecompose(
+            'Flat vector logo only — remove photographic rendering, mockup presentation, and 3D render language.',
+          ),
           {
             id: 'allow_photoreal',
             briefPatch: { allowPhotoreal: true },

@@ -37,6 +37,33 @@ const INTERVIEW_BOILERPLATE_MOTIFS = new Set([
   'combination',
 ]);
 
+/**
+ * Style / rendering anti-patterns — handled by allowPhotoreal, allowShadows, palette,
+ * and Avoid: lists. Must not become "client forbids motif" conflicts (that creates a loop
+ * when keep-brief resolutions append "no photoreal" back into constraints).
+ */
+const STYLE_ANTI_PATTERN_MOTIFS = [
+  'photoreal',
+  'photorealism',
+  'photorealistic',
+  'mockup',
+  'mockups',
+  'gradient',
+  'gradients',
+  'shadow',
+  'shadows',
+  '3d',
+  '3d render',
+  'busy backgrounds',
+  'stock clipart',
+  'flat vector',
+  'literal reference',
+  'literal references',
+  'literal clipart',
+  'emblem badge format',
+  'circular bracket template',
+];
+
 function unique(items: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -49,6 +76,20 @@ function unique(items: string[]): string[] {
   return result;
 }
 
+/** True when a parsed "forbidden motif" is really a style rule, not a visual motif. */
+export function isStyleAntiPatternMotif(motif: string): boolean {
+  const lower = motif.toLowerCase().trim();
+  if (!lower) return true;
+  if (STYLE_ANTI_PATTERN_MOTIFS.some((item) => lower === item || lower.includes(item))) {
+    return true;
+  }
+  // "never use photoreal" → extractForbidden can yield "use photoreal"
+  if (/^use\s+/.test(lower) && STYLE_ANTI_PATTERN_MOTIFS.some((item) => lower.includes(item))) {
+    return true;
+  }
+  return false;
+}
+
 function extractForbidden(text: string): string[] {
   const found: string[] = [];
   for (const pattern of FORBIDDEN_PATTERNS) {
@@ -59,7 +100,7 @@ function extractForbidden(text: string): string[] {
       if (!chunk || chunk.length < 3) continue;
       for (const part of chunk.split(/\band\b|,|\//)) {
         const trimmed = part.trim();
-        if (trimmed.length >= 3) found.push(trimmed);
+        if (trimmed.length >= 3 && !isStyleAntiPatternMotif(trimmed)) found.push(trimmed);
       }
     }
   }
@@ -138,7 +179,11 @@ export function mergeClientVisualIntent(
     ...base,
     ...patch,
     desiredMotifs: unique([...base.desiredMotifs, ...(patch.desiredMotifs ?? [])]),
-    forbiddenMotifs: unique([...base.forbiddenMotifs, ...(patch.forbiddenMotifs ?? [])]),
+    forbiddenMotifs: unique(
+      [...base.forbiddenMotifs, ...(patch.forbiddenMotifs ?? [])].filter(
+        (motif) => !isStyleAntiPatternMotif(motif),
+      ),
+    ),
     personality: unique([...base.personality, ...(patch.personality ?? [])]),
     visualTone: unique([...base.visualTone, ...(patch.visualTone ?? [])]),
     explicitRequests: unique([...base.explicitRequests, ...(patch.explicitRequests ?? [])]),
