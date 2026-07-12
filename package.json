@@ -31,7 +31,8 @@
     "test:brain:eval": "npm run test:eval -w @logo-platform/design-brain",
     "test:backend:e2e": "npm run test:e2e -w @logo-platform/backend",
     "dev:backend": "npm run dev -w @logo-platform/backend",
-    "dev:frontend": "npm run dev -w @logo-platform/frontend"
+    "dev:frontend": "npm run dev -w @logo-platform/frontend",
+    "start:backend": "npm run start -w @logo-platform/backend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

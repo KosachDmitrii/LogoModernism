@@ -1,0 +1,21 @@
+# Railway / Nixpacks — monorepo backend deploy (root directory MUST be repo root, not backend/)
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+dependsOn = ["setup"]
+# devDependencies needed for TypeScript build (tsc, nest-cli)
+cmds = ["npm ci --include=dev"]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = [
+  "npm run build:packages",
+  "npm run build -w @logo-platform/backend",
+]
+
+[start]
+cmd = "npm run start -w @logo-platform/backend"
+
+[variables]
+NODE_ENV = "production"
