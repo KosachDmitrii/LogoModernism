@@ -1,4 +1,5 @@
 # Railway / Nixpacks — monorepo backend deploy (root directory MUST be repo root, not backend/)
+# Do NOT set a custom Build Command in Railway UI that runs npm ci again — install phase already does it.
 [phases.setup]
 nixPkgs = ["nodejs_22"]
 
