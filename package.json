@@ -40,7 +40,7 @@
     "wait-on": "^9.0.10"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "optionalDependencies": {
     "lightningcss-darwin-arm64": "^1.32.0"
