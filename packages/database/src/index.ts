@@ -13,7 +13,13 @@ function createPrismaClient(): PrismaClient {
 
   return base.$extends({
     query: {
-      $allOperations({ args, query }) {
+      $allOperations({
+        args,
+        query,
+      }: {
+        args: unknown;
+        query: (args: unknown) => Promise<unknown>;
+      }) {
         return runWithPrismaReconnect(base, () => query(args));
       },
     },
@@ -27,7 +33,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 if (process.env.DATABASE_URL) {
-  void prisma.$connect().catch((error) => {
+  void prisma.$connect().catch((error: unknown) => {
     console.error(
       '[database] Initial PostgreSQL connection failed:',
       error instanceof Error ? error.message : error,

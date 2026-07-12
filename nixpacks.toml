@@ -1,6 +1,6 @@
 # Railway / Nixpacks — monorepo backend deploy (root directory MUST be repo root, not backend/)
 [phases.setup]
-nixPkgs = ["nodejs_20"]
+nixPkgs = ["nodejs_22"]
 
 [phases.install]
 dependsOn = ["setup"]
