@@ -49,14 +49,45 @@ export type CreativeTerritoryId =
 
 export type PromptCountOption = 1 | 3 | 5;
 
+export interface ConstraintConflictSide {
+  role: 'brief' | 'output';
+  fieldKey: string;
+  value: string;
+  excerpt?: string;
+}
+
+export interface ConstraintResolutionPatch {
+  colorPalette?: DesignBrief['colorPalette'];
+  allowShadows?: boolean;
+  allowPhotoreal?: boolean;
+  markType?: DesignBrief['markType'];
+  appendConstraints?: string;
+  appendClientNotes?: string;
+}
+
+export interface ConstraintResolutionCompose {
+  preferredTerritoryId?: CreativeTerritoryId;
+  appendConstraints?: string;
+}
+
+export interface ConstraintResolution {
+  id: string;
+  briefPatch?: ConstraintResolutionPatch;
+  compose?: ConstraintResolutionCompose;
+}
+
 export interface ConstraintReport {
   passed: boolean;
   score: number;
   violations: Array<{
+    id: string;
     code: string;
     severity: 'error' | 'warning';
     message: string;
     suggestion?: string;
+    briefSide?: ConstraintConflictSide;
+    outputSide?: ConstraintConflictSide;
+    resolutions?: ConstraintResolution[];
   }>;
 }
 

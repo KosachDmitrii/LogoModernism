@@ -7,6 +7,11 @@
 #   Env:    VITE_API_URL=https://logomodernism-production.up.railway.app/api
 #           FRONTEND_URL=https://<frontend-host>  (on backend service)
 #           CORS_ORIGINS=https://<frontend-host>,http://localhost:5173
+#
+# Persistent data (Railway dashboard → backend service → Volumes):
+#   Mount path: /app/persistent
+#   Stores: PDF uploads, generated logos, research candidates
+#   Catalog (data/catalog-pipeline) stays in the repo image — do NOT mount over /app/data
 
 [build]
 builder = "nixpacks"

@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { generatePrompts } from '../api';
 import { useAppStore } from '../store';
-import type { BrainPartnerState, CreativeTerritoryId } from '../types';
+import type { BrainPartnerState, CreativeTerritoryId, DesignBrief } from '../types';
 import {
   designBriefToBriefContext,
   parseEraFromBrief,
@@ -14,6 +14,8 @@ import {
 export interface ComposePromptsOptions {
   /** When set, brain applies this creative territory to reasoning and prompts */
   preferredTerritoryId?: CreativeTerritoryId;
+  /** Use this brief snapshot instead of the current store value (e.g. after conflict resolution) */
+  briefOverride?: DesignBrief;
 }
 
 function toBrainPartnerState(
@@ -55,26 +57,26 @@ export function useComposePrompts() {
     setResults,
   } = useAppStore();
 
-  const hasDesignBrief = designBrief.sources.length > 0;
-
   return useMutation({
     mutationFn: (options?: ComposePromptsOptions) => {
-      const era = hasDesignBrief
-        ? parseEraFromBrief(designBrief.era)
-        : parseEraFromBrief(preferredEra) ?? parseEraFromBrief(designBrief.era);
-      const principleIds = designBrief.principleIds ?? [];
+      const activeBrief = options?.briefOverride ?? designBrief;
+      const hasActiveBrief = activeBrief.sources.length > 0;
+      const era = hasActiveBrief
+        ? parseEraFromBrief(activeBrief.era)
+        : parseEraFromBrief(preferredEra) ?? parseEraFromBrief(activeBrief.era);
+      const principleIds = activeBrief.principleIds ?? [];
       const analysisPrincipleIds = principleIds.length > 0 ? principleIds : undefined;
-      const catalogIds = designBrief.catalogReferenceIds ?? [];
+      const catalogIds = activeBrief.catalogReferenceIds ?? [];
       const catalogReferenceIds = catalogIds.length > 0 ? catalogIds : undefined;
-      const markType = parseMarkTypeFromBrief(designBrief);
-      const typographyStyle = parseTypographyStyleFromBrief(designBrief);
+      const markType = parseMarkTypeFromBrief(activeBrief);
+      const typographyStyle = parseTypographyStyleFromBrief(activeBrief);
       const brandName = companyName.trim() || undefined;
       const logoMarkType = parseLogoMarkType(
-        markType ?? designBrief.markType,
+        markType ?? activeBrief.markType,
         brandName,
       );
       const briefContext = (() => {
-        const ctx = designBriefToBriefContext(designBrief);
+        const ctx = designBriefToBriefContext(activeBrief);
         if (!ctx || brandName) return ctx;
         const { typography: _typography, ...symbolOnlyContext } = ctx;
         return Object.keys(symbolOnlyContext).length > 0 ? symbolOnlyContext : undefined;
@@ -84,19 +86,24 @@ export function useComposePrompts() {
         industry: industry.trim(),
         companyName: brandName,
         variationCount,
-        inspirationMode: hasDesignBrief ? undefined : inspirationMode || undefined,
+        inspirationMode: hasActiveBrief ? undefined : inspirationMode || undefined,
         minimalismLevel,
         preferredEra: era,
         analysisPrincipleIds,
         catalogReferenceIds,
-        catalogNarrative: catalogReferenceIds ? designBrief.narrative || undefined : undefined,
+        catalogNarrative: catalogReferenceIds ? activeBrief.narrative || undefined : undefined,
         markType: logoMarkType,
-        typographyStyle: brandName ? typographyStyle : parseTypographyStyle(designBrief.typographyStyle),
+        typographyStyle: brandName ? typographyStyle : parseTypographyStyle(activeBrief.typographyStyle),
         briefContext,
         preferredTerritoryId: options?.preferredTerritoryId,
       }).then((data) => ({ data, options }));
     },
     onSuccess: ({ data, options }) => {
+      if (options?.briefOverride) {
+        setResults(data.prompts, data.recommendations, toBrainPartnerState(data, options));
+        useAppStore.setState({ designBrief: options.briefOverride });
+        return;
+      }
       setResults(data.prompts, data.recommendations, toBrainPartnerState(data, options));
     },
   });

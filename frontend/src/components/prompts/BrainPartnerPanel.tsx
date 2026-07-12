@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import {
-  AlertTriangle,
   ArrowRight,
   BookOpen,
   Brain,
@@ -12,21 +11,24 @@ import {
   Sparkles,
   XCircle,
 } from 'lucide-react';
-import type { BrainPartnerState, CreativeTerritory, CreativeTerritoryId } from '../../types';
+import { ConstraintConflictCard } from './ConstraintConflictCard';
+import type { BrainPartnerState, ConstraintResolution, CreativeTerritory, CreativeTerritoryId } from '../../types';
 import { useT, type MessageKey } from '../../i18n';
 
 export interface ComposeTerritoryOptions {
   preferredTerritoryId?: CreativeTerritoryId;
 }
 
-export type PartnerRegenerateAction = 'new-variations' | 're-pick' | 'apply';
+export type PartnerRegenerateAction = 'new-variations' | 're-pick' | 'apply' | 'resolve-conflict';
 
 interface BrainPartnerPanelProps {
   partner: BrainPartnerState;
   regeneratingAction?: PartnerRegenerateAction | null;
+  resolvingViolationId?: string | null;
   onApplyTerritory: (territoryId: CreativeTerritoryId) => void;
   onRegenerateAuto: () => void;
   onNewVariations: () => void;
+  onResolveConflict: (violationId: string, resolution: ConstraintResolution) => void;
 }
 
 const WORKFLOW_STEPS: Array<{
@@ -112,9 +114,11 @@ function TerritoryCard({
 export function BrainPartnerPanel({
   partner,
   regeneratingAction = null,
+  resolvingViolationId = null,
   onApplyTerritory,
   onRegenerateAuto,
   onNewVariations,
+  onResolveConflict,
 }: BrainPartnerPanelProps) {
   const t = useT();
   const [viewTerritoryId, setViewTerritoryId] = useState(partner.selectedTerritoryId);
@@ -329,27 +333,17 @@ export function BrainPartnerPanel({
           {partner.constraintReport.violations.length === 0 ? (
             <p className="text-xs text-zinc-500">{t('prompts.partner.constraintsSatisfied')}</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {[...errors, ...warnings].map((violation) => (
-                <li
-                  key={`${violation.code}-${violation.message}`}
-                  className={clsx(
-                    'rounded-lg border px-3 py-2 text-xs',
-                    violation.severity === 'error'
-                      ? 'border-red-500/20 bg-red-500/5 text-red-200/90'
-                      : 'border-amber-500/20 bg-amber-500/5 text-amber-200/90',
-                  )}
-                >
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle size={11} className="shrink-0 mt-0.5 opacity-70" />
-                    <div>
-                      <p>{violation.message}</p>
-                      {violation.suggestion && (
-                        <p className="text-zinc-500 mt-1">{violation.suggestion}</p>
-                      )}
-                    </div>
-                  </div>
-                </li>
+                <ConstraintConflictCard
+                  key={violation.id}
+                  violation={violation}
+                  isApplying={
+                    regeneratingAction === 'resolve-conflict' &&
+                    resolvingViolationId === violation.id
+                  }
+                  onApply={(resolution) => onResolveConflict(violation.id, resolution)}
+                />
               ))}
             </ul>
           )}

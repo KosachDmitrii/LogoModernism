@@ -175,6 +175,31 @@ export const ru: Record<MessageKey, string> = {
   'prompts.partner.issuesFound': 'Есть проблемы',
   'prompts.partner.autoSelected': 'автовыбор',
 
+  'prompts.conflict.roleBrief': 'Бриф',
+  'prompts.conflict.roleOutput': 'Промпт / направление',
+  'prompts.conflict.chooseResolution': 'Выберите, как разрешить конфликт',
+  'prompts.conflict.applyResolution': 'Применить и пересобрать промпты',
+  'prompts.conflict.field.colorPalette': 'Цветовая палитра',
+  'prompts.conflict.field.forbiddenMotifs': 'Запрещённые мотивы',
+  'prompts.conflict.field.promptText': 'Текст промпта',
+  'prompts.conflict.field.markType': 'Тип знака',
+  'prompts.conflict.field.allowShadows': 'Тени',
+  'prompts.conflict.field.allowPhotoreal': 'Стиль рендера',
+  'prompts.conflict.field.companyName': 'Имя бренда',
+  'prompts.conflict.field.constraints': 'Ограничения',
+  'prompts.conflict.resolution.keepBrief': 'Сохранить правило брифа — пересобрать промпт без нарушения',
+  'prompts.conflict.resolution.editBrand': 'Сохранить имя бренда — жёстко прописать в промпте',
+  'prompts.conflict.resolution.allowTwoColor': 'Разрешить акцентный цвет — сменить палитру на two-color',
+  'prompts.conflict.resolution.allowMultiColor': 'Разрешить цвет — сменить палитру на multi-color',
+  'prompts.conflict.resolution.allowMotif': 'Разрешить мотив — снять запрет в брифе',
+  'prompts.conflict.resolution.territoryTypography': 'Сменить направление — typography-led, без emblem/badge',
+  'prompts.conflict.resolution.allowShadows': 'Разрешить тени — ослабить правило flat vector',
+  'prompts.conflict.resolution.allowPhotoreal': 'Разрешить photoreal / 3D — ослабить правило flat vector',
+  'prompts.conflict.resolution.allowWordmark': 'Разрешить типографику — wordmark в брифе',
+  'prompts.conflict.resolution.allowTypography': 'Разрешить типографику — combination mark в брифе',
+  'prompts.conflict.resolution.useBriefMarkType': 'Использовать тип знака из брифа',
+  'prompts.conflict.resolution.useBrainMarkType': 'Использовать тип знака, выбранный brain',
+
   // brief
   'brief.optionalIntro':
     'Бриф опционален, но улучшает качество промптов. Build заполняет решения; Review позволяет отредактировать перед генерацией.',
@@ -243,10 +268,6 @@ export const ru: Record<MessageKey, string> = {
   'brief.build.section.analyzeDescription': 'Brain ищет пробелы и спрашивает, чего не хватает',
   'brief.build.status.done': 'готово',
   'brief.build.status.pending': 'ожидает',
-
-  'brief.projectSummary.title': 'Из проекта',
-  'brief.projectSummary.symbolOnly': 'Только символ (без названия)',
-  'brief.projectSummary.changeOnProject': 'Индустрию, название или эру меняйте на шаге Проект.',
 
   'brief.typography.markType': 'Тип знака',
   'brief.typography.typographyStyle': 'Стиль типографики',

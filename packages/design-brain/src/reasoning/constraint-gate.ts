@@ -11,6 +11,7 @@ import {
   normalizeBrandName,
   stylePreferenceOverrides,
 } from '@logo-platform/shared';
+import { enrichViolation, type ViolationContext } from './constraint-resolutions';
 
 function recommends(prompt: string, term: string): boolean {
   const lower = prompt.toLowerCase();
@@ -19,6 +20,15 @@ function recommends(prompt: string, term: string): boolean {
   if (new RegExp(`(no|without|avoid|not)\\s+[\\w\\s-]{0,20}${t}`, 'i').test(lower)) return false;
   if (new RegExp(`avoid[^.]{0,80}${t}`, 'i').test(lower)) return false;
   return true;
+}
+
+function pushViolation(
+  violations: ConstraintViolation[],
+  ctx: ViolationContext,
+  base: Omit<ConstraintViolation, 'id' | 'briefSide' | 'outputSide' | 'resolutions'>,
+  details: Record<string, string> = {},
+): void {
+  violations.push(enrichViolation(base, ctx, details));
 }
 
 export function evaluateConstraintCompliance(
@@ -33,9 +43,10 @@ export function evaluateConstraintCompliance(
   const brand = normalizeBrandName(request.companyName);
   const style = stylePreferenceOverrides(request.briefContext);
   const colorPalette = request.briefContext?.colorPalette;
+  const ctx: ViolationContext = { promptText: text, decision, request, architecture };
 
   if (brand && !lower.includes(brand.toLowerCase())) {
-    violations.push({
+    pushViolation(violations, ctx, {
       code: 'brand_missing',
       severity: 'error',
       message: `Prompt must include brand name "${brand}"`,
@@ -45,14 +56,14 @@ export function evaluateConstraintCompliance(
 
   if (!hasExplicitBrandName(brand)) {
     if (decision.markType === 'wordmark' || decision.markType === 'lettermark') {
-      violations.push({
+      pushViolation(violations, ctx, {
         code: 'symbol_only_mark_type',
         severity: 'error',
         message: 'Symbol-only brief cannot use wordmark or lettermark',
       });
     }
     if (/\bwordmark\b|\blettermark\b|\btypography\b/.test(lower) && !lower.includes('no text')) {
-      violations.push({
+      pushViolation(violations, ctx, {
         code: 'symbol_only_text',
         severity: 'error',
         message: 'Symbol-only brief must not require typography in the prompt',
@@ -63,17 +74,22 @@ export function evaluateConstraintCompliance(
   if (colorPalette === 'black_white' || colorPalette === 'monochrome') {
     for (const term of ['gradient', 'multicolor', 'rainbow', 'accent color', 'vibrant palette']) {
       if (recommends(lower, term)) {
-        violations.push({
-          code: 'palette_violation',
-          severity: 'error',
-          message: `Monochrome brief must not recommend ${term}`,
-        });
+        pushViolation(
+          violations,
+          ctx,
+          {
+            code: 'palette_violation',
+            severity: 'error',
+            message: `Monochrome brief must not recommend ${term}`,
+          },
+          { term },
+        );
       }
     }
   }
 
   if (!style.allowShadows && recommends(lower, 'shadow')) {
-    violations.push({
+    pushViolation(violations, ctx, {
       code: 'shadows_forbidden',
       severity: 'error',
       message: 'Brief disallows shadows',
@@ -83,11 +99,16 @@ export function evaluateConstraintCompliance(
   if (!style.allowPhotoreal) {
     for (const term of ['photoreal', '3d render', 'mockup', 'realistic photo']) {
       if (recommends(lower, term)) {
-        violations.push({
-          code: 'photoreal_forbidden',
-          severity: 'error',
-          message: `Brief requires flat vector — found "${term}"`,
-        });
+        pushViolation(
+          violations,
+          ctx,
+          {
+            code: 'photoreal_forbidden',
+            severity: 'error',
+            message: `Brief requires flat vector — found "${term}"`,
+          },
+          { term },
+        );
       }
     }
   }
@@ -95,24 +116,34 @@ export function evaluateConstraintCompliance(
   for (const forbidden of architecture.clientIntent.forbiddenMotifs) {
     const token = forbidden.toLowerCase().split(/\s+/)[0] ?? forbidden;
     if (token.length > 3 && recommends(lower, token)) {
-      violations.push({
-        code: 'forbidden_motif',
-        severity: 'error',
-        message: `Client forbids motif: ${forbidden}`,
-      });
+      pushViolation(
+        violations,
+        ctx,
+        {
+          code: 'forbidden_motif',
+          severity: 'error',
+          message: `Client forbids motif: ${forbidden}`,
+        },
+        { motif: forbidden },
+      );
     }
   }
 
   if (request.markType && decision.markType !== request.markType) {
-    violations.push({
-      code: 'mark_type_mismatch',
-      severity: 'warning',
-      message: `Requested mark type ${request.markType}, decision used ${decision.markType}`,
-    });
+    pushViolation(
+      violations,
+      ctx,
+      {
+        code: 'mark_type_mismatch',
+        severity: 'warning',
+        message: `Requested mark type ${request.markType}, decision used ${decision.markType}`,
+      },
+      { requested: request.markType },
+    );
   }
 
   if (text.length < 80) {
-    violations.push({
+    pushViolation(violations, ctx, {
       code: 'prompt_too_short',
       severity: 'warning',
       message: 'Enriched prompt is unusually short',

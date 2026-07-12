@@ -171,6 +171,31 @@ export const en = {
   'prompts.partner.issuesFound': 'Issues found',
   'prompts.partner.autoSelected': 'auto-selected',
 
+  'prompts.conflict.roleBrief': 'Brief says',
+  'prompts.conflict.roleOutput': 'Prompt / direction says',
+  'prompts.conflict.chooseResolution': 'Choose how to resolve this conflict',
+  'prompts.conflict.applyResolution': 'Apply & rebuild prompts',
+  'prompts.conflict.field.colorPalette': 'Color palette',
+  'prompts.conflict.field.forbiddenMotifs': 'Forbidden motifs',
+  'prompts.conflict.field.promptText': 'Prompt text',
+  'prompts.conflict.field.markType': 'Mark type',
+  'prompts.conflict.field.allowShadows': 'Shadows',
+  'prompts.conflict.field.allowPhotoreal': 'Rendering style',
+  'prompts.conflict.field.companyName': 'Brand name',
+  'prompts.conflict.field.constraints': 'Constraints',
+  'prompts.conflict.resolution.keepBrief': 'Keep brief rule — rebuild prompts without the violation',
+  'prompts.conflict.resolution.editBrand': 'Keep brand name — enforce exact spelling in prompts',
+  'prompts.conflict.resolution.allowTwoColor': 'Allow accent color — switch brief to two-color palette',
+  'prompts.conflict.resolution.allowMultiColor': 'Allow full color — switch brief to multi-color palette',
+  'prompts.conflict.resolution.allowMotif': 'Allow this motif — override the brief prohibition',
+  'prompts.conflict.resolution.territoryTypography': 'Change direction — typography-led, no emblem/badge',
+  'prompts.conflict.resolution.allowShadows': 'Allow shadows — relax flat-vector rule',
+  'prompts.conflict.resolution.allowPhotoreal': 'Allow photoreal / 3D language — relax flat-vector rule',
+  'prompts.conflict.resolution.allowWordmark': 'Allow typography — switch brief to wordmark',
+  'prompts.conflict.resolution.allowTypography': 'Allow typography — switch brief to combination mark',
+  'prompts.conflict.resolution.useBriefMarkType': 'Use mark type from brief',
+  'prompts.conflict.resolution.useBrainMarkType': 'Use mark type chosen by brain',
+
   // brief
   'brief.optionalIntro':
     'Brief is optional but improves prompt quality. Build fills in design decisions; Review lets you edit before generation.',
@@ -239,10 +264,6 @@ export const en = {
   'brief.build.section.analyzeDescription': 'Brain checks gaps and asks what is missing',
   'brief.build.status.done': 'done',
   'brief.build.status.pending': 'pending',
-
-  'brief.projectSummary.title': 'From Project',
-  'brief.projectSummary.symbolOnly': 'Symbol only (no name)',
-  'brief.projectSummary.changeOnProject': 'Change industry, name, or era on the Project step.',
 
   'brief.typography.markType': 'Mark type',
   'brief.typography.typographyStyle': 'Typography style',

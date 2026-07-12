@@ -15,7 +15,6 @@ import { useAppStore } from '../../store';
 import { BriefTypographySection } from './BriefTypographySection';
 import { BriefShapesSection } from './BriefShapesSection';
 import { BriefReferencesSection } from './BriefReferencesSection';
-import { BriefProjectSummary } from './BriefProjectSummary';
 import { BriefCoverageMap } from './BriefCoverageMap';
 import { BriefStyleSection } from './BriefStyleSection';
 import { BriefClientSection } from './BriefClientSection';
@@ -176,8 +175,6 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
 
   return (
     <div className="space-y-4">
-      <BriefProjectSummary />
-
       <div className="p-3 rounded-xl bg-zinc-900/40 border border-zinc-800">
         <p className="text-[13px] text-zinc-400 leading-relaxed">{t('brief.build.stepsIntro')}</p>
       </div>

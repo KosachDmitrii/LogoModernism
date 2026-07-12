@@ -10,7 +10,8 @@ export { ingestImage } from './ingest/ingest-image';
 export { ingestFeedback } from './ingest/ingest-feedback';
 export { ingestWebResearch } from './ingest/ingest-web';
 export { ensureBrainSchema, isPgvectorEnabled } from './storage/pgvector';
-export { EMBEDDING_DIMENSIONS, getBrainDataDir, getBrainUploadsDir } from './storage/paths';
+export { EMBEDDING_DIMENSIONS, getBrainDataDir, getBrainUploadsDir, getGeneratedImagesDir, getCatalogPipelineDir, getWritableDataRoot } from './storage/paths';
+export { ensureBrainStorageLayout } from './storage/ensure-storage';
 export { computeTasteProfile } from './learning/taste-profile';
 export { consolidateBrain, scheduleNightlyConsolidation } from './learning/consolidate';
 export {
