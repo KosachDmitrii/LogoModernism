@@ -11,3 +11,4 @@ export * from './industry-graph';
 export * from './design-strategy';
 export * from './brain-architecture';
 export * from './brain-partner';
+export * from './constraint-conflict';

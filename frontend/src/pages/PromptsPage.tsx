@@ -14,6 +14,8 @@ import { useAppStore } from '../store';
 import { StartOverButton } from '../components/prompts/StartOverButton';
 import { StartOverDialog } from '../components/prompts/StartOverDialog';
 import { BrainPartnerPanel, type PartnerRegenerateAction } from '../components/prompts/BrainPartnerPanel';
+import { applyConstraintResolution } from '../lib/apply-constraint-resolution';
+import type { ConstraintResolution } from '../types';
 import { useT, type MessageKey } from '../i18n';
 import { formatError } from '../lib/api-error';
 
@@ -28,6 +30,7 @@ export function PromptsPage() {
   const prompts = useAppStore((s) => s.prompts);
   const brainPartner = useAppStore((s) => s.brainPartner);
   const industry = useAppStore((s) => s.industry);
+  const designBrief = useAppStore((s) => s.designBrief);
   const selectedPromptId = useAppStore((s) => s.selectedPromptId);
   const selectPrompt = useAppStore((s) => s.selectPrompt);
   const resetWizard = useAppStore((s) => s.resetWizard);
@@ -35,6 +38,7 @@ export function PromptsPage() {
   const [activeStep, setActiveStep] = useState<PromptWizardStep>(prompts.length > 0 ? 3 : 1);
   const [startOverOpen, setStartOverOpen] = useState(false);
   const [regeneratingAction, setRegeneratingAction] = useState<PartnerRegenerateAction | null>(null);
+  const [resolvingViolationId, setResolvingViolationId] = useState<string | null>(null);
 
   const compose = useComposePrompts();
 
@@ -63,6 +67,26 @@ export function PromptsPage() {
     resetWizard();
     setActiveStep(1);
     setStartOverOpen(false);
+  };
+
+  const handleResolveConflict = (violationId: string, resolution: ConstraintResolution) => {
+    if (!industry.trim() || compose.isPending) return;
+
+    const { brief, composeOptions } = applyConstraintResolution(designBrief, resolution);
+    const options: ComposePromptsOptions = {
+      ...composeOptions,
+      briefOverride: brief,
+    };
+
+    setResolvingViolationId(violationId);
+    setRegeneratingAction('resolve-conflict');
+    compose.mutate(options, {
+      onSuccess: () => setActiveStep(3),
+      onSettled: () => {
+        setRegeneratingAction(null);
+        setResolvingViolationId(null);
+      },
+    });
   };
 
   return (
@@ -99,6 +123,7 @@ export function PromptsPage() {
                 <BrainPartnerPanel
                   partner={brainPartner}
                   regeneratingAction={compose.isPending ? regeneratingAction : null}
+                  resolvingViolationId={resolvingViolationId}
                   onApplyTerritory={(territoryId) =>
                     handleCompose({ preferredTerritoryId: territoryId }, 'apply')
                   }
@@ -112,6 +137,7 @@ export function PromptsPage() {
                       'new-variations',
                     )
                   }
+                  onResolveConflict={handleResolveConflict}
                 />
               )}
               <p className="text-sm text-zinc-400 mb-4">

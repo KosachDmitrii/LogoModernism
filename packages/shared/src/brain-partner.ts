@@ -23,11 +23,20 @@ export interface CreativeTerritory {
   tradeoffs: string[];
 }
 
+import type {
+  ConstraintConflictSide,
+  ConstraintResolution,
+} from './constraint-conflict';
+
 export interface ConstraintViolation {
+  id: string;
   code: string;
   severity: 'error' | 'warning';
   message: string;
   suggestion?: string;
+  briefSide?: ConstraintConflictSide;
+  outputSide?: ConstraintConflictSide;
+  resolutions?: ConstraintResolution[];
 }
 
 export interface ConstraintReport {

@@ -126,7 +126,23 @@ describe('evaluateConstraintCompliance', () => {
       request,
     );
     expect(report.passed).toBe(false);
-    expect(report.violations.some((v) => v.code === 'forbidden_motif')).toBe(true);
+    const violation = report.violations.find((v) => v.code === 'forbidden_motif');
+    expect(violation).toBeDefined();
+    expect(violation?.briefSide?.role).toBe('brief');
+    expect(violation?.outputSide?.role).toBe('output');
+    expect(violation?.resolutions?.length).toBeGreaterThan(0);
+  });
+
+  it('includes conflict resolutions for palette violations', () => {
+    const report = evaluateConstraintCompliance(
+      baseDecision,
+      prompt('NovaPay wordmark with vibrant gradient palette and multicolor accents.'),
+      baseArchitecture,
+      request,
+    );
+    const violation = report.violations.find((v) => v.code === 'palette_violation');
+    expect(violation?.resolutions?.some((r) => r.id === 'keep_brief_recompose')).toBe(true);
+    expect(violation?.resolutions?.some((r) => r.id === 'allow_two_color')).toBe(true);
   });
 
   it('returns actionable constraint feedback', () => {
