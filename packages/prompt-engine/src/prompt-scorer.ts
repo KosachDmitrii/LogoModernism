@@ -1,4 +1,11 @@
 import type { DesignRule, LogoDNA, PromptScores } from '@logo-platform/shared';
+import {
+  scoreCharacter,
+  scoreCohesion,
+  scoreIdentity,
+  countLiteralIndustryTerms,
+  countAbstractFormTerms,
+} from '@logo-platform/shared';
 
 export function scorePrompt(text: string, principles: DesignRule[], dna: LogoDNA): PromptScores {
   const lower = text.toLowerCase();
@@ -40,6 +47,22 @@ export function scorePrompt(text: string, principles: DesignRule[], dna: LogoDNA
       principles.filter((p) => p.category === 'mark_type').length,
   );
 
+  const cohesionScore = clamp(
+    scoreCohesion(lower) +
+      countMatches(lower, ['vertical lockup', 'symbol and wordmark', 'typographic lockup']) * 1.2,
+  );
+
+  const identityScore = clamp(
+    scoreIdentity(lower) +
+      countMatches(lower, ['custom wordmark', 'modified glyph', 'helvetica-style']) * 1,
+  );
+
+  const characterBoost = scoreCharacter(lower);
+  const adjustedBrandRecognition = clamp((brandRecognitionScore + characterBoost) / 2);
+
+  const literalPenalty = countLiteralIndustryTerms(lower) * 1.2;
+  const abstractBoost = Math.min(3, countAbstractFormTerms(lower) * 0.6);
+
   const promptQuality = clamp(
     (modernismScore +
       swissScore +
@@ -47,8 +70,12 @@ export function scorePrompt(text: string, principles: DesignRule[], dna: LogoDNA
       geometryScore +
       readabilityScore +
       scalabilityScore +
-      brandRecognitionScore) /
-      7,
+      adjustedBrandRecognition +
+      cohesionScore +
+      identityScore +
+      abstractBoost -
+      literalPenalty) /
+      9,
   );
 
   return {
@@ -58,7 +85,9 @@ export function scorePrompt(text: string, principles: DesignRule[], dna: LogoDNA
     geometryScore: round(geometryScore),
     readabilityScore: round(readabilityScore),
     scalabilityScore: round(scalabilityScore),
-    brandRecognitionScore: round(brandRecognitionScore),
+    brandRecognitionScore: round(adjustedBrandRecognition),
+    cohesionScore: round(cohesionScore),
+    identityScore: round(identityScore),
     promptQuality: round(promptQuality),
   };
 }

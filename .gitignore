@@ -1,4 +1,18 @@
 node_modules
 .env
+.env.*
+!.env.example
+
+# Build output
+dist
+**/dist
+*.tsbuildinfo
+
+# Runtime artifacts
+backend/generated/
+.tmp-screenshot/
+
+# Pipeline / brain data (large or local)
 data/catalog-pipeline/pages/
 data/catalog-pipeline/samples/
+data/brain/uploads/

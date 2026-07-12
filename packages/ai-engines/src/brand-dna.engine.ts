@@ -195,6 +195,18 @@ export function analyzeBrandDNA(input: BrandDNAInput): BrandDNAProfile {
       }
       constraints[1] = 'No separate icon, no pictorial symbol, no emblem, no industry imagery';
     }
+
+    if (markType === 'combination') {
+      constraints[0] = 'Combination mark — symbol and wordmark designed as one unified lockup';
+      constraints[1] = 'Symbol and typography share the same geometric system, stroke weight, and curve language';
+      constraints.push('Custom modified letterforms — not generic stock sans-serif');
+      constraints.push('Playful yet professional brand character with strong silhouette');
+      constraints.push(
+        'Industry hint through abstract form language — round focal geometry, quarter-circle arcs, radial construction, interlaced weave',
+      );
+      constraints.push('Never literal oven, flame, pizza slice, food clipart, or utensil icons');
+      constraints.push('Avoid generic circular bracket templates and disconnected floating symbols');
+    }
   }
 
   if (input.values?.includes('sustainability')) {

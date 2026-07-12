@@ -5,6 +5,7 @@ import { LOGO_CATALOG as CURATED_CATALOG } from './entries';
 import { CATALOG_TAXONOMY, CASE_STUDY_IDS, DESIGNER_PROFILE_IDS } from './taxonomy';
 import { resolveRepoRoot } from './repo-root';
 import { getCatalogPrincipleIdsFromContext } from './catalog-prompt';
+import { rankCatalogByIndustry } from './catalog-industry';
 
 const IMPORTED_FILE = 'data/catalog-pipeline/imported-catalog.json';
 
@@ -112,7 +113,15 @@ export function searchCatalog(filters: CatalogSearchFilters): LogoReference[] {
   }
 
   const limit = filters.limit ?? 200;
-  return results.slice(0, limit);
+  const sliced = results.slice(0, limit);
+
+  if (filters.rankByIndustry) {
+    return rankCatalogByIndustry(sliced, filters.rankByIndustry)
+      .slice(0, limit)
+      .map(({ industryScore, ...entry }) => ({ ...entry, industryScore }));
+  }
+
+  return sliced;
 }
 
 export function matchCatalogToDescription(description: string, limit = 8): LogoReference[] {
@@ -140,6 +149,13 @@ export function getCatalogPrincipleIds(referenceIds: string[]): string[] {
 
 export { buildCatalogPromptContext, getCatalogPrincipleIdsFromContext } from './catalog-prompt';
 export type { CatalogPromptContext } from './catalog-prompt';
+export {
+  rankCatalogByIndustry,
+  getCatalogRecommendations,
+  isWeakIndustryMatch,
+  scoreCatalogIndustryMatch,
+} from './catalog-industry';
+export type { CatalogRecommendation } from './catalog-industry';
 
 /** Backward-compatible alias */
 export const logoReferences = CURATED_CATALOG;

@@ -1,0 +1,15 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./backend" },
+    { "path": "./frontend" },
+    { "path": "./packages/shared" },
+    { "path": "./packages/database" },
+    { "path": "./packages/knowledge-base" },
+    { "path": "./packages/catalog-importer" },
+    { "path": "./packages/prompt-engine" },
+    { "path": "./packages/ai-engines" },
+    { "path": "./packages/image-generator" },
+    { "path": "./packages/design-brain" }
+  ]
+}

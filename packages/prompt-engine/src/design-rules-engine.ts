@@ -1,5 +1,10 @@
 import type { DesignRule, Era, InspirationMode, LogoDNA, LogoMarkType, Recommendation, TypographyStyle } from '@logo-platform/shared';
 import {
+  normalizeBrandName,
+  resolveMarkTypeForBrand,
+  resolveTypographyStyleForBrand,
+} from '@logo-platform/shared';
+import {
   designPrinciples,
   getConflictingPrinciples,
   getPrincipleById,
@@ -60,6 +65,7 @@ export interface RuleSelectionInput {
   catalogNarrative?: string;
   markType?: LogoMarkType;
   typographyStyle?: TypographyStyle;
+  colorPalette?: string;
 }
 
 export interface RuleSelectionResult {
@@ -68,6 +74,42 @@ export interface RuleSelectionResult {
   recommendations: Recommendation[];
   conflicts: string[][];
   catalogInspiration?: string[];
+}
+
+const MONOCHROME_PALETTES = new Set(['black_white', 'monochrome']);
+
+const BLOCKED_WHEN_MONOCHROME = new Set([
+  'col-extra-teal',
+  'col-extra-green-accent',
+  'typ-extra-serif-classic',
+  'typ-extra-slab-serif',
+  'fx-perspective',
+]);
+
+const ACCENT_COLOR_FRAGMENT =
+  /\b(?:teal accent|green accent|corporate blue|red accent|warm palette|multi-?color|two-?color)\b/i;
+
+const BLOCKED_AT_HIGH_MINIMALISM = new Set(['mark-emblem', 'fx-perspective', 'con-isometric']);
+
+function isMonochromePalette(colorPalette?: string): boolean {
+  return Boolean(colorPalette && MONOCHROME_PALETTES.has(colorPalette));
+}
+
+function isBlockedForPalette(rule: DesignRule, colorPalette?: string): boolean {
+  if (!isMonochromePalette(colorPalette)) return false;
+  if (BLOCKED_WHEN_MONOCHROME.has(rule.id)) return true;
+  if (rule.category === 'color' && ACCENT_COLOR_FRAGMENT.test(rule.promptFragment)) return true;
+  if (rule.category === 'effects' && /perspective|pseudo/i.test(rule.promptFragment)) return true;
+  return false;
+}
+
+function isBlockedForMinimalism(rule: DesignRule, minimalismLevel?: number): boolean {
+  if ((minimalismLevel ?? 8) < 7) return false;
+  if (BLOCKED_AT_HIGH_MINIMALISM.has(rule.id)) return true;
+  if (rule.category === 'construction' && /isometric|45.?degree|30.?degree/i.test(rule.promptFragment)) {
+    return true;
+  }
+  return false;
 }
 
 function seededRandom(seed: number): () => number {
@@ -135,13 +177,18 @@ function eraPrincipleId(era: Era): string {
 
 export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResult {
   const rand = seededRandom(input.variationSeed ?? Date.now());
+  const brandName = normalizeBrandName(input.companyName);
+  const markType = resolveMarkTypeForBrand(input.markType, brandName, input.typographyStyle);
+  const typographyStyle = resolveTypographyStyleForBrand(input.typographyStyle, brandName);
   const selected: DesignRule[] = [];
   const selectedIds = new Set<string>();
-  const markFilterOptions = { typographyStyle: input.typographyStyle };
+  const markFilterOptions = { typographyStyle, companyName: brandName };
 
   const addRule = (rule: DesignRule | undefined) => {
     if (!rule || selectedIds.has(rule.id)) return;
-    if (!isPrincipleAllowedForMarkType(rule, input.markType, markFilterOptions)) return;
+    if (isBlockedForPalette(rule, input.colorPalette)) return;
+    if (isBlockedForMinimalism(rule, input.minimalismLevel)) return;
+    if (!isPrincipleAllowedForMarkType(rule, markType, markFilterOptions)) return;
     const conflicts = getConflictingPrinciples([...selectedIds, rule.id]);
     if (conflicts.length > 0) return;
     selected.push(rule);
@@ -155,14 +202,14 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
   // Analysis-driven principles (Brand DNA, Pipeline, Knowledge Graph, Logo Catalog)
   const catalogContext = buildCatalogPromptContext(input.catalogReferenceIds ?? [], {
     narrative: input.catalogNarrative,
-    typographyStyle: input.typographyStyle,
+    typographyStyle,
   });
   const lockedPrincipleIds = filterPrincipleIdsForMarkType(
     [
       ...(input.analysisPrincipleIds ?? []),
       ...(catalogContext?.principleIds ?? []),
     ],
-    input.markType,
+    markType,
   );
   if (lockedPrincipleIds.length) {
     for (const id of lockedPrincipleIds) {
@@ -204,11 +251,13 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
 
   for (const category of CATEGORY_ORDER) {
     if (['industry', 'era', 'inspiration'].includes(category)) continue;
-    if (shouldSkipCategoryForMarkType(category, input.markType, markFilterOptions)) continue;
+    if (shouldSkipCategoryForMarkType(category, markType, markFilterOptions)) continue;
 
     const pool = CURATED_PRINCIPLES.filter((p) => {
       if (p.category !== category) return false;
       if (selectedIds.has(p.id)) return false;
+      if (isBlockedForPalette(p, input.colorPalette)) return false;
+      if (isBlockedForMinimalism(p, input.minimalismLevel)) return false;
 
       const compatibleWithSelected = selected.some(
         (s) =>
@@ -228,7 +277,9 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
       : category === 'rendering'
         ? 3
         : category === 'geometry' || category === 'construction'
-          ? 2
+          ? (input.minimalismLevel ?? 8) >= 8
+            ? 1
+            : 2
           : 1;
 
     for (const rule of pickWeighted(pool, rand, count)) {
@@ -247,18 +298,18 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
     addRule(getPrincipleById('cx-high-simplicity'));
   }
 
-  if (input.markType === 'wordmark') {
+  if (markType === 'wordmark' && brandName) {
     addRule(getPrincipleById('typ-wordmark'));
   }
 
-  if (input.typographyStyle === 'constructed') {
+  if (typographyStyle === 'constructed') {
     for (const id of ['con-modular-grid', 'con-grid-based', 'typ-custom-letterform', 'comp-stacked']) {
       addRule(getPrincipleById(id));
     }
   }
 
-  const dna = buildLogoDNA(selected, input, catalogContext);
-  const recommendations = buildRecommendations(input.industry, selected, input.markType);
+  const dna = buildLogoDNA(selected, input, catalogContext, markType, typographyStyle);
+  const recommendations = buildRecommendations(input.industry, selected, markType);
   const conflicts = getConflictingPrinciples(selected.map((p) => p.id));
 
   return {
@@ -274,6 +325,8 @@ function buildLogoDNA(
   principles: DesignRule[],
   input: RuleSelectionInput,
   catalogContext?: ReturnType<typeof buildCatalogPromptContext>,
+  markType?: LogoMarkType,
+  typographyStyle?: TypographyStyle,
 ): LogoDNA {
   const byCategory = (cat: DesignRule['category']) =>
     principles.filter((p) => p.category === cat).map((p) => p.name);
@@ -281,9 +334,8 @@ function buildLogoDNA(
   const complexityRule = principles.find((p) => p.category === 'complexity');
   const eraRule = principles.find((p) => p.category === 'era');
 
-  const constructed = input.typographyStyle === 'constructed';
-  const typographicOnly =
-    input.markType === 'wordmark' || input.markType === 'lettermark';
+  const constructed = typographyStyle === 'constructed';
+  const typographicOnly = markType === 'wordmark' || markType === 'lettermark';
 
   return {
     geometry:

@@ -1,6 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import type { ComposedPrompt, DesignRule, LogoDNA, LogoMarkType, PromptScores, TypographyStyle } from '@logo-platform/shared';
-import { isMultiWordCompanyName, lettermarkTextFromName } from '@logo-platform/shared';
+import {
+  appendStylePreferenceFragments,
+  isMultiWordCompanyName,
+  lettermarkTextFromName,
+  exactBrandSpellingFragment,
+  normalizeBrandName,
+  hasExplicitBrandName,
+  isSymbolOnlyLogo,
+  resolveMarkTypeForBrand,
+  resolveTypographyStyleForBrand,
+  NO_BRAND_TEXT_FRAGMENT,
+  buildArtDirectionFragments,
+  buildSymbolOnlyArtDirectionFragments,
+  isCombinationMark,
+  stylePreferenceOverrides,
+  finalizeLogoPromptText,
+} from '@logo-platform/shared';
 import { CATEGORY_ORDER } from './design-rules-engine';
 import { scorePrompt } from './prompt-scorer';
 import { clauseOverlaps, optimizePrompt } from './prompt-optimizer';
@@ -20,6 +36,8 @@ export interface ComposeInput {
   typographyStyle?: TypographyStyle;
   /** Fragments from Logo Catalog references */
   catalogInspiration?: string[];
+  /** Client-selected style preferences from Design Brief */
+  briefContext?: import('@logo-platform/shared').BriefContext;
 }
 
 const CATEGORY_LABELS: Partial<Record<DesignRule['category'], string>> = {
@@ -109,13 +127,16 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
   const fragments: string[] = [];
   const hasCatalog = Boolean(input.catalogInspiration?.length);
   const catalogText = (input.catalogInspiration ?? []).join(' ').toLowerCase();
-  const isWordmark = input.markType === 'wordmark';
-  const isLettermark = input.markType === 'lettermark';
-  const isConstructed = input.typographyStyle === 'constructed';
-  const markFilterOptions = { typographyStyle: input.typographyStyle };
-  const lettermarkText = input.companyName ? lettermarkTextFromName(input.companyName) : '';
-  const lettermarkUsesInitials = input.companyName ? isMultiWordCompanyName(input.companyName) : false;
-  const principles = filterPrinciplesForMarkType(input.principles, input.markType, markFilterOptions);
+  const brandName = normalizeBrandName(input.companyName);
+  const markType = resolveMarkTypeForBrand(input.markType, brandName, input.typographyStyle);
+  const typographyStyle = resolveTypographyStyleForBrand(input.typographyStyle, brandName);
+  const isWordmark = markType === 'wordmark';
+  const isLettermark = markType === 'lettermark';
+  const isConstructed = typographyStyle === 'constructed';
+  const markFilterOptions = { typographyStyle, companyName: brandName };
+  const lettermarkText = brandName ? lettermarkTextFromName(brandName) : '';
+  const lettermarkUsesInitials = brandName ? isMultiWordCompanyName(brandName) : false;
+  const principles = filterPrinciplesForMarkType(input.principles, markType, markFilterOptions);
 
   if (isConstructed) {
     fragments.push('Modernist constructed typography logo design');
@@ -126,20 +147,27 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     fragments.push('Modernist typographic wordmark logo design');
   } else if (isLettermark) {
     fragments.push('Modernist lettermark monogram logo design');
+  } else if (isSymbolOnlyLogo(brandName, markType)) {
+    fragments.push('Abstract symbol-only logo design');
   } else {
     fragments.push('Minimal geometric logo design');
   }
 
-  if (input.companyName) {
+  if (brandName) {
     if (isLettermark && lettermarkText) {
       if (lettermarkUsesInitials) {
-        fragments.push(`monogram of the initials "${lettermarkText}" for brand "${input.companyName}"`);
+        fragments.push(`monogram of the initials "${lettermarkText}" for brand "${brandName}"`);
       } else {
         fragments.push(`lettermark built from the full word "${lettermarkText}"`);
       }
+    } else if (isWordmark || !markType) {
+      fragments.push(`wordmark for "${brandName}"`);
     } else {
-      fragments.push(`for "${input.companyName}"`);
+      fragments.push(`for "${brandName}"`);
     }
+    fragments.push(exactBrandSpellingFragment(brandName, markType ?? (isWordmark ? 'wordmark' : undefined)));
+  } else {
+    fragments.push(NO_BRAND_TEXT_FRAGMENT);
   }
 
   if (input.catalogInspiration?.length) {
@@ -147,7 +175,7 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
   }
 
   for (const category of CATEGORY_ORDER) {
-    if (shouldSkipCategoryForMarkType(category, input.markType, markFilterOptions)) continue;
+    if (shouldSkipCategoryForMarkType(category, markType, markFilterOptions)) continue;
 
     const marker = CATALOG_CATEGORY_MARKERS[category];
     if (hasCatalog && marker && catalogText.includes(marker)) {
@@ -188,12 +216,12 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     fragments.push('Dense stacked typographic block — letters are the entire logo');
     fragments.push('Bold black constructive letterforms, not an off-the-shelf font');
     fragments.push('No separate icon, roundel, emblem, or pictorial symbol');
-  } else if (isWordmark) {
+  } else if (isWordmark && brandName) {
     fragments.push('Typography-only wordmark, company name spelled as the logo');
     fragments.push('No separate icon, no symbol above text, no pictorial mark, no emblem');
   }
 
-  if (isLettermark) {
+  if (isLettermark && brandName) {
     if (lettermarkUsesInitials) {
       fragments.push(
         lettermarkText
@@ -210,16 +238,33 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     fragments.push('Letters are the entire logo. No separate icon, no pictorial symbol, no emblem, no badge, no industry imagery');
   }
 
+  if (isCombinationMark(markType, brandName)) {
+    fragments.push(...buildArtDirectionFragments({ markType, industry: input.industry, companyName: brandName }));
+  } else if (isSymbolOnlyLogo(brandName, markType)) {
+    fragments.push(...buildSymbolOnlyArtDirectionFragments({ industry: input.industry }));
+  } else if (isWordmark || isLettermark) {
+    fragments.push(...buildArtDirectionFragments({ markType }));
+  }
+
   fragments.push('Premium professional branding');
   fragments.push('Timeless modernist aesthetic');
 
-  const rawText = fragments.join('. ').replace(/\.\s*\./g, '.');
-  const optimized = optimizePrompt(rawText, principles);
-  const scores = scorePrompt(optimized, principles, input.dna);
+  const rawText = appendStylePreferenceFragments(
+    fragments.join('. ').replace(/\.\s*\./g, '.'),
+    input.briefContext,
+  );
+  const optimized = optimizePrompt(rawText, principles, stylePreferenceOverrides(input.briefContext));
+  const text = finalizeLogoPromptText(optimized, {
+    clientNotes: input.briefContext?.clientNotes,
+    companyName: brandName,
+    markType,
+    colorPalette: input.briefContext?.colorPalette,
+  });
+  const scores = scorePrompt(text, principles, input.dna);
 
   return {
     id: randomUUID(),
-    text: optimized,
+    text,
     industry: input.industry,
     selectedPrinciples: principles,
     scores,
@@ -228,8 +273,17 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
       era: input.dna.era,
       variationIndex: input.variationIndex,
       inspirationMode: input.inspirationMode,
-      markType: input.markType,
-      typographyStyle: input.typographyStyle,
+      markType,
+      typographyStyle,
+      stylePreferences: input.briefContext
+        ? {
+            colorPalette: input.briefContext.colorPalette,
+            colorSelections: input.briefContext.colorSelections,
+            allowShadows: input.briefContext.allowShadows,
+            allowPhotoreal: input.briefContext.allowPhotoreal,
+            clientNotes: input.briefContext.clientNotes,
+          }
+        : undefined,
     },
   };
 }

@@ -1,4 +1,4 @@
-import type { CatalogChapter, CatalogMarkType, Era } from '@logo-platform/shared';
+import type { CatalogChapter, CatalogMarkType, CatalogCandidate, Era } from '@logo-platform/shared';
 import { designPrinciples } from '@logo-platform/knowledge-base';
 
 const VALID_ERAS: Era[] = [
@@ -61,6 +61,25 @@ export interface VisionLogoEntry {
   color_count?: number;
   significance?: string;
   keywords?: string[];
+  logo_bbox?: { xmin?: number; ymin?: number; xmax?: number; ymax?: number };
+}
+
+export function normalizeCropBox(
+  raw?: VisionLogoEntry['logo_bbox'],
+): CatalogCandidate['cropBox'] | undefined {
+  if (!raw) return undefined;
+  const xmin = Number(raw.xmin);
+  const ymin = Number(raw.ymin);
+  const xmax = Number(raw.xmax);
+  const ymax = Number(raw.ymax);
+  if (![xmin, ymin, xmax, ymax].every((value) => Number.isFinite(value))) return undefined;
+  if (xmax <= xmin || ymax <= ymin) return undefined;
+  return {
+    xmin: Math.max(0, Math.min(1000, xmin)),
+    ymin: Math.max(0, Math.min(1000, ymin)),
+    xmax: Math.max(0, Math.min(1000, xmax)),
+    ymax: Math.max(0, Math.min(1000, ymax)),
+  };
 }
 
 export function normalizeSection(raw?: string): string | undefined {

@@ -1,0 +1,10 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "search.exclude": {
+    "**/apps": true
+  },
+  "files.watcherExclude": {
+    "**/apps/**": true
+  }
+}

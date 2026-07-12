@@ -5,8 +5,38 @@ interface OpenAIImageResponse {
   data: Array<{ url?: string; revised_prompt?: string; b64_json?: string }>;
 }
 
+const OPENAI_IMAGE_RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504, 520, 522, 524]);
+const OPENAI_IMAGE_MAX_ATTEMPTS = 3;
+
+function readEnv(name: string, fallback: string): string {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  return raw.replace(/^["']|["']$/g, '');
+}
+
 function getImageModel(): string {
-  return process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1';
+  return readEnv('OPENAI_IMAGE_MODEL', 'gpt-image-1');
+}
+
+function getImageQuality(): string {
+  return readEnv('OPENAI_IMAGE_QUALITY', 'high');
+}
+
+function mapQualityForGptImage(quality: string): string {
+  const normalized = quality.toLowerCase();
+  if (normalized === 'low' || normalized === 'medium' || normalized === 'high' || normalized === 'auto') {
+    return normalized;
+  }
+  if (normalized === 'standard' || normalized === 'hd') {
+    return normalized === 'hd' ? 'high' : 'medium';
+  }
+  return 'high';
+}
+
+function mapQualityForDalle3(quality: string): 'standard' | 'hd' {
+  const normalized = quality.toLowerCase();
+  if (normalized === 'hd' || normalized === 'high') return 'hd';
+  return 'standard';
 }
 
 function isGptImageModel(model: string): boolean {
@@ -22,7 +52,13 @@ function mapSizeForGptImage(size: ImageSize): string {
   return map[size] ?? '1024x1024';
 }
 
-function buildRequestBody(model: string, prompt: string, size: ImageSize, count: number): Record<string, unknown> {
+function buildRequestBody(
+  model: string,
+  prompt: string,
+  size: ImageSize,
+  count: number,
+  quality: string,
+): Record<string, unknown> {
   const body: Record<string, unknown> = {
     model,
     prompt: prompt.slice(0, 4000),
@@ -32,7 +68,7 @@ function buildRequestBody(model: string, prompt: string, size: ImageSize, count:
     // gpt-image-* returns base64 only; response_format is not supported
     body.n = 1;
     body.size = mapSizeForGptImage(size);
-    body.quality = 'medium';
+    body.quality = mapQualityForGptImage(quality);
     body.output_format = 'png';
     // Opaque white background so dark marks stay visible on dark UI
     body.background = 'opaque';
@@ -42,7 +78,7 @@ function buildRequestBody(model: string, prompt: string, size: ImageSize, count:
   if (model === 'dall-e-3') {
     body.n = Math.min(count, 1);
     body.size = size;
-    body.quality = 'standard';
+    body.quality = mapQualityForDalle3(quality);
     body.style = 'natural';
     return body;
   }
@@ -59,6 +95,54 @@ function toImageUrl(item: { url?: string; b64_json?: string }): string {
   throw new Error('OpenAI response contained no image data');
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function compactErrorBody(body: string): string {
+  const plain = body
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return (plain || body).slice(0, 500);
+}
+
+async function postOpenAIImageRequest(
+  apiKey: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= OPENAI_IMAGE_MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!OPENAI_IMAGE_RETRY_STATUSES.has(response.status) || attempt === OPENAI_IMAGE_MAX_ATTEMPTS) {
+        return response;
+      }
+
+      await response.text().catch(() => '');
+      await sleep(800 * attempt);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt === OPENAI_IMAGE_MAX_ATTEMPTS) throw lastError;
+      await sleep(800 * attempt);
+    }
+  }
+
+  throw lastError ?? new Error('OpenAI image generation request failed');
+}
+
 export async function generateWithOpenAI(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -69,19 +153,14 @@ export async function generateWithOpenAI(request: ImageGenerationRequest): Promi
   const size = request.size ?? '1024x1024';
   const count = Math.min(request.count ?? 1, 4);
   const model = getImageModel();
+  const quality = getImageQuality();
+  const body = buildRequestBody(model, enhancedPrompt, size, count, quality);
 
-  const response = await fetch('https://api.openai.com/v1/images/generations', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(buildRequestBody(model, enhancedPrompt, size, count)),
-  });
+  const response = await postOpenAIImageRequest(apiKey, body);
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`OpenAI image generation failed (${response.status}): ${errorBody}`);
+    throw new Error(`OpenAI image generation failed (${response.status}): ${compactErrorBody(errorBody)}`);
   }
 
   const data = (await response.json()) as OpenAIImageResponse;

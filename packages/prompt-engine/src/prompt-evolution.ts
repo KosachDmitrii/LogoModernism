@@ -46,11 +46,19 @@ export function evolvePrompt(
       }
     }
 
+    const clientNotes =
+      typeof weakPrompt.metadata?.stylePreferences === 'object' &&
+      weakPrompt.metadata.stylePreferences &&
+      'clientNotes' in weakPrompt.metadata.stylePreferences
+        ? (weakPrompt.metadata.stylePreferences as { clientNotes?: string }).clientNotes
+        : undefined;
+
     const newPrompt = composePrompt({
       industry: weakPrompt.industry,
       principles: selection.principles,
       dna: selection.dna,
       variationIndex: seed,
+      briefContext: clientNotes ? { clientNotes } : undefined,
     });
 
     evolved.push(newPrompt);
@@ -99,6 +107,24 @@ export function suggestMutations(prompt: ComposedPrompt): EvolutionMutation[] {
     });
   }
 
+  if (scores.cohesionScore < 6) {
+    mutations.push({
+      field: 'hierarchy',
+      from: [],
+      to: ['comp-stacked'],
+      reason: 'Unify symbol and wordmark into one geometric lockup',
+    });
+  }
+
+  if (scores.identityScore < 6) {
+    mutations.push({
+      field: 'typography',
+      from: [],
+      to: ['typ-custom-letterform'],
+      reason: 'Strengthen custom wordmark typography and distinctive glyphs',
+    });
+  }
+
   const randomMutation = MUTATION_FIELDS[Math.floor(Math.random() * MUTATION_FIELDS.length)];
   mutations.push({
     field: randomMutation.field,
@@ -119,13 +145,17 @@ export function critiqueDesign(prompt: ComposedPrompt): DesignCriticResult {
   if (s.brandRecognitionScore < 7) feedback.push('Strengthen distinctive mark type or monogram');
   if (s.geometryScore < 7) feedback.push('Define clearer geometric construction system');
   if (s.readabilityScore < 6) feedback.push('Balance prompt length for model clarity');
+  if (s.cohesionScore < 7) feedback.push('Unify symbol and wordmark into one shared geometric system');
+  if (s.identityScore < 7) feedback.push('Add custom modified letterforms — avoid generic stock sans-serif');
 
   const overallScore =
     s.brandRecognitionScore +
     s.scalabilityScore +
     s.readabilityScore +
     s.minimalismScore +
-    s.modernismScore;
+    s.modernismScore +
+    s.cohesionScore +
+    s.identityScore;
 
   return {
     recognizability: s.brandRecognitionScore,
@@ -135,7 +165,7 @@ export function critiqueDesign(prompt: ComposedPrompt): DesignCriticResult {
     simplicity: s.minimalismScore,
     modernity: s.modernismScore,
     registrability: s.minimalismScore > 7 && s.geometryScore > 6 ? 8 : 6,
-    overallScore: Math.round((overallScore / 6) * 10) / 10,
+    overallScore: Math.round((overallScore / 8) * 10) / 10,
     feedback,
     suggestedMutations: suggestMutations(prompt),
   };

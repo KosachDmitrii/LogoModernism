@@ -88,6 +88,8 @@ export interface LogoReference {
   /** Original analytical summary (not book text) */
   significance?: string;
   bookPageHint?: string;
+  /** Public URL of cropped logo image (Supabase Storage) */
+  logoImageUrl?: string;
 }
 
 export interface CatalogTaxonomySection {
@@ -110,6 +112,8 @@ export interface CatalogSearchFilters {
   section?: string;
   era?: Era;
   industry?: string;
+  /** Sort results by relevance to this project industry */
+  rankByIndustry?: string;
   designer?: string;
   entryKind?: CatalogEntryKind;
   markType?: CatalogMarkType;
@@ -118,6 +122,14 @@ export interface CatalogSearchFilters {
 
 export type CatalogCandidateStatus = 'pending' | 'approved' | 'rejected';
 
+export interface CatalogCropBox {
+  /** Normalized 0–1000 coordinates relative to page image */
+  xmin: number;
+  ymin: number;
+  xmax: number;
+  ymax: number;
+}
+
 /** Raw + normalized entry from PDF/Vision import pipeline */
 export interface CatalogCandidate {
   id: string;
@@ -125,6 +137,11 @@ export interface CatalogCandidate {
   sourcePage: number;
   sourceIndex: number;
   pageImagePath?: string;
+  /** Cropped logo PNG relative to PIPELINE_DIR, e.g. logos/cand-p29-0-name.png */
+  logoImagePath?: string;
+  /** Public Supabase Storage URL for cropped logo */
+  logoImageUrl?: string;
+  cropBox?: CatalogCropBox;
   name: string;
   industry: string;
   designer?: string;
@@ -181,6 +198,8 @@ export interface PromptScores {
   readabilityScore: number;
   scalabilityScore: number;
   brandRecognitionScore: number;
+  cohesionScore: number;
+  identityScore: number;
   promptQuality: number;
 }
 
@@ -191,12 +210,26 @@ export interface ComposedPrompt {
   selectedPrinciples: DesignRule[];
   scores: PromptScores;
   dna: LogoDNA;
+  logos?: import('./image-types').GeneratedImage[];
+  saved?: boolean;
+  /** @deprecated use saved + logo feedback */
+  feedback?: 'LIKE' | 'DISLIKE';
   metadata: {
     era: Era;
     variationIndex?: number;
     inspirationMode?: string;
     markType?: LogoMarkType;
     typographyStyle?: TypographyStyle;
+    brainPowered?: boolean;
+    reasoning?: string;
+    confidence?: number;
+    basePromptLength?: number;
+    enrichedPromptLength?: number;
+    stylePreferences?: import('./brain-types').BriefContext;
+    brainArchitecture?: import('./brain-architecture').BrainArchitecture;
+    creativeTerritory?: import('./brain-partner').CreativeTerritory;
+    constraintReport?: import('./brain-partner').ConstraintReport;
+    partnerCritique?: DesignCriticResult;
   };
 }
 
@@ -217,6 +250,11 @@ export interface PromptGenerationRequest {
   catalogReferenceIds?: string[];
   /** Optional narrative from Design Brief (e.g. catalog significance) */
   catalogNarrative?: string;
+  /** Design brief context from client */
+  briefContext?: import('./brain-types').BriefContext;
+  /** When false, skip Brain and use rule-based pipeline only */
+  useBrain?: boolean;
+  preferredTerritoryId?: import('./brain-partner').CreativeTerritoryId;
 }
 
 export type InspirationMode =

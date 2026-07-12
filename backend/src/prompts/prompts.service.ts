@@ -1,0 +1,386 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import type { PromptGenerationRequest } from '@logo-platform/shared';
+import { normalizeBrandName } from '@logo-platform/shared';
+import { designBrain } from '@logo-platform/design-brain';
+import { runPromptPipeline, critiqueDesign, evolvePrompt } from '@logo-platform/prompt-engine';
+import { ImagesService } from '../images/images.service';
+import { PromptRecordsService } from './prompt-records.service';
+
+@Injectable()
+export class PromptsService {
+  constructor(
+    private readonly imagesService: ImagesService,
+    private readonly promptRecords: PromptRecordsService,
+  ) {}
+
+  async generate(request: PromptGenerationRequest) {
+    const caps = designBrain.getCapabilities();
+    const preferBrain = request.useBrain !== false && caps.databaseConfigured;
+
+    if (preferBrain) {
+      try {
+        return await designBrain.generate({
+          industry: request.industry,
+          companyName: normalizeBrandName(request.companyName),
+          variationCount: request.variationCount,
+          inspirationMode: request.inspirationMode,
+          preferredEra: request.preferredEra,
+          minimalismLevel: request.minimalismLevel,
+          markType: request.markType,
+          typographyStyle: request.typographyStyle,
+          analysisPrincipleIds: request.analysisPrincipleIds,
+          catalogReferenceIds: request.catalogReferenceIds,
+      catalogNarrative: request.catalogNarrative,
+      briefContext: request.briefContext,
+      useBrain: true,
+      preferredTerritoryId: request.preferredTerritoryId,
+    });
+      } catch (error) {
+        if (request.useBrain === true) throw error;
+        console.warn('Brain prompt pipeline failed, falling back to rules:', error);
+      }
+    }
+
+    return runPromptPipeline(request);
+  }
+
+  async generateAndPersist(request: PromptGenerationRequest) {
+    const result = await this.generate(request);
+    if (!process.env.DATABASE_URL) {
+      return {
+        result,
+        promptsWithLogos: this.promptRecords.attachLogosToPrompts(result.prompts),
+      };
+    }
+
+    await this.promptRecords.saveBatch(request, result);
+    const promptsWithLogos = await this.promptRecords.attachStoredState(result.prompts);
+    return { result, promptsWithLogos };
+  }
+
+  async togglePromptSave(promptId: string, saved: boolean) {
+    if (!process.env.DATABASE_URL) {
+      throw new BadRequestException('DATABASE_URL is required to save prompts');
+    }
+
+    const record = await this.promptRecords.getById(promptId);
+    const updated = await this.promptRecords.setSaved(promptId, saved);
+
+    if (saved) {
+      try {
+        await designBrain.ingestFeedback({
+          signalType: 'APPROVE',
+          score: 7,
+          context: [
+            'Prompt saved to favorites',
+            record.companyName ? `Company: ${record.companyName}` : '',
+            `Industry: ${record.industry}`,
+            `Prompt quality: ${(record.scores as { promptQuality?: number })?.promptQuality ?? 'unknown'}`,
+            `Prompt: ${record.text.slice(0, 600)}`,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          metadata: {
+            kind: 'prompt_saved',
+            promptId,
+            companyName: record.companyName,
+            industry: record.industry,
+          },
+        });
+      } catch (error) {
+        console.warn('Brain ingest failed for prompt save', promptId, error);
+      }
+    }
+
+    return { promptId, saved: updated.saved ?? saved };
+  }
+
+  async submitLogoFeedback(
+    promptId: string,
+    logoId: string,
+    body: {
+      score: number;
+      emoji: string;
+    },
+  ) {
+    if (!process.env.DATABASE_URL) {
+      throw new BadRequestException('DATABASE_URL is required to store logo feedback');
+    }
+
+    const record = await this.promptRecords.getById(promptId);
+    const logo = record.logos.find((item) => item.id === logoId);
+    if (!logo) {
+      throw new BadRequestException(`Logo not found: ${logoId}`);
+    }
+
+    const prev = logo.feedback;
+    const feedback = {
+      ...prev,
+      score: body.score,
+      emoji: body.emoji,
+      submittedAt: new Date().toISOString(),
+    };
+
+    const updated = await this.promptRecords.setLogoFeedback(promptId, logoId, feedback);
+
+    try {
+      await designBrain.ingestFeedback({
+        signalType: 'RATING',
+        score: body.score,
+        context: [
+          `Logo rating: ${body.score}/10 (${body.emoji})`,
+          record.companyName ? `Company: ${record.companyName}` : '',
+          `Industry: ${record.industry}`,
+          prev?.workedTags?.length ? `Worked: ${prev.workedTags.join(', ')}` : '',
+          prev?.missedTags?.length ? `Missed: ${prev.missedTags.join(', ')}` : '',
+          `Prompt: ${record.text.slice(0, 500)}`,
+          `Image: ${logo.url}`,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        metadata: {
+          kind: 'logo_rating',
+          promptId,
+          logoId,
+          score: body.score,
+          emoji: body.emoji,
+          workedTags: prev?.workedTags,
+          missedTags: prev?.missedTags,
+          companyName: record.companyName,
+          industry: record.industry,
+          imageUrl: logo.url,
+        },
+      });
+    } catch (error) {
+      console.warn('Brain ingest failed for logo feedback', promptId, logoId, error);
+    }
+
+    const savedLogo = updated.logos.find((item) => item.id === logoId);
+    return {
+      promptId,
+      logoId,
+      feedback: savedLogo?.feedback,
+      logos: updated.logos,
+    };
+  }
+
+  async submitLogoTags(
+    promptId: string,
+    logoId: string,
+    body: {
+      workedTags?: string[];
+      missedTags?: string[];
+    },
+  ) {
+    if (!process.env.DATABASE_URL) {
+      throw new BadRequestException('DATABASE_URL is required to store logo tags');
+    }
+
+    const record = await this.promptRecords.getById(promptId);
+    const logo = record.logos.find((item) => item.id === logoId);
+    if (!logo) {
+      throw new BadRequestException(`Logo not found: ${logoId}`);
+    }
+
+    const updated = await this.promptRecords.setLogoTags(promptId, logoId, body);
+
+    const baseContext = [
+      record.companyName ? `Company: ${record.companyName}` : '',
+      `Industry: ${record.industry}`,
+      `Prompt: ${record.text.slice(0, 400)}`,
+      `Image: ${logo.url}`,
+    ].filter(Boolean);
+
+    const tagMetadata = {
+      kind: 'logo_tags' as const,
+      promptId,
+      logoId,
+      companyName: record.companyName,
+      industry: record.industry,
+      imageUrl: logo.url,
+    };
+
+    try {
+      if (body.workedTags?.length) {
+        await designBrain.ingestFeedback({
+          signalType: 'APPROVE',
+          score: 7,
+          context: [
+            'Logo worked feedback',
+            ...baseContext,
+            `Worked: ${body.workedTags.join(', ')}`,
+          ].join('\n'),
+          metadata: {
+            ...tagMetadata,
+            tagPolarity: 'worked',
+            workedTags: body.workedTags,
+          },
+        });
+      }
+
+      if (body.missedTags?.length) {
+        await designBrain.ingestFeedback({
+          signalType: 'REJECT',
+          score: 6,
+          context: [
+            'Logo missed feedback',
+            ...baseContext,
+            `Missed: ${body.missedTags.join(', ')}`,
+          ].join('\n'),
+          metadata: {
+            ...tagMetadata,
+            tagPolarity: 'missed',
+            missedTags: body.missedTags,
+          },
+        });
+      }
+    } catch (error) {
+      console.warn('Brain ingest failed for logo tags', promptId, logoId, error);
+    }
+
+    const savedLogo = updated.logos.find((item) => item.id === logoId);
+    return {
+      promptId,
+      logoId,
+      feedback: savedLogo?.feedback,
+      logos: updated.logos,
+    };
+  }
+
+  /** @deprecated use togglePromptSave */
+  async submitPromptFeedback(promptId: string, signalType: 'LIKE' | 'DISLIKE') {
+    if (!process.env.DATABASE_URL) {
+      throw new BadRequestException('DATABASE_URL is required to store prompt feedback');
+    }
+
+    const record = await this.promptRecords.getById(promptId);
+    const updated = await this.promptRecords.setFeedback(promptId, signalType);
+    const stylePreferences =
+      typeof record.metadata === 'object' &&
+      record.metadata !== null &&
+      'stylePreferences' in record.metadata
+        ? (record.metadata as { stylePreferences?: Record<string, unknown> }).stylePreferences
+        : undefined;
+
+    try {
+      await designBrain.ingestFeedback({
+        signalType,
+        score: signalType === 'LIKE' ? 8 : 2,
+        context: [
+          `Prompt feedback: ${signalType}`,
+          record.companyName ? `Company: ${record.companyName}` : '',
+          `Industry: ${record.industry}`,
+          `Prompt ID: ${promptId}`,
+          stylePreferences ? `Style preferences: ${JSON.stringify(stylePreferences)}` : '',
+          `Prompt: ${record.text}`,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        metadata: {
+          kind: 'prompt_feedback',
+          promptId,
+          composedPromptId: promptId,
+          promptQuality:
+            typeof record.scores === 'object' &&
+            record.scores !== null &&
+            'promptQuality' in record.scores
+              ? (record.scores as { promptQuality?: number }).promptQuality
+              : undefined,
+          era:
+            typeof record.metadata === 'object' &&
+            record.metadata !== null &&
+            'era' in record.metadata
+              ? (record.metadata as { era?: string }).era
+              : undefined,
+          stylePreferences,
+        },
+      });
+    } catch (error) {
+      console.warn('Brain feedback ingest failed for prompt', promptId, error);
+    }
+
+    return {
+      promptId,
+      feedback: updated.feedback,
+    };
+  }
+
+  async generateLogoForPrompt(
+    promptId: string,
+    body: {
+      companyName?: string;
+      markType?: 'wordmark' | 'lettermark' | 'combination';
+      typographyStyle?: 'standard' | 'constructed';
+      provider?: 'openai' | 'mock';
+    },
+  ) {
+    if (!process.env.DATABASE_URL) {
+      throw new BadRequestException('DATABASE_URL is required to store prompt logos');
+    }
+
+    const record = await this.promptRecords.getById(promptId);
+    const stylePreferences =
+      typeof record.metadata === 'object' &&
+      record.metadata !== null &&
+      'stylePreferences' in record.metadata
+        ? (record.metadata as {
+            stylePreferences?: {
+              colorSelections?: string[];
+              allowShadows?: boolean;
+              allowPhotoreal?: boolean;
+            };
+          }).stylePreferences
+        : undefined;
+    if (record.logos.length >= 3) {
+      throw new BadRequestException('Maximum 3 logos per prompt');
+    }
+
+    const generation = await this.imagesService.generateFromComposedPrompt({
+      text: record.text,
+      companyName: normalizeBrandName(body.companyName ?? record.companyName),
+      industry: record.industry,
+      markType: body.markType,
+      typographyStyle: body.typographyStyle,
+      provider: body.provider,
+      colorSelections: stylePreferences?.colorSelections,
+      allowShadows: stylePreferences?.allowShadows,
+      allowPhotoreal: stylePreferences?.allowPhotoreal,
+    });
+
+    const image = generation.images[0];
+    if (!image) {
+      throw new BadRequestException('Image generation returned no result');
+    }
+
+    const updated = await this.promptRecords.appendLogo(promptId, image);
+    return {
+      image,
+      logos: updated.logos,
+      remaining: Math.max(0, 3 - updated.logos.length),
+    };
+  }
+
+  getPrompt(promptId: string) {
+    return this.promptRecords.getById(promptId);
+  }
+
+  listSavedPrompts() {
+    if (!process.env.DATABASE_URL) {
+      return { prompts: [], total: 0 };
+    }
+    return this.promptRecords.listSaved().then((prompts) => ({
+      prompts,
+      total: prompts.length,
+    }));
+  }
+
+  critique(promptId: string, pipelineResult: Awaited<ReturnType<typeof this.generate>>) {
+    const prompt = pipelineResult.prompts.find((p) => p.id === promptId) ?? pipelineResult.bestPrompt;
+    return critiqueDesign(prompt);
+  }
+
+  evolve(promptId: string, pipelineResult: Awaited<ReturnType<typeof this.generate>>) {
+    const prompt = pipelineResult.prompts.find((p) => p.id === promptId) ?? pipelineResult.bestPrompt;
+    return evolvePrompt(prompt);
+  }
+}
