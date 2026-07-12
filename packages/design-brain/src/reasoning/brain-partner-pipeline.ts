@@ -254,7 +254,7 @@ export async function runBrainPartnerPipeline(
 
     lastConstraint = evaluateConstraintCompliance(
       pipeline.decision,
-      withTerritory.bestPrompt,
+      pipeline.bestPrompt,
       pipeline.brainArchitecture,
       currentRequest,
     );

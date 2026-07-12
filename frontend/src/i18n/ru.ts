@@ -246,7 +246,7 @@ export const ru: Record<MessageKey, string> = {
   'brief.checklist.color': 'Цветовая палитра',
   'brief.checklist.colorHint': 'Опциональное предпочтение стиля',
   'brief.checklist.clientNotes': 'Заметки клиента',
-  'brief.checklist.clientNotesHint': 'Шаг 5 в Сборке',
+  'brief.checklist.clientNotesHint': 'Предпочтения и детали клиента',
   'brief.checklist.references': 'Референсы каталога',
   'brief.checklist.referencesHint': 'Вдохновение из Logo Catalog',
 

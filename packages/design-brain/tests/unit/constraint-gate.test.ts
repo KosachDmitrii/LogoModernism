@@ -131,6 +131,48 @@ describe('evaluateConstraintCompliance', () => {
     expect(report.violations.some((v) => v.code === 'photoreal_forbidden')).toBe(false);
   });
 
+  it('does not flag render terms when body lists client forbids before Avoid section', () => {
+    const report = evaluateConstraintCompliance(
+      baseDecision,
+      prompt(
+        'Minimal geometric wordmark for NovaPay. Flat vector Swiss modernism. Client forbids: photorealism, mockups, gradients. Avoid: photorealism, mockups, busy backgrounds, stock clipart.',
+      ),
+      baseArchitecture,
+      request,
+    );
+    expect(report.passed).toBe(true);
+    expect(report.violations.some((v) => v.code === 'photoreal_forbidden')).toBe(false);
+  });
+
+  it('does not flag creative territory metadata appended after Avoid section', () => {
+    const report = evaluateConstraintCompliance(
+      baseDecision,
+      prompt(
+        'Minimal geometric wordmark for NovaPay. Flat vector Swiss modernism. Avoid: photorealism, mockups. Creative direction: Modular grid thesis. Construction focus: baseline grid. Typography focus: geometric sans. Color approach: monochrome.',
+      ),
+      baseArchitecture,
+      request,
+    );
+    expect(report.passed).toBe(true);
+    expect(report.violations.some((v) => v.code === 'photoreal_forbidden')).toBe(false);
+  });
+
+  it('does not flag typography when body says symbol-only with no text', () => {
+    const symbolRequest: BrainGenerateRequest = {
+      industry: 'food',
+      markType: 'combination',
+    };
+    const report = evaluateConstraintCompliance(
+      { ...baseDecision, markType: 'combination' },
+      prompt(
+        'Abstract symbol-only mark, no text, no wordmark. Flat vector geometric pizza silhouette. Avoid: photorealism, mockups.',
+      ),
+      baseArchitecture,
+      symbolRequest,
+    );
+    expect(report.violations.some((v) => v.code === 'symbol_only_text')).toBe(false);
+  });
+
   it('does not treat style anti-patterns as client motif conflicts', () => {
     const architecture = {
       ...baseArchitecture,

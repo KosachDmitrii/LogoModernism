@@ -2,6 +2,7 @@ import type { LogoMarkType } from './types';
 import type { AbstractionLevel } from './client-visual-intent';
 import { exactBrandSpellingFragment, normalizeBrandName, hasExplicitBrandName, ensureSymbolOnlyDirectives, stripTextualMarkLanguage } from './brand-text';
 import { ensureModernistFormLanguage, sanitizeLiteralIndustryLanguage, buildAbstractIndustryFragment } from './industry-form-language';
+import { COMPLIANCE_METADATA_PATTERNS, stripComplianceMetadata } from './prompt-compliance';
 
 export interface PolishPromptOptions {
   clientNotes?: string;
@@ -80,6 +81,7 @@ const CONSTRUCTION_AXIS_PATTERNS: Array<{ pattern: RegExp; family: string; score
 ];
 
 const PIPELINE_METADATA_PATTERNS = [
+  ...COMPLIANCE_METADATA_PATTERNS,
   /\bPrompt ID:\s*[a-f0-9-]+\b/gi,
   /\bStyle preferences:\s*\{[\s\S]*?\}\b/gi,
   /\bCompany:\s*[^.,]+/gi,
@@ -445,7 +447,7 @@ function stripPipelineMetadata(body: string): string {
   for (const pattern of PIPELINE_METADATA_PATTERNS) {
     result = result.replace(pattern, '');
   }
-  return result.replace(/\s{2,}/g, ' ').trim();
+  return stripComplianceMetadata(result).replace(/\s{2,}/g, ' ').trim();
 }
 
 function avoidItemRedundantWithBody(body: string, item: string): boolean {

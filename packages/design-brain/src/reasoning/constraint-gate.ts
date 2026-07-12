@@ -7,41 +7,17 @@ import type {
   DesignDecision,
 } from '@logo-platform/shared';
 import {
+  bodyRecommendsTerm,
+  bodyRequiresTypography,
+  buildComplianceScanContext,
+  FLAT_VECTOR_POSITIVE_TERMS,
   hasExplicitBrandName,
   isStyleAntiPatternMotif,
+  MONOCHROME_POSITIVE_TERMS,
   normalizeBrandName,
   stylePreferenceOverrides,
 } from '@logo-platform/shared';
 import { enrichViolation, type ViolationContext } from './constraint-resolutions';
-
-function recommends(prompt: string, term: string): boolean {
-  const lower = prompt.toLowerCase();
-  const t = term.toLowerCase();
-  let start = 0;
-
-  while (true) {
-    const idx = lower.indexOf(t, start);
-    if (idx === -1) return false;
-
-    const prefix = lower.slice(Math.max(0, idx - 160), idx);
-    const lastSentenceBreak = Math.max(
-      prefix.lastIndexOf('.'),
-      prefix.lastIndexOf(';'),
-      prefix.lastIndexOf('\n'),
-    );
-    const sentencePrefix = prefix.slice(lastSentenceBreak + 1);
-
-    const isNegated =
-      /\b(no|without|avoid|avoiding|never|not|remove|forbid|forbidden|disallow|disallowed)\b[^.]*$/i.test(
-        sentencePrefix,
-      ) ||
-      /\bavoid\s*:[^.]*$/i.test(sentencePrefix) ||
-      /\banti-?patterns?\s*:[^.]*$/i.test(sentencePrefix);
-
-    if (!isNegated) return true;
-    start = idx + t.length;
-  }
-}
 
 function pushViolation(
   violations: ConstraintViolation[],
@@ -60,13 +36,14 @@ export function evaluateConstraintCompliance(
 ): ConstraintReport {
   const violations: ConstraintViolation[] = [];
   const text = prompt.text;
-  const lower = text.toLowerCase();
+  const { body: complianceBody } = buildComplianceScanContext(text);
+  const fullLower = text.toLowerCase();
   const brand = normalizeBrandName(request.companyName);
   const style = stylePreferenceOverrides(request.briefContext);
   const colorPalette = request.briefContext?.colorPalette;
   const ctx: ViolationContext = { promptText: text, decision, request, architecture };
 
-  if (brand && !lower.includes(brand.toLowerCase())) {
+  if (brand && !fullLower.includes(brand.toLowerCase())) {
     pushViolation(violations, ctx, {
       code: 'brand_missing',
       severity: 'error',
@@ -83,7 +60,7 @@ export function evaluateConstraintCompliance(
         message: 'Symbol-only brief cannot use wordmark or lettermark',
       });
     }
-    if (/\bwordmark\b|\blettermark\b|\btypography\b/.test(lower) && !lower.includes('no text')) {
+    if (bodyRequiresTypography(complianceBody)) {
       pushViolation(violations, ctx, {
         code: 'symbol_only_text',
         severity: 'error',
@@ -93,8 +70,8 @@ export function evaluateConstraintCompliance(
   }
 
   if (colorPalette === 'black_white' || colorPalette === 'monochrome') {
-    for (const term of ['gradient', 'multicolor', 'rainbow', 'accent color', 'vibrant palette']) {
-      if (recommends(lower, term)) {
+    for (const term of MONOCHROME_POSITIVE_TERMS) {
+      if (bodyRecommendsTerm(complianceBody, term)) {
         pushViolation(
           violations,
           ctx,
@@ -109,7 +86,7 @@ export function evaluateConstraintCompliance(
     }
   }
 
-  if (!style.allowShadows && recommends(lower, 'shadow')) {
+  if (!style.allowShadows && bodyRecommendsTerm(complianceBody, 'shadow')) {
     pushViolation(violations, ctx, {
       code: 'shadows_forbidden',
       severity: 'error',
@@ -118,8 +95,8 @@ export function evaluateConstraintCompliance(
   }
 
   if (!style.allowPhotoreal) {
-    for (const term of ['photoreal', '3d render', 'mockup', 'realistic photo']) {
-      if (recommends(lower, term)) {
+    for (const term of FLAT_VECTOR_POSITIVE_TERMS) {
+      if (bodyRecommendsTerm(complianceBody, term)) {
         pushViolation(
           violations,
           ctx,
@@ -138,8 +115,7 @@ export function evaluateConstraintCompliance(
     if (isStyleAntiPatternMotif(forbidden)) continue;
     const motif = forbidden.trim();
     if (motif.length <= 3) continue;
-    // Prefer full phrase so "literal reference" does not match every "literal …"
-    if (recommends(lower, motif.toLowerCase())) {
+    if (bodyRecommendsTerm(complianceBody, motif.toLowerCase())) {
       pushViolation(
         violations,
         ctx,

@@ -242,7 +242,7 @@ export const en = {
   'brief.checklist.color': 'Color palette',
   'brief.checklist.colorHint': 'Optional style preference',
   'brief.checklist.clientNotes': 'Client notes',
-  'brief.checklist.clientNotesHint': 'Step 5 on Build',
+  'brief.checklist.clientNotesHint': 'Client preferences and details',
   'brief.checklist.references': 'Catalog references',
   'brief.checklist.referencesHint': 'Logo Catalog inspiration',
 
