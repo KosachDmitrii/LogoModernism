@@ -1,11 +1,14 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Secrets / local env
 .env
 .env.*
 !.env.example
 
 # Build output
-dist
-**/dist
+dist/
+**/dist/
 *.tsbuildinfo
 
 # Runtime artifacts
@@ -15,4 +18,47 @@ backend/generated/
 # Pipeline / brain data (large or local)
 data/catalog-pipeline/pages/
 data/catalog-pipeline/samples/
+data/catalog-pipeline/*.log
 data/brain/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Vite / frontend cache
+.vite/
+
+# Python (catalog pipeline scripts)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / IDE (user-specific; shared .idea config may stay tracked)
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/shelf/
+.idea/**/httpRequests/
+.idea/**/dataSources/
+.idea/**/dataSources.local.xml
+.cursor/
+
+# Misc local
+*.swp
+*.swo
+.cache/
+*.local
+*.sqlite
+*.sqlite3
