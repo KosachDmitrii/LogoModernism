@@ -6,6 +6,7 @@
  * - Compliance checks scan only the body; Avoid lists prohibitions by definition.
  * - Pipeline metadata (Client forbids, constraint resolutions, etc.) is stripped
  *   from the body before scanning and during prompt finalization.
+ * - Inline negators ("no photorealism", "no shadows") must not count as violations.
  */
 
 export const FLAT_VECTOR_POSITIVE_TERMS = [
@@ -30,6 +31,11 @@ const NEGATED_CLAUSE_PREFIX =
 const NEGATED_CLAUSE_INLINE =
   /\b(?:client forbids?|forbidden|hard constraint|\[constraint resolution\])\b/i;
 
+const INLINE_NEGATOR_BEFORE_TERM =
+  /\b(?:no|without|avoid|avoiding|never|not|remove|forbid|forbidden|forbids|disallow|disallowed|must not|do not|don't|doesn't|cannot|can't)\s*$/i;
+
+const NEGATED_SPAN_PATTERN = /\b(?:no|without|avoid|avoiding|never|not)\s+[^.;]+/gi;
+
 /** Metadata echoed from brain/strategy that must not appear in image prompts or compliance scans. */
 export const COMPLIANCE_METADATA_PATTERNS: RegExp[] = [
   /\bClient forbids:\s*[^.]+\./gi,
@@ -43,14 +49,23 @@ export const COMPLIANCE_METADATA_PATTERNS: RegExp[] = [
 ];
 
 export function splitPromptForCompliance(text: string): { body: string; avoidSuffix: string } {
-  const idx = text.search(/\bAvoid:\s*/i);
-  if (idx === -1) {
-    return { body: text.trim(), avoidSuffix: '' };
+  const colonIdx = text.search(/\bAvoid:\s*/i);
+  if (colonIdx >= 0) {
+    return {
+      body: text.slice(0, colonIdx).trim().replace(/\.\s*$/, ''),
+      avoidSuffix: text.slice(colonIdx).trim(),
+    };
   }
-  return {
-    body: text.slice(0, idx).trim().replace(/\.\s*$/, ''),
-    avoidSuffix: text.slice(idx).trim(),
-  };
+
+  const bareAvoidMatch = text.match(/\bAvoid\s+(?=[a-z])/i);
+  if (bareAvoidMatch?.index != null && bareAvoidMatch.index > 0) {
+    return {
+      body: text.slice(0, bareAvoidMatch.index).trim().replace(/\.\s*$/, ''),
+      avoidSuffix: text.slice(bareAvoidMatch.index).trim(),
+    };
+  }
+
+  return { body: text.trim(), avoidSuffix: '' };
 }
 
 export function stripComplianceMetadata(body: string): string {
@@ -76,10 +91,29 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function isNegatedClause(clause: string): boolean {
-  const trimmed = clause.trim();
-  if (!trimmed) return false;
-  return NEGATED_CLAUSE_PREFIX.test(trimmed) || NEGATED_CLAUSE_INLINE.test(trimmed);
+function isTermNegatedInClause(clause: string, matchIndex: number): boolean {
+  const before = clause.slice(0, matchIndex);
+  const trimmedBefore = before.trim();
+
+  if (!trimmedBefore) return false;
+
+  if (NEGATED_CLAUSE_PREFIX.test(trimmedBefore) || NEGATED_CLAUSE_INLINE.test(trimmedBefore)) {
+    return true;
+  }
+
+  if (INLINE_NEGATOR_BEFORE_TERM.test(trimmedBefore)) {
+    return true;
+  }
+
+  for (const span of clause.matchAll(NEGATED_SPAN_PATTERN)) {
+    const start = span.index ?? 0;
+    const end = start + span[0].length;
+    if (matchIndex >= start && matchIndex < end) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -90,22 +124,28 @@ export function bodyRecommendsTerm(body: string, term: string): boolean {
   const normalized = stripComplianceMetadata(body);
   if (!normalized.trim()) return false;
 
-  const pattern = new RegExp(`\\b${escapeRegExp(term)}\\w*\\b`, 'i');
+  const pattern = new RegExp(`\\b${escapeRegExp(term)}\\w*\\b`, 'gi');
   const clauses = normalized.split(/[.;\n]+/);
 
   for (const clause of clauses) {
     const trimmed = clause.trim();
-    if (!trimmed || !pattern.test(trimmed)) continue;
-    if (isNegatedClause(trimmed)) continue;
-    return true;
+    if (!trimmed) continue;
+
+    for (const match of trimmed.matchAll(pattern)) {
+      const matchIndex = match.index ?? 0;
+      if (!isTermNegatedInClause(trimmed, matchIndex)) {
+        return true;
+      }
+    }
   }
 
   return false;
 }
 
 export function bodyRequiresTypography(body: string): boolean {
-  const normalized = stripComplianceMetadata(body).toLowerCase();
-  if (normalized.includes('no text') || normalized.includes('symbol-only') || normalized.includes('symbol only')) {
+  const normalized = stripComplianceMetadata(body);
+  const lower = normalized.toLowerCase();
+  if (lower.includes('no text') || lower.includes('symbol-only') || lower.includes('symbol only')) {
     return false;
   }
   return (
