@@ -105,7 +105,7 @@ async function buildCandidateFromUrl(
     sourceTitle: fetched.title || fallbackTitle || url,
     snippet: fallbackSnippet || summary.slice(0, 280),
     summary,
-    extractedText: text.slice(0, 4000),
+    extractedText: text,
     principles,
     sourceScore: initialScore ?? sourceScore,
     status: 'pending',

@@ -14,27 +14,21 @@ export function LanguageSwitcher() {
   const activeIndex = LOCALES.findIndex((item) => item.id === locale);
 
   return (
-    <div
-      className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]"
-      role="group"
-      aria-label={t('common.language')}
-    >
-      <div className="flex items-center gap-2 mb-2.5 px-0.5">
-        <Globe size={15} className="text-zinc-500 shrink-0" strokeWidth={1.75} />
-        <span className="text-sm font-medium text-zinc-400">{t('common.language')}</span>
+    <div className="flex items-center justify-between gap-3 px-0.5" role="group" aria-label={t('common.language')}>
+      <div className="flex items-center gap-1.5 min-w-0">
+        <Globe size={13} className="text-zinc-600 shrink-0" strokeWidth={1.5} />
+        <span className="text-xs text-zinc-500 truncate">{t('common.language')}</span>
       </div>
 
-      <div className="relative grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-950/90 ring-1 ring-inset ring-zinc-800/80">
+      <div className="relative flex shrink-0 p-0.5 rounded-lg bg-zinc-900/80 ring-1 ring-zinc-800/60">
         <div
           aria-hidden
           className={clsx(
-            'pointer-events-none absolute top-1 bottom-1 w-[calc(50%-6px)] rounded-lg',
-            'bg-gradient-to-b from-violet-500/20 to-violet-600/5',
-            'border border-violet-500/30',
-            'shadow-[0_0_16px_-4px_rgba(139,92,246,0.35)]',
-            'transition-[left] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
+            'pointer-events-none absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-md',
+            'bg-zinc-800/90 border border-zinc-700/50',
+            'transition-[left] duration-200 ease-out',
           )}
-          style={{ left: activeIndex === 0 ? '4px' : 'calc(50% + 2px)' }}
+          style={{ left: activeIndex === 0 ? '2px' : 'calc(50%)' }}
         />
 
         {LOCALES.map(({ id, key }) => {
@@ -47,9 +41,9 @@ export function LanguageSwitcher() {
               aria-checked={isActive}
               onClick={() => setLocale(id)}
               className={clsx(
-                'relative z-10 py-2 rounded-lg text-sm font-semibold tracking-wide transition-colors duration-200',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950',
-                isActive ? 'text-violet-100' : 'text-zinc-500 hover:text-zinc-300',
+                'relative z-10 w-8 py-1 rounded-md text-[11px] font-medium tracking-wide transition-colors duration-150',
+                'focus:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/50',
+                isActive ? 'text-zinc-100' : 'text-zinc-600 hover:text-zinc-400',
               )}
             >
               {t(key)}

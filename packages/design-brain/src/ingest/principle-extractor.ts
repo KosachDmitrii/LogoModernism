@@ -111,6 +111,41 @@ async function callOpenAi(
   return parsePrinciples(data.choices?.[0]?.message?.content ?? '[]');
 }
 
+const EXTRACT_CHUNK_SIZE = 8_000;
+const EXTRACT_CHUNK_OVERLAP = 400;
+const SUMMARY_EXCERPT_MAX = 12_000;
+
+function normalizeText(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function chunkForExtraction(text: string): string[] {
+  if (text.length <= EXTRACT_CHUNK_SIZE) return [text];
+
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    chunks.push(text.slice(start, start + EXTRACT_CHUNK_SIZE));
+    if (start + EXTRACT_CHUNK_SIZE >= text.length) break;
+    start += EXTRACT_CHUNK_SIZE - EXTRACT_CHUNK_OVERLAP;
+  }
+  return chunks;
+}
+
+function excerptForSummary(text: string): string {
+  if (text.length <= SUMMARY_EXCERPT_MAX) return text;
+  const half = Math.floor(SUMMARY_EXCERPT_MAX / 2);
+  return `${text.slice(0, half)}\n\n[... middle omitted for summary ...]\n\n${text.slice(-half)}`;
+}
+
+async function extractFromChunk(
+  chunk: string,
+  context?: string,
+): Promise<ExtractedPrinciple[]> {
+  const userContent = `${context ? `Context: ${context}\n\n` : ''}Source material:\n${chunk}`;
+  const brainstormed = await callOpenAi(BRAINSTORM_PROMPT, userContent, 3500);
+  return dedupePrinciples(brainstormed).slice(0, MAX_BRAINSTORM);
+}
 async function rankPrinciples(
   text: string,
   context: string | undefined,
@@ -129,7 +164,7 @@ async function rankPrinciples(
 
   const ranked = await callOpenAi(
     RANK_PROMPT,
-    `${context ? `Context: ${context}\n\n` : ''}Source excerpt:\n${text.slice(0, 3000)}\n\nCandidates (${candidates.length}):\n${numbered}`,
+    `${context ? `Context: ${context}\n\n` : ''}Source excerpt:\n${text.slice(0, 8000)}\n\nCandidates (${candidates.length}):\n${numbered}`,
     3200,
   );
 
@@ -148,21 +183,24 @@ export async function extractPrinciplesFromText(
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return [];
 
-  const trimmed = text.replace(/\s+/g, ' ').trim().slice(0, 6000);
+  const trimmed = normalizeText(text);
   if (!trimmed) return [];
 
-  const userContent = `${context ? `Context: ${context}\n\n` : ''}Source material:\n${trimmed}`;
+  const chunks = chunkForExtraction(trimmed);
+  const candidates: ExtractedPrinciple[] = [];
 
-  const brainstormed = await callOpenAi(BRAINSTORM_PROMPT, userContent, 3500);
-  const candidates = dedupePrinciples(brainstormed).slice(0, MAX_BRAINSTORM);
-
-  if (!candidates.length) return [];
-
-  if (candidates.length <= MIN_SELECTED) {
-    return candidates;
+  for (const chunk of chunks) {
+    candidates.push(...(await extractFromChunk(chunk, context)));
   }
 
-  return rankPrinciples(trimmed, context, candidates);
+  const deduped = dedupePrinciples(candidates);
+  if (!deduped.length) return [];
+
+  if (deduped.length <= MIN_SELECTED) {
+    return deduped;
+  }
+
+  return rankPrinciples(excerptForSummary(trimmed), context, deduped);
 }
 
 export async function summarizeText(text: string, title?: string): Promise<string> {
@@ -172,7 +210,7 @@ export async function summarizeText(text: string, title?: string): Promise<strin
   }
 
   const model = process.env.OPENAI_TEXT_MODEL ?? 'gpt-4o-mini';
-  const trimmed = text.replace(/\s+/g, ' ').trim().slice(0, 6000);
+  const trimmed = excerptForSummary(normalizeText(text));
   if (!trimmed) return '';
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {

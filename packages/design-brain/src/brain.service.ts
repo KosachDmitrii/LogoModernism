@@ -6,6 +6,7 @@ import type {
   BrainFeedbackInput,
   BrainGenerateRequest,
   BrainIngestResult,
+  BrainPdfIngestStartResult,
   BrainSearchRequest,
   BrainSearchResult,
   BrainSourceType,
@@ -18,11 +19,17 @@ import { EMBEDDING_DIMENSIONS } from './storage/paths';
 import { ingestFeedback } from './ingest/ingest-feedback';
 import { ingestImage, type IngestImageOptions } from './ingest/ingest-image';
 import { ingestPdf, checkPdfIngest, type IngestPdfOptions } from './ingest/ingest-pdf';
+import { hashPdfContent } from './ingest/pdf-dedup';
 import {
   clearPdfIngestProgress,
+  enqueuePdfIngest,
+  finalizePdfIngestJob,
+  getPdfIngestJobFile,
   getPdfIngestProgress,
+  readQueuedPdfBuffer,
+  registerPdfIngestProcessor,
   setPdfIngestProgress,
-} from './ingest/pdf-ingest-progress';
+} from './ingest/pdf-ingest-jobs';
 import { ensureBrainSchema, isPgvectorEnabled } from './storage/pgvector';
 import {
   getExperienceById,
@@ -53,6 +60,7 @@ export class DesignBrainService {
   private nightlyResearchTimer: NodeJS.Timeout | null = null;
 
   constructor() {
+    registerPdfIngestProcessor((jobId) => this.processQueuedPdfIngest(jobId));
     if (process.env.BRAIN_NIGHTLY_CONSOLIDATE === 'true') {
       this.nightlyTimer = scheduleNightlyConsolidation(() => this.consolidate());
     }
@@ -69,6 +77,87 @@ export class DesignBrainService {
     return prisma;
   }
 
+  async enqueuePdfIngest(options: IngestPdfOptions): Promise<BrainPdfIngestStartResult> {
+    const client = await this.getClient();
+    const contentHash = hashPdfContent(options.buffer);
+    const preCheck = await checkPdfIngest(client, options.title, contentHash);
+
+    if (preCheck.alreadyIngested) {
+      return enqueuePdfIngest({
+        jobId: options.jobId ?? `pdf-${Date.now()}`,
+        title: options.title,
+        fileName: options.originalName,
+        buffer: options.buffer,
+        preSkipped: {
+          message: preCheck.message,
+          result: {
+            experienceId: '',
+            sourceType: 'PDF',
+            title: options.title,
+            chunksStored: 0,
+            principlesExtracted: 0,
+            skipped: true,
+            alreadyIngested: true,
+            contentHash,
+            summary: preCheck.message,
+          },
+        },
+      });
+    }
+
+    if (!options.jobId) {
+      throw new Error('jobId is required for background PDF ingest');
+    }
+
+    return enqueuePdfIngest({
+      jobId: options.jobId,
+      title: options.title,
+      fileName: options.originalName,
+      buffer: options.buffer,
+    });
+  }
+
+  private async processQueuedPdfIngest(jobId: string): Promise<void> {
+    const file = getPdfIngestJobFile(jobId);
+    if (!file) {
+      throw new Error(`PDF ingest job not found: ${jobId}`);
+    }
+
+    const buffer = readQueuedPdfBuffer(jobId);
+    if (!buffer) {
+      throw new Error(`PDF file missing for job: ${jobId}`);
+    }
+
+    const client = await this.getClient();
+    try {
+      const result = await ingestPdf(client, {
+        buffer,
+        savedPath: file.savedPath,
+        originalName: file.fileName,
+        title: file.title,
+        jobId,
+      });
+
+      finalizePdfIngestJob(jobId, {
+        status: result.alreadyIngested || result.skipped ? 'skipped' : 'done',
+        phase: 'done',
+        result,
+        message: result.summary,
+        finishedAt: new Date().toISOString(),
+        processedChunks: result.chunksStored,
+      });
+    } catch (error) {
+      finalizePdfIngestJob(jobId, {
+        status: 'error',
+        phase: 'error',
+        message: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : String(error),
+        finishedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  /** @deprecated Use enqueuePdfIngest for API uploads. Kept for direct/tests. */
   async ingestPdf(options: IngestPdfOptions): Promise<BrainIngestResult> {
     const client = await this.getClient();
     try {

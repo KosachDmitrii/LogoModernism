@@ -5,7 +5,7 @@ export { ingestPdf } from './ingest/ingest-pdf';
 export {
   getPdfIngestProgress,
   clearPdfIngestProgress,
-} from './ingest/pdf-ingest-progress';
+} from './ingest/pdf-ingest-jobs';
 export { ingestImage } from './ingest/ingest-image';
 export { ingestFeedback } from './ingest/ingest-feedback';
 export { ingestWebResearch } from './ingest/ingest-web';

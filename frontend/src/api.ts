@@ -7,6 +7,7 @@ import type {
   BrainIngestResult,
   BrainPdfIngestCheck,
   BrainPdfIngestProgress,
+  BrainPdfIngestStartResult,
   BrainResearchCandidate,
   BrainResearchRunResult,
   BrainStats,
@@ -351,7 +352,7 @@ export async function ingestBrainPdf(
   file: File,
   title: string,
   jobId: string,
-): Promise<BrainIngestResult> {
+): Promise<BrainPdfIngestStartResult> {
   const form = new FormData();
   form.append('file', file);
   form.append('title', title);

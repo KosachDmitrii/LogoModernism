@@ -96,8 +96,6 @@ export const en = {
   'prompts.results.empty': 'No prompts yet.',
   'prompts.results.goToBrief': 'Go to Brief to compose →',
   'prompts.results.rankedCount': '{count} prompts ranked by quality',
-  'prompts.results.stepHint':
-    'Step 3: pick a prompt → Generate logo on the card. The active creative direction above is written into the top-ranked prompt.',
   'prompts.results.generateLogo': 'Generate logo',
   'prompts.results.backToBrief': 'Back to Brief',
   'prompts.results.regenerateAuto': 'Regenerate (auto-pick direction)',
@@ -422,6 +420,9 @@ export const en = {
   'brain.uploadTitlePlaceholder': 'e.g. Logo Modernism',
   'brain.uploadStoredResult': 'Stored {chunks} chunks, {principles} principles',
   'brain.ingestComplete': 'Ingest complete',
+  'brain.ingest.queued': 'Queued — processing continues on the server',
+  'brain.ingest.jobLost':
+    'Processing status lost (server may have restarted). Re-upload the same PDF to resume.',
   'brain.research.title': 'Autonomous research',
   'brain.research.description':
     'Enter a topic — Brain composes search phrases, searches Tavily + Wikipedia + Brave + Internet Archive in parallel, extracts principles with citations, and waits for approval.',

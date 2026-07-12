@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { BrainIngestResult, BrainPdfIngestCheck } from '../types';
-import { checkBrainPdfIngest, ingestBrainPdf } from '../api';
+import type { BrainIngestResult, BrainPdfIngestCheck, BrainPdfIngestProgress } from '../types';
+import { checkBrainPdfIngest, getBrainPdfIngestProgress, ingestBrainPdf } from '../api';
 import { ApiError } from '../lib/api-error';
 import type { MessageKey } from '../i18n';
 
@@ -32,7 +32,9 @@ export interface BrainIngestJob {
 interface BrainIngestState {
   jobs: BrainIngestJob[];
   activeJobId: string | null;
-  startPdfIngest: (file: File, title: string) => Promise<BrainIngestJob>;
+  startPdfIngest: (file: File) => Promise<BrainIngestJob>;
+  applyServerJobState: (jobId: string, server: BrainPdfIngestProgress) => void;
+  markIngestJobLost: (jobId: string) => void;
   clearFinishedJobs: () => void;
   dismissJob: (id: string) => void;
 }
@@ -51,17 +53,36 @@ async function hashFile(file: File): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+function titleFromPdfFileName(fileName: string): string {
+  const base = fileName.replace(/\.pdf$/i, '').replace(/[-_]+/g, ' ').trim();
+  return base || fileName;
+}
+
+function mapServerStatus(status: BrainPdfIngestProgress['status']): BrainIngestJobStatus {
+  switch (status) {
+    case 'queued':
+    case 'parsing':
+    case 'processing':
+      return 'processing';
+    case 'done':
+      return 'done';
+    case 'skipped':
+      return 'skipped';
+    case 'error':
+      return 'error';
+    default:
+      return 'processing';
+  }
+}
+
 export const useBrainIngestStore = create<BrainIngestState>()(
   persist(
     (set) => ({
       jobs: [],
       activeJobId: null,
 
-      startPdfIngest: async (file, title) => {
-        const trimmedTitle = title.trim();
-        if (!trimmedTitle) {
-          throw new ApiError('brain.upload.titleRequired');
-        }
+      startPdfIngest: async (file) => {
+        const trimmedTitle = titleFromPdfFileName(file.name);
 
         const id = `pdf-${Date.now()}`;
         const job: BrainIngestJob = {
@@ -121,21 +142,34 @@ export const useBrainIngestStore = create<BrainIngestState>()(
             }),
           }));
 
-          const result = await ingestBrainPdf(file, trimmedTitle, id);
-          const finished: Partial<BrainIngestJob> = {
-            status: result.alreadyIngested || result.skipped ? 'skipped' : 'done',
-            finishedAt: new Date().toISOString(),
-            result,
-            message: result.summary,
-            messageKey: result.summary ? undefined : 'brain.ingestComplete',
-          };
+          const queued = await ingestBrainPdf(file, trimmedTitle, id);
+
+          if (queued.status === 'skipped') {
+            const server = await getBrainPdfIngestProgress(id);
+            if (server) {
+              const finished: Partial<BrainIngestJob> = {
+                status: 'skipped',
+                finishedAt: server.finishedAt ?? new Date().toISOString(),
+                message: server.message,
+                result: server.result,
+              };
+              set((state) => ({
+                jobs: updateJob(state.jobs, id, finished),
+                activeJobId: null,
+              }));
+              return { ...job, ...finished, contentHash, check } as BrainIngestJob;
+            }
+          }
 
           set((state) => ({
-            jobs: updateJob(state.jobs, id, finished),
-            activeJobId: state.activeJobId === id ? null : state.activeJobId,
+            jobs: updateJob(state.jobs, id, {
+              status: 'processing',
+              message: queued.message,
+              messageKey: queued.message ? undefined : 'brain.ingest.queued',
+            }),
           }));
 
-          return { ...job, ...finished, contentHash, check } as BrainIngestJob;
+          return { ...job, contentHash, check, status: 'processing' } as BrainIngestJob;
         } catch (error) {
           const message = error instanceof ApiError
             ? undefined
@@ -157,6 +191,38 @@ export const useBrainIngestStore = create<BrainIngestState>()(
         }
       },
 
+      applyServerJobState: (jobId, server) =>
+        set((state) => {
+          const mappedStatus = mapServerStatus(server.status);
+          const terminal =
+            mappedStatus === 'done' || mappedStatus === 'skipped' || mappedStatus === 'error';
+
+          return {
+            jobs: updateJob(state.jobs, jobId, {
+              status: mappedStatus,
+              message: server.message ?? server.error,
+              messageKey: undefined,
+              result: server.result,
+              error: server.error,
+              finishedAt: terminal
+                ? server.finishedAt ?? new Date().toISOString()
+                : undefined,
+            }),
+            activeJobId: terminal && state.activeJobId === jobId ? null : state.activeJobId,
+          };
+        }),
+
+      markIngestJobLost: (jobId) =>
+        set((state) => ({
+          jobs: updateJob(state.jobs, jobId, {
+            status: 'error',
+            messageKey: 'brain.ingest.jobLost',
+            message: undefined,
+            finishedAt: new Date().toISOString(),
+          }),
+          activeJobId: state.activeJobId === jobId ? null : state.activeJobId,
+        })),
+
       clearFinishedJobs: () =>
         set((state) => ({
           jobs: state.jobs.filter(
@@ -172,7 +238,7 @@ export const useBrainIngestStore = create<BrainIngestState>()(
     }),
     {
       name: 'logo-platform-brain-ingest',
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ jobs: state.jobs, activeJobId: state.activeJobId }),
     },
   ),

@@ -99,8 +99,6 @@ export const ru: Record<MessageKey, string> = {
   'prompts.results.empty': 'Промптов пока нет.',
   'prompts.results.goToBrief': 'Перейти к брифу →',
   'prompts.results.rankedCount': '{count} промптов, отсортированных по качеству',
-  'prompts.results.stepHint':
-    'Шаг 3: выберите промпт → Generate logo на карточке. Активное креативное направление выше записывается в топовый промпт.',
   'prompts.results.generateLogo': 'Сгенерировать лого',
   'prompts.results.backToBrief': 'Назад к брифу',
   'prompts.results.regenerateAuto': 'Перегенерировать (авто-выбор направления)',
@@ -428,6 +426,9 @@ export const ru: Record<MessageKey, string> = {
   'brain.uploadTitlePlaceholder': 'например Logo Modernism',
   'brain.uploadStoredResult': 'Сохранено {chunks} чанков, {principles} принципов',
   'brain.ingestComplete': 'Загрузка завершена',
+  'brain.ingest.queued': 'В очереди — обработка идёт на сервере',
+  'brain.ingest.jobLost':
+    'Статус обработки потерян (возможно, сервер перезапустился). Загрузите тот же PDF снова — продолжится с места остановки.',
   'brain.research.title': 'Автономный research',
   'brain.research.description':
     'Введите тему — Brain составляет поисковые фразы, ищет в Tavily + Wikipedia + Brave + Internet Archive, извлекает принципы с цитатами и ждёт одобрения.',

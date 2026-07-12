@@ -71,12 +71,20 @@ export class DesignBrainApiService {
     return designBrain.rejectResearch(id);
   }
 
-  ingestPdf(buffer: Buffer, originalName: string, title: string, jobId?: string) {
+  enqueuePdfIngest(buffer: Buffer, originalName: string, title: string, jobId: string) {
     const trimmed = title?.trim();
     if (!trimmed) {
       throw new BadRequestException('Title is required');
     }
-    return designBrain.ingestPdf({ buffer, originalName, title: trimmed, jobId }).catch((error) => {
+    if (!jobId?.trim()) {
+      throw new BadRequestException('jobId is required');
+    }
+    return designBrain.enqueuePdfIngest({
+      buffer,
+      originalName,
+      title: trimmed,
+      jobId: jobId.trim(),
+    }).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       if (
         message.includes('no extractable text') ||

@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import type { BrainIngestResult, BrainPdfIngestCheck } from '@logo-platform/shared';
+import type { BrainIngestResult, BrainPdfIngestCheck, BrainPdfIngestPhase } from '@logo-platform/shared';
 import type { PrismaClient } from '@logo-platform/database';
 import { embedText } from '../embedding/embedding.service';
 import { createExperience, upsertLearnedPrinciple } from '../storage/experience.repository';
@@ -14,8 +14,7 @@ import {
   hashPdfContent,
   normalizeBookTitle,
 } from './pdf-dedup';
-import { setPdfIngestProgress } from './pdf-ingest-progress';
-import type { BrainPdfIngestProgress } from '@logo-platform/shared';
+import { setPdfIngestProgress } from './pdf-ingest-jobs';
 
 const MIN_CHUNK_LENGTH = 120;
 const MAX_CHUNK_LENGTH = 3500;
@@ -25,12 +24,25 @@ export interface IngestPdfOptions {
   originalName: string;
   title: string;
   jobId?: string;
-  onProgress?: (progress: BrainPdfIngestProgress) => void;
+  savedPath?: string;
+  onProgress?: (progress: {
+    phase: BrainPdfIngestPhase;
+    pageCount?: number;
+    totalChunks?: number;
+    processedChunks?: number;
+    message?: string;
+  }) => void;
 }
 
 function reportProgress(
   options: IngestPdfOptions,
-  progress: BrainPdfIngestProgress,
+  progress: {
+    phase: BrainPdfIngestPhase;
+    pageCount?: number;
+    totalChunks?: number;
+    processedChunks?: number;
+    message?: string;
+  },
 ): void {
   if (options.jobId) {
     setPdfIngestProgress(options.jobId, progress);
@@ -94,10 +106,15 @@ export async function ingestPdf(
   const contentHash = hashPdfContent(options.buffer);
   const preCheck = await checkPdfIngestStatus(prisma, title, contentHash);
 
-  mkdirSync(getBrainUploadsDir(), { recursive: true });
-  const savedName = `${Date.now()}-${basename(options.originalName).replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-  const savedPath = join(getBrainUploadsDir(), savedName);
-  writeFileSync(savedPath, options.buffer);
+  let savedPath: string;
+  if (options.savedPath) {
+    savedPath = options.savedPath;
+  } else {
+    mkdirSync(getBrainUploadsDir(), { recursive: true });
+    const savedName = `${Date.now()}-${basename(options.originalName).replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    savedPath = join(getBrainUploadsDir(), savedName);
+    writeFileSync(savedPath, options.buffer);
+  }
 
   reportProgress(options, {
     phase: 'parsing',

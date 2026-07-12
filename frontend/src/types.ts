@@ -412,11 +412,34 @@ export interface BrainPdfIngestCheck {
 
 export type BrainPdfIngestPhase = 'parsing' | 'processing' | 'done' | 'error';
 
+export type BrainPdfIngestJobStatus =
+  | 'queued'
+  | 'parsing'
+  | 'processing'
+  | 'done'
+  | 'skipped'
+  | 'error';
+
 export interface BrainPdfIngestProgress {
-  phase: BrainPdfIngestPhase;
+  jobId: string;
+  title: string;
+  fileName: string;
+  contentHash?: string;
+  status: BrainPdfIngestJobStatus;
+  phase?: BrainPdfIngestPhase;
   pageCount?: number;
   totalChunks?: number;
   processedChunks?: number;
+  message?: string;
+  result?: BrainIngestResult;
+  error?: string;
+  startedAt: string;
+  finishedAt?: string;
+}
+
+export interface BrainPdfIngestStartResult {
+  jobId: string;
+  status: BrainPdfIngestJobStatus;
   message?: string;
 }
 

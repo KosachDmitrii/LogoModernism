@@ -127,7 +127,10 @@ export class DesignBrainController {
     if (!title?.trim()) {
       throw new BadRequestException('Title is required');
     }
-    return this.service.ingestPdf(file.buffer, file.originalname, title, jobId?.trim());
+    if (!jobId?.trim()) {
+      throw new BadRequestException('jobId is required');
+    }
+    return this.service.enqueuePdfIngest(file.buffer, file.originalname, title, jobId.trim());
   }
 
   @Post('ingest/image')

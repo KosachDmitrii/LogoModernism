@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { getBrainPdfIngestProgress } from '../api';
-import type { BrainPdfIngestProgress } from '../types';
+import type { BrainPdfIngestJobStatus, BrainPdfIngestProgress } from '../types';
+import { useBrainIngestStore } from '../stores/brain-ingest-store';
 
 export interface PdfUploadUiProgress {
   pageCount?: number;
   percent: number;
-  phase: BrainPdfIngestProgress['phase'] | 'waiting';
+  phase: BrainPdfIngestProgress['phase'] | BrainPdfIngestJobStatus | 'waiting';
+  status: BrainPdfIngestJobStatus | 'waiting';
 }
 
 function toUiPercent(server: BrainPdfIngestProgress, resumeRatio: number | null): number | null {
+  if (server.status === 'done' || server.status === 'skipped') return 100;
   if (server.phase === 'done') return 100;
 
   if (
@@ -19,9 +22,11 @@ function toUiPercent(server: BrainPdfIngestProgress, resumeRatio: number | null)
     return Math.round((server.processedChunks / server.totalChunks) * 100);
   }
 
-  if (server.phase === 'parsing' && resumeRatio != null && resumeRatio > 0) {
+  if ((server.phase === 'parsing' || server.status === 'parsing') && resumeRatio != null && resumeRatio > 0) {
     return Math.round(resumeRatio * 100);
   }
+
+  if (server.status === 'queued') return 0;
 
   return null;
 }
@@ -33,10 +38,14 @@ export function useBrainPdfIngestProgress(
 ): PdfUploadUiProgress | null {
   const [ui, setUi] = useState<PdfUploadUiProgress | null>(null);
   const maxPercentRef = useRef(0);
+  const missCountRef = useRef(0);
+  const applyServerJobState = useBrainIngestStore((s) => s.applyServerJobState);
+  const markIngestJobLost = useBrainIngestStore((s) => s.markIngestJobLost);
 
   useEffect(() => {
     if (!jobId || !enabled) {
       maxPercentRef.current = 0;
+      missCountRef.current = 0;
       setUi(null);
       return;
     }
@@ -44,7 +53,11 @@ export function useBrainPdfIngestProgress(
     const initial =
       resumeRatio != null && resumeRatio > 0 ? Math.round(resumeRatio * 100) : 0;
     maxPercentRef.current = initial;
-    setUi(initial > 0 ? { percent: initial, phase: 'waiting' } : null);
+    setUi(
+      initial > 0
+        ? { percent: initial, phase: 'waiting', status: 'waiting' }
+        : null,
+    );
 
     let cancelled = false;
     const poll = async () => {
@@ -52,17 +65,27 @@ export function useBrainPdfIngestProgress(
         const server = await getBrainPdfIngestProgress(jobId);
         if (cancelled) return;
 
+        missCountRef.current = 0;
+        applyServerJobState(jobId, server);
+
         const next = toUiPercent(server, resumeRatio);
         const monotonic = Math.max(maxPercentRef.current, next ?? maxPercentRef.current);
         maxPercentRef.current = monotonic;
 
+        const phase = server.phase ?? server.status;
+
         setUi({
           pageCount: server.pageCount,
           percent: monotonic,
-          phase: server.phase,
+          phase,
+          status: server.status,
         });
       } catch {
-        // Progress is unavailable until the server starts processing the upload.
+        if (cancelled) return;
+        missCountRef.current += 1;
+        if (missCountRef.current >= 45) {
+          markIngestJobLost(jobId);
+        }
       }
     };
 
@@ -73,7 +96,7 @@ export function useBrainPdfIngestProgress(
       cancelled = true;
       clearInterval(timer);
     };
-  }, [jobId, enabled, resumeRatio]);
+  }, [jobId, enabled, resumeRatio, applyServerJobState, markIngestJobLost]);
 
   return ui;
 }

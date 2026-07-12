@@ -114,11 +114,8 @@ export function PromptsPage() {
                   }
                 />
               )}
-              <p className="text-sm text-zinc-400 mb-1">
+              <p className="text-sm text-zinc-400 mb-4">
                 {t('prompts.results.rankedCount', { count: prompts.length })}
-              </p>
-              <p className="text-xs text-zinc-600 mb-4 leading-relaxed">
-                {t('prompts.results.stepHint')}
               </p>
               <div id="prompt-results" className="space-y-4 scroll-mt-6">
                 {prompts.map((prompt, i) => (

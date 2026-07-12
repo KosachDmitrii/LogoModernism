@@ -59,12 +59,54 @@ export function DesignBrainPage() {
   const isLoading =
     healthLoading || statsLoading || tasteLoading || principlesLoading || pendingResearchLoading;
 
-  const [pdfTitle, setPdfTitle] = useState('');
   const [researchQuery, setResearchQuery] = useState('');
   const [manualUrl, setManualUrl] = useState('');
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [researchError, setResearchError] = useState<string | null>(null);
+  const [candidateActions, setCandidateActions] = useState<
+    Record<string, 'approve' | 'reject'>
+  >({});
   const lastInvalidatedRef = useRef<string | null>(null);
+
+  const setCandidateAction = (id: string, action: 'approve' | 'reject' | null) => {
+    setCandidateActions((prev) => {
+      if (action === null) {
+        if (!(id in prev)) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }
+      return { ...prev, [id]: action };
+    });
+  };
+
+  const handleApproveCandidate = async (id: string) => {
+    setCandidateAction(id, 'approve');
+    setResearchError(null);
+    try {
+      await approveBrainResearch(id);
+      await queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
+      queryClient.invalidateQueries({ queryKey: ['brain-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['brain-principles'] });
+    } catch (error) {
+      setResearchError(formatError(error, t));
+    } finally {
+      setCandidateAction(id, null);
+    }
+  };
+
+  const handleRejectCandidate = async (id: string) => {
+    setCandidateAction(id, 'reject');
+    setResearchError(null);
+    try {
+      await rejectBrainResearch(id);
+      await queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
+    } catch (error) {
+      setResearchError(formatError(error, t));
+    } finally {
+      setCandidateAction(id, null);
+    }
+  };
 
   const startPdfIngest = useBrainIngestStore((s) => s.startPdfIngest);
   const ingestJobs = useBrainIngestStore((s) => s.jobs);
@@ -74,16 +116,9 @@ export function DesignBrainPage() {
   const liveProgress = useBrainPdfIngestProgress(activePdfJob?.id, isPdfIngesting, resumeRatio);
 
   const latestPdfJob = ingestJobs[0];
-  const displayPdfTitle = activePdfJob?.title ?? pdfTitle;
   const latestFinishedAt = ingestJobs.find(
     (j) => j.status === 'done' || j.status === 'skipped',
   )?.finishedAt;
-
-  useEffect(() => {
-    if (activePdfJob?.title && !pdfTitle.trim()) {
-      setPdfTitle(activePdfJob.title);
-    }
-  }, [activePdfJob?.title, pdfTitle]);
 
   useEffect(() => {
     if (!latestFinishedAt || latestFinishedAt === lastInvalidatedRef.current) return;
@@ -93,14 +128,9 @@ export function DesignBrainPage() {
   }, [latestFinishedAt, queryClient]);
 
   const handlePdfUpload = async (file: File) => {
-    const title = pdfTitle.trim();
-    if (!title) {
-      setPdfError(t('brain.upload.titleRequired'));
-      return;
-    }
     setPdfError(null);
     try {
-      await startPdfIngest(file, title);
+      await startPdfIngest(file);
     } catch (error) {
       setPdfError(formatError(error, t));
     }
@@ -135,22 +165,6 @@ export function DesignBrainPage() {
       queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
     },
     onError: (error) => setResearchError(formatError(error, t)),
-  });
-
-  const approveResearch = useMutation({
-    mutationFn: approveBrainResearch,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
-      queryClient.invalidateQueries({ queryKey: ['brain-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['brain-principles'] });
-    },
-  });
-
-  const rejectResearch = useMutation({
-    mutationFn: rejectBrainResearch,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
-    },
   });
 
   const tabs: Array<{ id: Tab; labelKey: MessageKey; icon: typeof Brain }> = [
@@ -334,23 +348,10 @@ export function DesignBrainPage() {
             description={t('brain.uploadPdfDescription')}
             icon={FileText}
           >
-            <label className="block text-xs text-zinc-500 mb-1">
-              {t('brain.uploadTitleLabel')} <span className="text-red-400">*</span>
-            </label>
-            <input
-              value={displayPdfTitle}
-              onChange={(e) => {
-                setPdfTitle(e.target.value);
-                if (e.target.value.trim()) setPdfError(null);
-              }}
-              placeholder={t('brain.uploadTitlePlaceholder')}
-              disabled={isPdfIngesting}
-              className="w-full mb-1 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-sm disabled:opacity-60"
-            />
             <FileUpload
               accept=".pdf"
               loading={isPdfIngesting}
-              disabled={!displayPdfTitle.trim() && !isPdfIngesting}
+              disabled={isPdfIngesting}
               statusTitle={activePdfJob?.title}
               progress={liveProgress}
               onFile={handlePdfUpload}
@@ -466,10 +467,10 @@ export function DesignBrainPage() {
               <ResearchCandidateCard
                 key={candidate.id}
                 candidate={candidate}
-                onApprove={() => approveResearch.mutate(candidate.id)}
-                onReject={() => rejectResearch.mutate(candidate.id)}
-                isApproving={approveResearch.isPending && approveResearch.variables === candidate.id}
-                isRejecting={rejectResearch.isPending && rejectResearch.variables === candidate.id}
+                onApprove={() => handleApproveCandidate(candidate.id)}
+                onReject={() => handleRejectCandidate(candidate.id)}
+                isApproving={candidateActions[candidate.id] === 'approve'}
+                isRejecting={candidateActions[candidate.id] === 'reject'}
               />
             ))}
             {!pendingResearch?.length && (
@@ -546,7 +547,7 @@ function ResearchCandidateCard({
           type="button"
           onClick={onApprove}
           disabled={isApproving || isRejecting}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-700 text-white text-xs font-medium hover:bg-emerald-600 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-700 text-white text-xs font-medium hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-wait"
         >
           {isApproving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           {t('brain.research.approveLearn')}
@@ -555,7 +556,7 @@ function ResearchCandidateCard({
           type="button"
           onClick={onReject}
           disabled={isApproving || isRejecting}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-wait"
         >
           {isRejecting ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
           {t('common.reject')}
@@ -630,7 +631,8 @@ function FileUpload({
   progress?: {
     pageCount?: number;
     percent: number;
-    phase?: 'parsing' | 'processing' | 'done' | 'error' | 'waiting';
+    phase?: 'parsing' | 'processing' | 'done' | 'error' | 'queued' | 'skipped' | 'waiting';
+    status?: 'queued' | 'parsing' | 'processing' | 'done' | 'skipped' | 'error' | 'waiting';
   } | null;
   onFile: (file: File) => void;
 }) {
@@ -638,11 +640,13 @@ function FileUpload({
 
   const statusLine = progress?.pageCount
     ? t('brain.pagesProcessing', { count: progress.pageCount })
-    : progress?.phase === 'parsing'
-      ? t('common.preparingPdf')
-      : loading
-        ? t('common.uploadingPdf')
-        : null;
+    : progress?.phase === 'queued' || progress?.status === 'queued'
+      ? t('brain.ingest.queued')
+      : progress?.phase === 'parsing'
+        ? t('common.preparingPdf')
+        : loading
+          ? t('common.uploadingPdf')
+          : null;
 
   const displayPercent = progress?.percent ?? null;
 
@@ -684,7 +688,7 @@ function FileUpload({
         )
       ) : (
         <span className="text-xs text-zinc-500">
-          {disabled ? t('common.enterTitleFirst') : t('common.clickToUpload')}
+          {t('common.clickToUpload')}
         </span>
       )}
       <input

@@ -34,11 +34,9 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-zinc-800/80 space-y-3">
+        <div className="px-4 py-3 border-t border-zinc-800/80 space-y-2">
           <LanguageSwitcher />
-          <p className="px-1 text-xs font-mono text-zinc-600 tracking-wider">
-            {t('layout.version')}
-          </p>
+          <p className="text-[10px] font-mono text-zinc-700 tracking-wider">{t('layout.version')}</p>
         </div>
       </aside>
 

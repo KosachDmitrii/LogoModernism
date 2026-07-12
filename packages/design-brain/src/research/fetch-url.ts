@@ -2,9 +2,7 @@ import { gunzipSync } from 'node:zlib';
 import { sanitizePostgresText } from '../storage/sanitize-text';
 import { archiveIdentifierFromUrl, isArchiveUrl } from './archive-search';
 
-const MAX_BYTES = 500_000;
-const MAX_TEXT_LENGTH = 12_000;
-const FETCH_TIMEOUT_MS = 20_000;
+const FETCH_TIMEOUT_MS = 60_000;
 
 function stripHtml(html: string): string {
   const withoutScripts = html
@@ -128,8 +126,7 @@ async function downloadArchiveFile(
     if (!response.ok) return null;
 
     const buffer = await response.arrayBuffer();
-    const slice = buffer.byteLength > MAX_BYTES ? buffer.slice(0, MAX_BYTES) : buffer;
-    const text = decodeArchiveBuffer(slice, fileName).slice(0, MAX_TEXT_LENGTH);
+    const text = decodeArchiveBuffer(buffer, fileName);
     return text.length >= 120 ? text : null;
   } catch {
     return null;
@@ -155,10 +152,10 @@ async function fetchArchiveDetailsDescription(identifier: string): Promise<strin
       /<div[^>]*id="descript"[^>]*>([\s\S]*?)<\/div>/i,
     );
     if (!descriptionMatch?.[1]) {
-      return stripHtml(html).slice(0, MAX_TEXT_LENGTH);
+      return stripHtml(html);
     }
 
-    return stripHtml(descriptionMatch[1]).slice(0, MAX_TEXT_LENGTH);
+    return stripHtml(descriptionMatch[1]);
   } catch {
     return '';
   } finally {
@@ -197,7 +194,7 @@ async function fetchArchiveText(url: string): Promise<{ title: string; text: str
     (await fetchArchiveDetailsDescription(identifier));
 
   if (description.length >= 120) {
-    return { title, text: description.slice(0, MAX_TEXT_LENGTH) };
+    return { title, text: description };
   }
 
   throw new Error(
@@ -218,7 +215,7 @@ export async function fetchUrlText(url: string): Promise<{ title: string; text: 
     }
     return {
       title: decodeURIComponent(url.split('/wiki/')[1] ?? 'Wikipedia').replace(/_/g, ' '),
-      text: text.slice(0, MAX_TEXT_LENGTH),
+      text,
     };
   }
 
@@ -244,24 +241,16 @@ export async function fetchUrlText(url: string): Promise<{ title: string; text: 
     }
 
     const contentType = response.headers.get('content-type') ?? '';
-    const buffer = await response.arrayBuffer();
-    const truncated = buffer.byteLength > MAX_BYTES;
-    const slice = truncated ? buffer.slice(0, MAX_BYTES) : buffer;
-
-    const raw = new TextDecoder('utf-8', { fatal: false }).decode(slice);
+    const raw = await response.text();
     const titleMatch = raw.match(/<title[^>]*>([^<]+)<\/title>/i);
     const title = sanitizePostgresText(titleMatch?.[1]?.trim()) ?? parsed.hostname;
 
     const text = contentType.includes('text/html')
-      ? stripHtml(raw).slice(0, MAX_TEXT_LENGTH)
-      : raw.replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT_LENGTH);
+      ? stripHtml(raw)
+      : raw.replace(/\s+/g, ' ').trim();
 
     if (text.length < 120) {
       throw new Error('Not enough readable text on this page');
-    }
-
-    if (truncated) {
-      console.info(`[design-brain] truncated large page to ${MAX_BYTES} bytes: ${url}`);
     }
 
     return { title, text };
