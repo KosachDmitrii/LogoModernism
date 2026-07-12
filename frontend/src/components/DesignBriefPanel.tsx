@@ -37,6 +37,14 @@ const BRIEF_FIELD_KEYS: Array<{ key: TextBriefField; labelKey: MessageKey; rows?
   { key: 'critiqueNote', labelKey: 'brief.panel.field.critique' },
 ];
 
+function colorPaletteLabel(
+  value: DesignBrief['colorPalette'],
+  t: ReturnType<typeof useT>,
+): string {
+  const option = COLOR_OPTIONS.find((item) => item.value === value);
+  return option ? t(option.labelKey) : value;
+}
+
 export function DesignBriefPanel() {
   const t = useT();
   const designBrief = useAppStore((s) => s.designBrief);
@@ -50,6 +58,20 @@ export function DesignBriefPanel() {
       </div>
     );
   }
+
+  const filledTextFields = BRIEF_FIELD_KEYS.filter(({ key }) => designBrief[key].trim());
+  const hasColorPalette = Boolean(designBrief.colorPalette);
+  const hasStyleExtras =
+    designBrief.colorSelections.length > 0 || designBrief.allowShadows || designBrief.allowPhotoreal;
+  const hasCatalogRefs = (designBrief.catalogReferenceIds?.length ?? 0) > 0;
+  const hasFieldContent =
+    Boolean(designBrief.era.trim()) ||
+    Boolean(designBrief.markType) ||
+    Boolean(designBrief.typographyStyle) ||
+    hasColorPalette ||
+    hasStyleExtras ||
+    hasCatalogRefs ||
+    filledTextFields.length > 0;
 
   return (
     <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
@@ -77,6 +99,10 @@ export function DesignBriefPanel() {
         </button>
       </div>
 
+      {!hasFieldContent && (
+        <p className="text-xs text-zinc-500">{t('brief.panel.noFieldsYet')}</p>
+      )}
+
       {designBrief.era.trim() && (
         <p className="text-xs text-zinc-300">
           <span className="text-zinc-500">{t('brief.panel.era')}</span>{' '}
@@ -98,26 +124,16 @@ export function DesignBriefPanel() {
         </p>
       )}
 
-      <div>
-        <label className="block text-xs font-medium text-zinc-500 mb-1">{t('brief.panel.colorPalette')}</label>
-        <select
-          value={designBrief.colorPalette}
-          onChange={(e) =>
-            updateDesignBrief({
-              colorPalette: e.target.value as DesignBrief['colorPalette'],
-            })
-          }
-          className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
-        >
-          {COLOR_OPTIONS.map((option) => (
-            <option key={option.value || 'empty'} value={option.value}>
-              {t(option.labelKey)}
-            </option>
-          ))}
-        </select>
-      </div>
+      {hasColorPalette && (
+        <div>
+          <p className="text-xs font-medium text-zinc-500 mb-1">{t('brief.panel.colorPalette')}</p>
+          <p className="px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300">
+            {colorPaletteLabel(designBrief.colorPalette, t)}
+          </p>
+        </div>
+      )}
 
-      {(designBrief.colorSelections.length > 0 || designBrief.allowShadows || designBrief.allowPhotoreal) && (
+      {hasStyleExtras && (
         <div className="space-y-1">
           {designBrief.colorSelections.length > 0 && (
             <p className="text-xs text-zinc-300">
@@ -139,34 +155,36 @@ export function DesignBriefPanel() {
         </div>
       )}
 
-      {(designBrief.catalogReferenceIds?.length ?? 0) > 0 && (
+      {hasCatalogRefs && (
         <p className="text-xs text-zinc-300">
           <span className="text-zinc-500">{t('brief.panel.catalogRefs')}</span>{' '}
           {designBrief.catalogReferenceIds.length}
         </p>
       )}
 
-      <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-        {BRIEF_FIELD_KEYS.map(({ key, labelKey, rows }) => (
-          <div key={key}>
-            <label className="block text-xs font-medium text-zinc-500 mb-1">{t(labelKey)}</label>
-            {rows ? (
-              <textarea
-                value={designBrief[key]}
-                onChange={(e) => updateDesignBrief({ [key]: e.target.value })}
-                rows={rows}
-                className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 resize-none"
-              />
-            ) : (
-              <input
-                value={designBrief[key]}
-                onChange={(e) => updateDesignBrief({ [key]: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
-              />
-            )}
-          </div>
-        ))}
-      </div>
+      {filledTextFields.length > 0 && (
+        <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
+          {filledTextFields.map(({ key, labelKey, rows }) => (
+            <div key={key}>
+              <label className="block text-xs font-medium text-zinc-500 mb-1">{t(labelKey)}</label>
+              {rows ? (
+                <textarea
+                  value={designBrief[key]}
+                  onChange={(e) => updateDesignBrief({ [key]: e.target.value })}
+                  rows={rows}
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 resize-none"
+                />
+              ) : (
+                <input
+                  value={designBrief[key]}
+                  onChange={(e) => updateDesignBrief({ [key]: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

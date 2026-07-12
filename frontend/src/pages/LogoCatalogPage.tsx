@@ -10,7 +10,7 @@ import {
   searchCatalog,
 } from '../api';
 import { useAppStore } from '../store';
-import { advanceBriefBuildSection } from '../components/brief/BriefBuildPanel';
+import { returnToBriefBuildSection } from '../lib/brief-navigation';
 import { ApplyToPromptsButton } from '../components/ApplyToPromptsButton';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
@@ -115,10 +115,32 @@ export function LogoCatalogPage() {
     enabled: appliedIds.length > 0,
   });
 
-  const selected = useMemo(
+  const recommendationMatch = useMemo(
+    () => (recommendations as CatalogEntry[] | undefined)?.find((e) => e.id === selectedId) ?? null,
+    [recommendations, selectedId],
+  );
+
+  const resultMatch = useMemo(
     () => (results as CatalogEntry[] | undefined)?.find((e) => e.id === selectedId) ?? null,
     [results, selectedId],
   );
+
+  const { data: fetchedSelected } = useQuery({
+    queryKey: ['catalog-entry', selectedId],
+    queryFn: () => getCatalogEntry(selectedId!),
+    enabled: Boolean(selectedId) && !resultMatch && !recommendationMatch,
+  });
+
+  const selected = resultMatch ?? recommendationMatch ?? (fetchedSelected as CatalogEntry | null) ?? null;
+
+  const focusEntry = (entry: CatalogEntry) => {
+    setChapter('');
+    setSection('');
+    setEntryKind('');
+    setEra('');
+    setQuery(entry.name);
+    setSelectedId(entry.id);
+  };
 
   const activeChapter = taxonomy?.find((c: { id: string }) => c.id === chapter);
 
@@ -149,17 +171,13 @@ export function LogoCatalogPage() {
         : designBrief.preferredShapes,
       sources,
     });
-    advanceBriefBuildSection('references');
+    returnToBriefBuildSection('references', projectIndustry ?? '');
   };
 
   const removeApplied = (id: string) => {
     updateDesignBrief({
       catalogReferenceIds: appliedIds.filter((refId) => refId !== id),
     });
-  };
-
-  const clearApplied = () => {
-    updateDesignBrief({ catalogReferenceIds: [] });
   };
 
   const selectedIsApplied = selected ? appliedIds.includes(selected.id) : false;
@@ -291,7 +309,7 @@ export function LogoCatalogPage() {
                   <button
                     key={entry.id}
                     type="button"
-                    onClick={() => setSelectedId(entry.id)}
+                    onClick={() => focusEntry(entry)}
                     className={clsx(
                       'text-xs px-2.5 py-1.5 rounded-lg border transition-colors',
                       selectedId === entry.id
@@ -482,18 +500,9 @@ export function LogoCatalogPage() {
 
           {appliedIds.length > 0 && (
             <div className="mt-4 p-4 rounded-xl bg-emerald-900/20 border border-emerald-800/40">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="text-xs text-emerald-300 font-medium">
-                  {t('catalog.appliedToBrief', { count: appliedIds.length })}
-                </p>
-                <button
-                  type="button"
-                  onClick={clearApplied}
-                  className="text-xs text-emerald-400/80 hover:text-emerald-200 uppercase tracking-wide"
-                >
-                  {t('catalog.clearAll')}
-                </button>
-              </div>
+              <p className="text-xs text-emerald-300 font-medium mb-2">
+                {t('catalog.appliedToBrief', { count: appliedIds.length })}
+              </p>
               <ul className="space-y-1.5">
                 {(appliedEntries ?? appliedIds.map((id) => ({ id, name: id }))).map((entry) => (
                   <li

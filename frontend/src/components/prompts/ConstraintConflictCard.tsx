@@ -1,7 +1,6 @@
-import { useState } from 'react';
 import clsx from 'clsx';
-import { AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
-import type { ConstraintResolution, ConstraintReport } from '../../types';
+import { AlertTriangle } from 'lucide-react';
+import type { ConstraintReport } from '../../types';
 import { useT, type MessageKey } from '../../i18n';
 
 type Violation = ConstraintReport['violations'][number];
@@ -63,16 +62,17 @@ function ConflictSide({
 
 interface ConstraintConflictCardProps {
   violation: Violation;
-  isApplying: boolean;
-  onApply: (resolution: ConstraintResolution) => void;
+  selectedResolutionId: string;
+  onSelectResolution: (resolutionId: string) => void;
 }
 
-export function ConstraintConflictCard({ violation, isApplying, onApply }: ConstraintConflictCardProps) {
+export function ConstraintConflictCard({
+  violation,
+  selectedResolutionId,
+  onSelectResolution,
+}: ConstraintConflictCardProps) {
   const t = useT();
   const resolutions = violation.resolutions ?? [];
-  const [selectedId, setSelectedId] = useState(resolutions[0]?.id ?? '');
-
-  const selected = resolutions.find((item) => item.id === selectedId) ?? resolutions[0];
 
   return (
     <li
@@ -121,7 +121,7 @@ export function ConstraintConflictCard({ violation, isApplying, onApply }: Const
                 <label
                   className={clsx(
                     'flex items-start gap-2 rounded-lg border px-2.5 py-2 cursor-pointer transition-colors',
-                    selectedId === resolution.id
+                    selectedResolutionId === resolution.id
                       ? 'border-violet-500/40 bg-violet-500/5'
                       : 'border-zinc-800 hover:border-zinc-700',
                   )}
@@ -130,8 +130,8 @@ export function ConstraintConflictCard({ violation, isApplying, onApply }: Const
                     type="radio"
                     name={`conflict-${violation.id}`}
                     value={resolution.id}
-                    checked={selectedId === resolution.id}
-                    onChange={() => setSelectedId(resolution.id)}
+                    checked={selectedResolutionId === resolution.id}
+                    onChange={() => onSelectResolution(resolution.id)}
                     className="mt-0.5 accent-violet-500"
                   />
                   <span className="text-zinc-300 leading-relaxed">
@@ -141,16 +141,6 @@ export function ConstraintConflictCard({ violation, isApplying, onApply }: Const
               </li>
             ))}
           </ul>
-
-          <button
-            type="button"
-            disabled={!selected || isApplying}
-            onClick={() => selected && onApply(selected)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-[13px] font-medium text-white transition-colors"
-          >
-            {isApplying ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
-            {t('prompts.conflict.applyResolution')}
-          </button>
         </div>
       )}
     </li>

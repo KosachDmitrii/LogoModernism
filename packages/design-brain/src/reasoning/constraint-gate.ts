@@ -16,10 +16,30 @@ import { enrichViolation, type ViolationContext } from './constraint-resolutions
 function recommends(prompt: string, term: string): boolean {
   const lower = prompt.toLowerCase();
   const t = term.toLowerCase();
-  if (!lower.includes(t)) return false;
-  if (new RegExp(`(no|without|avoid|not)\\s+[\\w\\s-]{0,20}${t}`, 'i').test(lower)) return false;
-  if (new RegExp(`avoid[^.]{0,80}${t}`, 'i').test(lower)) return false;
-  return true;
+  let start = 0;
+
+  while (true) {
+    const idx = lower.indexOf(t, start);
+    if (idx === -1) return false;
+
+    const prefix = lower.slice(Math.max(0, idx - 160), idx);
+    const lastSentenceBreak = Math.max(
+      prefix.lastIndexOf('.'),
+      prefix.lastIndexOf(';'),
+      prefix.lastIndexOf('\n'),
+    );
+    const sentencePrefix = prefix.slice(lastSentenceBreak + 1);
+
+    const isNegated =
+      /\b(no|without|avoid|avoiding|never|not|remove|forbid|forbidden|disallow|disallowed)\b[^.]*$/i.test(
+        sentencePrefix,
+      ) ||
+      /\bavoid\s*:[^.]*$/i.test(sentencePrefix) ||
+      /\banti-?patterns?\s*:[^.]*$/i.test(sentencePrefix);
+
+    if (!isNegated) return true;
+    start = idx + t.length;
+  }
 }
 
 function pushViolation(

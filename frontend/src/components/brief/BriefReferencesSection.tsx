@@ -1,13 +1,15 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, ExternalLink } from 'lucide-react';
+import { BookOpen, ExternalLink, X } from 'lucide-react';
 import { getCatalogEntry } from '../../api';
+import { rememberBriefBuildSection } from '../../lib/brief-navigation';
 import { useAppStore } from '../../store';
 import { useT } from '../../i18n';
 
 export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: () => void }) {
   const t = useT();
   const designBrief = useAppStore((s) => s.designBrief);
+  const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
   const appliedIds = designBrief.catalogReferenceIds ?? [];
 
   const { data: appliedEntries } = useQuery({
@@ -25,6 +27,16 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
     enabled: appliedIds.length > 0,
   });
 
+  const removeReference = (id: string) => {
+    updateDesignBrief({
+      catalogReferenceIds: appliedIds.filter((refId) => refId !== id),
+    });
+  };
+
+  const clearReferences = () => {
+    updateDesignBrief({ catalogReferenceIds: [] });
+  };
+
   return (
     <div className="space-y-3">
       <p className="text-[13px] text-zinc-500 leading-relaxed">{t('brief.references.intro')}</p>
@@ -32,7 +44,7 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
       <Link
         to="/logo-catalog"
         onClick={() => {
-          sessionStorage.setItem('brief-build-section', 'references');
+          rememberBriefBuildSection('references');
         }}
         className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-violet-800/50 bg-violet-950/30 hover:bg-violet-900/30 text-xs font-medium text-violet-200 transition-colors"
       >
@@ -43,15 +55,35 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
 
       {appliedIds.length > 0 ? (
         <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 space-y-2">
-          <p className="text-xs font-medium text-emerald-300">
-            {appliedIds.length === 1
-              ? t('brief.references.appliedCount', { count: appliedIds.length })
-              : t('brief.references.appliedCountPlural', { count: appliedIds.length })}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium text-emerald-300">
+              {appliedIds.length === 1
+                ? t('brief.references.appliedCount', { count: appliedIds.length })
+                : t('brief.references.appliedCountPlural', { count: appliedIds.length })}
+            </p>
+            <button
+              type="button"
+              onClick={clearReferences}
+              className="text-[11px] text-zinc-500 hover:text-zinc-300 uppercase tracking-wide"
+            >
+              {t('brief.references.clearAll')}
+            </button>
+          </div>
           <ul className="space-y-1">
             {(appliedEntries ?? appliedIds.map((id) => ({ id, name: id }))).map((entry) => (
-              <li key={entry.id} className="text-[13px] text-emerald-100/90 truncate">
-                {entry.name}
+              <li
+                key={entry.id}
+                className="flex items-center justify-between gap-2 px-2 py-1 rounded-md bg-emerald-950/30 border border-emerald-800/20"
+              >
+                <span className="text-[13px] text-emerald-100/90 truncate">{entry.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeReference(entry.id)}
+                  className="shrink-0 p-0.5 rounded hover:bg-emerald-900/60 text-emerald-400 hover:text-red-300 transition-colors"
+                  aria-label={`${t('common.remove')} ${entry.name}`}
+                >
+                  <X size={14} />
+                </button>
               </li>
             ))}
           </ul>

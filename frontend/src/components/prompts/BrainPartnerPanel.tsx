@@ -24,11 +24,10 @@ export type PartnerRegenerateAction = 'new-variations' | 're-pick' | 'apply' | '
 interface BrainPartnerPanelProps {
   partner: BrainPartnerState;
   regeneratingAction?: PartnerRegenerateAction | null;
-  resolvingViolationId?: string | null;
   onApplyTerritory: (territoryId: CreativeTerritoryId) => void;
   onRegenerateAuto: () => void;
   onNewVariations: () => void;
-  onResolveConflict: (violationId: string, resolution: ConstraintResolution) => void;
+  onResolveConflicts: (resolutions: ConstraintResolution[]) => void;
 }
 
 const WORKFLOW_STEPS: Array<{
@@ -114,14 +113,16 @@ function TerritoryCard({
 export function BrainPartnerPanel({
   partner,
   regeneratingAction = null,
-  resolvingViolationId = null,
   onApplyTerritory,
   onRegenerateAuto,
   onNewVariations,
-  onResolveConflict,
+  onResolveConflicts,
 }: BrainPartnerPanelProps) {
   const t = useT();
   const [viewTerritoryId, setViewTerritoryId] = useState(partner.selectedTerritoryId);
+  const [selectedResolutionByViolation, setSelectedResolutionByViolation] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     setViewTerritoryId(partner.selectedTerritoryId);
@@ -138,6 +139,36 @@ export function BrainPartnerPanel({
   const isRegenerating = regeneratingAction !== null;
   const errors = partner.constraintReport.violations.filter((v) => v.severity === 'error');
   const warnings = partner.constraintReport.violations.filter((v) => v.severity === 'warning');
+  const conflictViolations = [...errors, ...warnings].filter(
+    (violation) => (violation.resolutions?.length ?? 0) > 0,
+  );
+  const conflictViolationKey = conflictViolations.map((violation) => violation.id).join('|');
+
+  useEffect(() => {
+    setSelectedResolutionByViolation((current) => {
+      const next: Record<string, string> = {};
+      for (const violation of conflictViolations) {
+        const resolutions = violation.resolutions ?? [];
+        const existing = current[violation.id];
+        next[violation.id] = resolutions.some((item) => item.id === existing)
+          ? existing
+          : (resolutions[0]?.id ?? '');
+      }
+      return next;
+    });
+  }, [conflictViolationKey]);
+
+  const selectedResolutions = conflictViolations
+    .map((violation) => {
+      const selectedId = selectedResolutionByViolation[violation.id];
+      return violation.resolutions?.find((item) => item.id === selectedId);
+    })
+    .filter((resolution): resolution is ConstraintResolution => Boolean(resolution));
+
+  const canApplyAllConflicts =
+    conflictViolations.length > 0 &&
+    selectedResolutions.length === conflictViolations.length;
+  const isApplyingConflicts = regeneratingAction === 'resolve-conflict';
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden mb-6">
@@ -333,19 +364,36 @@ export function BrainPartnerPanel({
           {partner.constraintReport.violations.length === 0 ? (
             <p className="text-xs text-zinc-500">{t('prompts.partner.constraintsSatisfied')}</p>
           ) : (
-            <ul className="space-y-3">
-              {[...errors, ...warnings].map((violation) => (
-                <ConstraintConflictCard
-                  key={violation.id}
-                  violation={violation}
-                  isApplying={
-                    regeneratingAction === 'resolve-conflict' &&
-                    resolvingViolationId === violation.id
-                  }
-                  onApply={(resolution) => onResolveConflict(violation.id, resolution)}
-                />
-              ))}
-            </ul>
+            <div className="space-y-3">
+              <ul className="space-y-3">
+                {conflictViolations.map((violation) => (
+                  <ConstraintConflictCard
+                    key={violation.id}
+                    violation={violation}
+                    selectedResolutionId={selectedResolutionByViolation[violation.id] ?? ''}
+                    onSelectResolution={(resolutionId) =>
+                      setSelectedResolutionByViolation((current) => ({
+                        ...current,
+                        [violation.id]: resolutionId,
+                      }))
+                    }
+                  />
+                ))}
+              </ul>
+              <button
+                type="button"
+                disabled={!canApplyAllConflicts || isApplyingConflicts || isRegenerating}
+                onClick={() => onResolveConflicts(selectedResolutions)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-[13px] font-medium text-white transition-colors"
+              >
+                {isApplyingConflicts ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <ArrowRight size={14} />
+                )}
+                {t('prompts.conflict.applyAllResolutions')}
+              </button>
+            </div>
           )}
         </section>
 

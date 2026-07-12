@@ -22,39 +22,16 @@ import { BriefAnalyzeSection } from './BriefAnalyzeSection';
 import { StartOverButton } from '../prompts/StartOverButton';
 import { useT, type MessageKey } from '../../i18n';
 
-export type BuildSection = 'typography' | 'shapes' | 'style' | 'references' | 'client' | 'analyze';
+import {
+  advanceBriefBuildSection,
+  BUILD_SECTIONS,
+  readInitialBuildSection,
+  rememberBriefBuildSection,
+  type BuildSection,
+} from '../../lib/brief-navigation';
 
-const BUILD_SECTIONS: BuildSection[] = [
-  'typography',
-  'shapes',
-  'style',
-  'references',
-  'client',
-  'analyze',
-];
-
-const SECTION_STORAGE_KEY = 'brief-build-section';
-const SECTION_ADVANCE_KEY = 'brief-build-advance';
-
-function readInitialSection(): BuildSection {
-  const advance = sessionStorage.getItem(SECTION_ADVANCE_KEY);
-  if (advance && BUILD_SECTIONS.includes(advance as BuildSection)) {
-    sessionStorage.removeItem(SECTION_ADVANCE_KEY);
-    return advance as BuildSection;
-  }
-  const saved = sessionStorage.getItem(SECTION_STORAGE_KEY);
-  if (saved && BUILD_SECTIONS.includes(saved as BuildSection)) {
-    return saved as BuildSection;
-  }
-  return 'typography';
-}
-
-export function advanceBriefBuildSection(from: BuildSection) {
-  const idx = BUILD_SECTIONS.indexOf(from);
-  if (idx >= 0 && idx < BUILD_SECTIONS.length - 1) {
-    sessionStorage.setItem(SECTION_ADVANCE_KEY, BUILD_SECTIONS[idx + 1]!);
-  }
-}
+export type { BuildSection };
+export { advanceBriefBuildSection };
 
 interface BriefBuildPanelProps {
   onGoToReview: () => void;
@@ -99,7 +76,7 @@ function sectionStatus(
 export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuildPanelProps) {
   const t = useT();
   const designBrief = useAppStore((s) => s.designBrief);
-  const [openSection, setOpenSection] = useState<BuildSection | null>(readInitialSection);
+  const [openSection, setOpenSection] = useState<BuildSection | null>(readInitialBuildSection);
 
   const goToNext = (current: BuildSection) => {
     const idx = BUILD_SECTIONS.indexOf(current);
@@ -110,7 +87,7 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
 
   useEffect(() => {
     if (openSection) {
-      sessionStorage.setItem(SECTION_STORAGE_KEY, openSection);
+      rememberBriefBuildSection(openSection);
     }
   }, [openSection]);
 

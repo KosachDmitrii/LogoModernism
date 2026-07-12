@@ -43,3 +43,21 @@ export function applyConstraintResolution(
 
   return { brief: next, composeOptions };
 }
+
+export function applyConstraintResolutions(
+  brief: DesignBrief,
+  resolutions: ConstraintResolution[],
+): { brief: DesignBrief; composeOptions?: ComposePromptsOptions } {
+  let current = brief;
+  let composeOptions: ComposePromptsOptions | undefined;
+
+  for (const resolution of resolutions) {
+    const result = applyConstraintResolution(current, resolution);
+    current = result.brief;
+    if (result.composeOptions) {
+      composeOptions = { ...composeOptions, ...result.composeOptions };
+    }
+  }
+
+  return { brief: current, composeOptions };
+}

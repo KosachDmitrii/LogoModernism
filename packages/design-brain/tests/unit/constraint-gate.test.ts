@@ -118,6 +118,19 @@ describe('evaluateConstraintCompliance', () => {
     expect(report.violations.some((v) => v.code === 'palette_violation')).toBe(true);
   });
 
+  it('does not flag render terms listed as avoided', () => {
+    const report = evaluateConstraintCompliance(
+      baseDecision,
+      prompt(
+        'Minimal geometric wordmark for NovaPay. Flat vector Swiss modernism, black on white, modular grid construction. Avoid: gradients, photorealism, mockups, busy backgrounds, stock clipart.',
+      ),
+      baseArchitecture,
+      request,
+    );
+    expect(report.passed).toBe(true);
+    expect(report.violations.some((v) => v.code === 'photoreal_forbidden')).toBe(false);
+  });
+
   it('flags forbidden motifs from client intent', () => {
     const report = evaluateConstraintCompliance(
       baseDecision,

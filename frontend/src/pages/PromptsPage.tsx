@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { PromptCard } from '../components/PromptCard';
 import { BriefWorkflowPanel } from '../components/brief/BriefWorkflowPanel';
 import { ProjectStep } from '../components/prompts/ProjectStep';
@@ -14,10 +14,11 @@ import { useAppStore } from '../store';
 import { StartOverButton } from '../components/prompts/StartOverButton';
 import { StartOverDialog } from '../components/prompts/StartOverDialog';
 import { BrainPartnerPanel, type PartnerRegenerateAction } from '../components/prompts/BrainPartnerPanel';
-import { applyConstraintResolution } from '../lib/apply-constraint-resolution';
+import { applyConstraintResolutions } from '../lib/apply-constraint-resolution';
 import type { ConstraintResolution } from '../types';
 import { useT, type MessageKey } from '../i18n';
 import { formatError } from '../lib/api-error';
+import { readPromptsWizardReturnStep, resolveInitialPromptsWizardStep } from '../lib/brief-navigation';
 
 const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
   1: 'prompts.step.projectSubtitle',
@@ -35,10 +36,17 @@ export function PromptsPage() {
   const selectPrompt = useAppStore((s) => s.selectPrompt);
   const resetWizard = useAppStore((s) => s.resetWizard);
 
-  const [activeStep, setActiveStep] = useState<PromptWizardStep>(prompts.length > 0 ? 3 : 1);
+  const [activeStep, setActiveStep] = useState<PromptWizardStep>(() => {
+    const industryValue = useAppStore.getState().industry;
+    const returnStep = readPromptsWizardReturnStep();
+    if (returnStep != null) {
+      if (returnStep === 2 && !industryValue.trim()) return 1;
+      return returnStep;
+    }
+    return resolveInitialPromptsWizardStep(industryValue);
+  });
   const [startOverOpen, setStartOverOpen] = useState(false);
   const [regeneratingAction, setRegeneratingAction] = useState<PartnerRegenerateAction | null>(null);
-  const [resolvingViolationId, setResolvingViolationId] = useState<string | null>(null);
 
   const compose = useComposePrompts();
 
@@ -69,23 +77,19 @@ export function PromptsPage() {
     setStartOverOpen(false);
   };
 
-  const handleResolveConflict = (violationId: string, resolution: ConstraintResolution) => {
-    if (!industry.trim() || compose.isPending) return;
+  const handleResolveConflicts = (resolutions: ConstraintResolution[]) => {
+    if (!industry.trim() || compose.isPending || resolutions.length === 0) return;
 
-    const { brief, composeOptions } = applyConstraintResolution(designBrief, resolution);
+    const { brief, composeOptions } = applyConstraintResolutions(designBrief, resolutions);
     const options: ComposePromptsOptions = {
       ...composeOptions,
       briefOverride: brief,
     };
 
-    setResolvingViolationId(violationId);
     setRegeneratingAction('resolve-conflict');
     compose.mutate(options, {
       onSuccess: () => setActiveStep(3),
-      onSettled: () => {
-        setRegeneratingAction(null);
-        setResolvingViolationId(null);
-      },
+      onSettled: () => setRegeneratingAction(null),
     });
   };
 
@@ -123,7 +127,6 @@ export function PromptsPage() {
                 <BrainPartnerPanel
                   partner={brainPartner}
                   regeneratingAction={compose.isPending ? regeneratingAction : null}
-                  resolvingViolationId={resolvingViolationId}
                   onApplyTerritory={(territoryId) =>
                     handleCompose({ preferredTerritoryId: territoryId }, 'apply')
                   }
@@ -137,7 +140,7 @@ export function PromptsPage() {
                       'new-variations',
                     )
                   }
-                  onResolveConflict={handleResolveConflict}
+                  onResolveConflicts={handleResolveConflicts}
                 />
               )}
               <p className="text-sm text-zinc-400 mb-4">
@@ -158,25 +161,12 @@ export function PromptsPage() {
                 <button
                   type="button"
                   onClick={() => setActiveStep(2)}
-                  className="flex items-center gap-1.5 px-3 py-3.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-zinc-800 transition-colors shrink-0"
+                  className="flex items-center gap-1.5 px-3 py-3.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-zinc-800 transition-colors"
                 >
                   <ArrowLeft size={16} />
                   {t('prompts.results.backToBrief')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleCompose(undefined, 're-pick')}
-                  disabled={compose.isPending}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-zinc-800 text-zinc-200 text-sm font-medium hover:bg-zinc-700 disabled:opacity-50"
-                >
-                  {compose.isPending && regeneratingAction === 're-pick' ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Sparkles size={16} />
-                  )}
-                  {t('prompts.results.regenerateAuto')}
-                </button>
-                <StartOverButton onClick={handleStartOver} disabled={compose.isPending} />
+                <StartOverButton onClick={handleStartOver} disabled={compose.isPending} variant="primary" />
               </div>
             </div>
           )}
