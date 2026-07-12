@@ -21,8 +21,9 @@ import type {
   ComposedPrompt,
 } from './types';
 import { parseApiError } from './lib/api-error';
+import { getApiBase } from './lib/api-base';
 
-const API_BASE = '/api';
+const API_BASE = getApiBase();
 
 export async function generatePrompts(body: {
   industry: string;

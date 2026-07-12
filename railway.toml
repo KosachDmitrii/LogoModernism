@@ -4,8 +4,9 @@
 # Frontend (second service, also Root Directory = "/"):
 #   Build:  npm run build -w @logo-platform/frontend
 #   Start:  npm run preview -w @logo-platform/frontend -- --host 0.0.0.0 --port $PORT
-#   Env:    VITE_API_URL=https://<backend-host>/api
+#   Env:    VITE_API_URL=https://logomodernism-production.up.railway.app/api
 #           FRONTEND_URL=https://<frontend-host>  (on backend service)
+#           CORS_ORIGINS=https://<frontend-host>,http://localhost:5173
 
 [build]
 builder = "nixpacks"
