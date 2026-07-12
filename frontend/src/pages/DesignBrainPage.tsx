@@ -34,6 +34,7 @@ import { BrainPrinciplesCard } from '../components/brain/BrainPrinciplesCard';
 import { BrainPrinciplesFilters } from '../components/brain/BrainPrinciplesFilters';
 import { BrainPrinciplesPagination, BRAIN_PRINCIPLES_PAGE_SIZE } from '../components/brain/BrainPrinciplesPagination';
 import { BrainTasteProfileCard } from '../components/brain/BrainTasteProfileCard';
+import { BrainKnowledgeGraph } from '../components/brain/BrainKnowledgeGraph';
 import {
   useBrainIngestStore,
   useIsBrainIngesting,
@@ -78,7 +79,6 @@ export function DesignBrainPage() {
   const { data: principleCategories = [] } = useQuery({
     queryKey: ['brain-principle-categories'],
     queryFn: listBrainPrincipleCategories,
-    enabled: tab === 'principles',
   });
 
   const allPrinciples = principlesPageData?.items;
@@ -256,8 +256,22 @@ export function DesignBrainPage() {
       <div className="flex gap-1 mb-8 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
         {tabs.map(({ id, labelKey, icon: Icon }) => {
           const isUploadTab = id === 'learn';
-          const tabLabel = isUploadTab && isPdfIngesting ? t('brain.tab.uploading') : t(labelKey);
-          const TabIcon = isUploadTab && isPdfIngesting ? Loader2 : Icon;
+          const isResearchTab = id === 'research';
+          const isResearching = researchRun.isPending || researchPreview.isPending;
+          const tabLabel =
+            isUploadTab && isPdfIngesting
+              ? t('brain.tab.uploading')
+              : isResearchTab && isResearching
+                ? t('brain.tab.researching')
+                : t(labelKey);
+          const TabIcon =
+            isUploadTab && isPdfIngesting
+              ? Loader2
+              : isResearchTab && isResearching
+                ? Loader2
+                : Icon;
+          const tabIconSpinning =
+            (isUploadTab && isPdfIngesting) || (isResearchTab && isResearching);
 
           return (
           <button
@@ -270,7 +284,7 @@ export function DesignBrainPage() {
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            <TabIcon size={16} className={isUploadTab && isPdfIngesting ? 'animate-spin' : undefined} />
+            <TabIcon size={16} className={tabIconSpinning ? 'animate-spin' : undefined} />
             {tabLabel}
             {id === 'research' && (pendingResearch?.length ?? 0) > 0 && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-900/50 text-amber-200 text-[11px]">
@@ -289,6 +303,21 @@ export function DesignBrainPage() {
 
       {tab === 'overview' && (
         <div className="space-y-6">
+          <BrainKnowledgeGraph
+            categories={principleCategories}
+            principles={principles}
+            taste={taste}
+            totalPrinciples={stats?.learnedPrinciples ?? 0}
+            isIngesting={isPdfIngesting}
+            isConsolidating={consolidate.isPending}
+            consolidateResult={consolidate.data ?? null}
+            onCategorySelect={(category) => {
+              setPrinciplesCategory(category);
+              setPrinciplesPage(1);
+              setTab('principles');
+            }}
+          />
+
           <div className="grid sm:grid-cols-4 gap-4">
             <StatCard label={t('brain.stat.experiences')} value={stats?.experiences ?? '—'} />
             <StatCard label={t('brain.stat.learnedRules')} value={stats?.learnedPrinciples ?? '—'} />
