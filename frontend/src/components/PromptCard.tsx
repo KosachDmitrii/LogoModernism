@@ -11,6 +11,7 @@ import { LogoFeedbackBar } from './LogoFeedbackBar';
 import { useAppStore, useIsGenerating, usePromptImages } from '../store';
 import { generatePromptLogo, togglePromptSave } from '../api';
 import { parseLogoMarkType, parseTypographyStyle } from '../lib/brief-mappers';
+import { resolveApiUrl } from '../lib/api-base';
 import { useT } from '../i18n';
 import { formatError } from '../lib/api-error';
 import { imageProviderLabel } from '../lib/translate-labels';
@@ -195,7 +196,7 @@ export function PromptCard({
             >
               <div className="rounded-lg overflow-hidden border-b border-zinc-800 bg-white">
                 <img
-                  src={image.url}
+                  src={resolveApiUrl(image.url)}
                   alt={t('prompts.card.generatedLogoAlt', { index: index + 1 })}
                   className="w-full aspect-square object-contain bg-white"
                 />
@@ -205,7 +206,7 @@ export function PromptCard({
                   {imageProviderLabel(image.provider, image.model, t)}
                 </span>
                 <a
-                  href={image.url}
+                  href={resolveApiUrl(image.url)}
                   download={`logo-${prompt.id}-${index + 1}.png`}
                   onClick={(e) => e.stopPropagation()}
                   className="text-zinc-400 hover:text-zinc-200 shrink-0"
