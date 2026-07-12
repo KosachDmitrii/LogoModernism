@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-
-const GENERATED_DIR = join(process.cwd(), 'generated');
+import { getGeneratedImagesDir } from '@logo-platform/design-brain';
 
 const MIME_TO_EXT: Record<string, string> = {
   jpeg: 'jpg',
@@ -11,10 +10,11 @@ const MIME_TO_EXT: Record<string, string> = {
 const ALLOWED_FILENAME = /^img-[\w-]+\.(png|jpg|jpeg|webp|svg|svg\+xml)$/;
 
 export function getGeneratedDir(): string {
-  if (!existsSync(GENERATED_DIR)) {
-    mkdirSync(GENERATED_DIR, { recursive: true });
+  const dir = getGeneratedImagesDir();
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
   }
-  return GENERATED_DIR;
+  return dir;
 }
 
 export function persistImageUrl(url: string, id: string): string {

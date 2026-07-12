@@ -20,6 +20,7 @@ data/catalog-pipeline/pages/
 data/catalog-pipeline/samples/
 data/catalog-pipeline/*.log
 data/brain/uploads/
+data/generated/
 
 # Logs
 *.log

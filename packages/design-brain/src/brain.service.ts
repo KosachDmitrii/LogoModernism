@@ -16,6 +16,7 @@ import type {
 } from '@logo-platform/shared';
 import { prisma } from '@logo-platform/database';
 import { EMBEDDING_DIMENSIONS } from './storage/paths';
+import { ensureBrainStorageLayout, touchStorageReadyMarker } from './storage/ensure-storage';
 import { ingestFeedback } from './ingest/ingest-feedback';
 import { ingestImage, type IngestImageOptions } from './ingest/ingest-image';
 import { ingestPdf, checkPdfIngest, type IngestPdfOptions } from './ingest/ingest-pdf';
@@ -60,6 +61,8 @@ export class DesignBrainService {
   private nightlyResearchTimer: NodeJS.Timeout | null = null;
 
   constructor() {
+    ensureBrainStorageLayout();
+    touchStorageReadyMarker();
     registerPdfIngestProcessor((jobId) => this.processQueuedPdfIngest(jobId));
     if (process.env.BRAIN_NIGHTLY_CONSOLIDATE === 'true') {
       this.nightlyTimer = scheduleNightlyConsolidation(() => this.consolidate());
