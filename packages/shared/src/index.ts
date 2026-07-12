@@ -13,3 +13,4 @@ export * from './brain-architecture';
 export * from './brain-partner';
 export * from './constraint-conflict';
 export * from './prompt-compliance';
+export * from './prompt-generate-intent';

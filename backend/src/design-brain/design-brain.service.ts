@@ -28,8 +28,16 @@ export class DesignBrainApiService {
     return designBrain.getExperience(id);
   }
 
-  listPrinciples(limit?: number) {
-    return designBrain.listPrinciples(limit);
+  listPrinciples(
+    limit?: number,
+    offset?: number,
+    options?: { category?: string; sort?: import('@logo-platform/shared').LearnedPrinciplesSort },
+  ) {
+    return designBrain.listPrinciples(limit, offset, options);
+  }
+
+  listPrincipleCategories() {
+    return designBrain.listPrincipleCategories();
   }
 
   previewResearch(query: string, url: string) {

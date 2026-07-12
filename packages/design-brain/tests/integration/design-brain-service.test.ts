@@ -57,7 +57,8 @@ describeIntegration('DesignBrainService (integration)', () => {
     expect(experiences.some((exp) => exp.title === 'Listed experience')).toBe(true);
 
     const principles = await designBrain.listPrinciples(10);
-    expect(Array.isArray(principles)).toBe(true);
+    expect(Array.isArray(principles.items)).toBe(true);
+    expect(principles.total).toBeGreaterThanOrEqual(0);
   });
 
   it('computes taste profile through service API', async () => {

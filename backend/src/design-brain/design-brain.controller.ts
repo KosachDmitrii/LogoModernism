@@ -12,7 +12,8 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import type { BrainResearchCandidateStatus, BrainSourceType } from '@logo-platform/shared';
+import type { LearnedPrinciplesSort, BrainResearchCandidateStatus, BrainSourceType } from '@logo-platform/shared';
+import { LEARNED_PRINCIPLES_SORTS } from '@logo-platform/shared';
 import { DesignBrainApiService } from './design-brain.service';
 import {
   BrainFeedbackDto,
@@ -65,9 +66,30 @@ export class DesignBrainController {
     return this.service.getExperience(id);
   }
 
+  @Get('principles/categories')
+  principleCategories() {
+    return this.service.listPrincipleCategories();
+  }
+
   @Get('principles')
-  principles(@Query('limit') limit?: string) {
-    return this.service.listPrinciples(limit ? Number(limit) : undefined);
+  principles(
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Query('category') category?: string,
+    @Query('sort') sort?: string,
+  ) {
+    const resolvedSort = LEARNED_PRINCIPLES_SORTS.includes(sort as LearnedPrinciplesSort)
+      ? (sort as LearnedPrinciplesSort)
+      : 'influence_desc';
+
+    return this.service.listPrinciples(
+      limit ? Number(limit) : undefined,
+      offset ? Number(offset) : undefined,
+      {
+        category: category?.trim() || undefined,
+        sort: resolvedSort,
+      },
+    );
   }
 
   @Post('research/run')

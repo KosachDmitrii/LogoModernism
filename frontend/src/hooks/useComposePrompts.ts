@@ -10,12 +10,15 @@ import {
   parseTypographyStyle,
   parseTypographyStyleFromBrief,
 } from '../lib/brief-mappers';
+import type { PromptGenerateIntent } from '../lib/prompt-generate-intent';
 
 export interface ComposePromptsOptions {
   /** When set, brain applies this creative territory to reasoning and prompts */
   preferredTerritoryId?: CreativeTerritoryId;
   /** Use this brief snapshot instead of the current store value (e.g. after conflict resolution) */
   briefOverride?: DesignBrief;
+  /** Declares why generate was invoked (observability; echoed in API meta) */
+  intent?: PromptGenerateIntent;
 }
 
 function toBrainPartnerState(
@@ -96,6 +99,7 @@ export function useComposePrompts() {
         typographyStyle: brandName ? typographyStyle : parseTypographyStyle(activeBrief.typographyStyle),
         briefContext,
         preferredTerritoryId: options?.preferredTerritoryId,
+        intent: options?.intent,
       }).then((data) => ({ data, options }));
     },
     onSuccess: ({ data, options }) => {

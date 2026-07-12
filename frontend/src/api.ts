@@ -11,7 +11,9 @@ import type {
   BrainResearchCandidate,
   BrainResearchRunResult,
   BrainStats,
-  LearnedPrincipleRecord,
+  LearnedPrincipleCategoryCount,
+  LearnedPrinciplesPage,
+  LearnedPrinciplesSort,
   TasteProfile,
   ImageGenerationResponse,
   ImageProviderInfo,
@@ -20,6 +22,7 @@ import type {
   BriefInterviewResponse,
   ComposedPrompt,
 } from './types';
+import type { PromptGenerateIntent } from './lib/prompt-generate-intent';
 import { parseApiError } from './lib/api-error';
 import { getApiBase } from './lib/api-base';
 
@@ -40,11 +43,18 @@ export async function generatePrompts(body: {
   briefContext?: BriefContextPayload;
   useBrain?: boolean;
   preferredTerritoryId?: 'territory-primary' | 'territory-construction' | 'territory-typography';
+  intent?: PromptGenerateIntent;
 }): Promise<GenerateResponse> {
-  const res = await fetch(`${API_BASE}/prompts/generate`, {
+  const intent = body.intent ?? 'compose';
+  const { intent: _intent, ...payload } = body;
+  const url = `${API_BASE}/prompts/generate?intent=${encodeURIComponent(intent)}`;
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Prompt-Intent': intent,
+    },
+    body: JSON.stringify({ ...payload, intent }),
   });
   if (!res.ok) await parseApiError(res, 'common.generationFailed');
   return res.json();
@@ -327,8 +337,24 @@ export async function consolidateBrain(): Promise<BrainConsolidateResult> {
   return res.json();
 }
 
-export async function listBrainPrinciples(limit = 50): Promise<LearnedPrincipleRecord[]> {
-  const res = await fetch(`${API_BASE}/brain/principles?limit=${limit}`);
+export async function listBrainPrinciples(
+  limit = 50,
+  offset = 0,
+  options?: { category?: string; sort?: LearnedPrinciplesSort },
+): Promise<LearnedPrinciplesPage> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (options?.category) params.set('category', options.category);
+  if (options?.sort) params.set('sort', options.sort);
+  const res = await fetch(`${API_BASE}/brain/principles?${params}`);
+  if (!res.ok) await parseApiError(res, 'errors.api.principlesLoadFailed');
+  return res.json();
+}
+
+export async function listBrainPrincipleCategories(): Promise<LearnedPrincipleCategoryCount[]> {
+  const res = await fetch(`${API_BASE}/brain/principles/categories`);
   if (!res.ok) await parseApiError(res, 'errors.api.principlesLoadFailed');
   return res.json();
 }

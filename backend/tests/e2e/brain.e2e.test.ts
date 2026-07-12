@@ -79,7 +79,8 @@ describeE2e('Brain API (e2e)', () => {
     expect(taste.body.signalCount).toBeGreaterThanOrEqual(1);
 
     const principles = await request(app.getHttpServer()).get('/api/brain/principles?limit=10').expect(200);
-    expect(Array.isArray(principles.body)).toBe(true);
+    expect(Array.isArray(principles.body.items)).toBe(true);
+    expect(typeof principles.body.total).toBe('number');
   });
 
   it('POST /api/brain/brief/interview returns interview questions', async () => {

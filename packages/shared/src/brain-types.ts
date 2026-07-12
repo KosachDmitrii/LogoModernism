@@ -120,6 +120,19 @@ export interface LearnedPrincipleRecord {
   updatedAt: string;
 }
 
+export const LEARNED_PRINCIPLES_SORTS = ['influence_desc', 'influence_asc', 'category'] as const;
+export type LearnedPrinciplesSort = (typeof LEARNED_PRINCIPLES_SORTS)[number];
+
+export interface LearnedPrinciplesPage {
+  items: LearnedPrincipleRecord[];
+  total: number;
+}
+
+export interface LearnedPrincipleCategoryCount {
+  category: string;
+  count: number;
+}
+
 export interface BriefInterviewQuestion {
   id: string;
   prompt: string;

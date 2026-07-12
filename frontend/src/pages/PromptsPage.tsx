@@ -19,6 +19,7 @@ import type { ConstraintResolution } from '../types';
 import { useT, type MessageKey } from '../i18n';
 import { formatError } from '../lib/api-error';
 import { readPromptsWizardReturnStep, resolveInitialPromptsWizardStep } from '../lib/brief-navigation';
+import { toPromptGenerateIntent } from '../lib/prompt-generate-intent';
 
 const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
   1: 'prompts.step.projectSubtitle',
@@ -63,10 +64,13 @@ export function PromptsPage() {
   ) => {
     if (!industry.trim() || compose.isPending) return;
     if (action) setRegeneratingAction(action);
-    compose.mutate(options, {
-      onSuccess: () => setActiveStep(3),
-      onSettled: () => setRegeneratingAction(null),
-    });
+    compose.mutate(
+      { ...options, intent: options?.intent ?? toPromptGenerateIntent(action) },
+      {
+        onSuccess: () => setActiveStep(3),
+        onSettled: () => setRegeneratingAction(null),
+      },
+    );
   };
 
   const handleStartOver = () => setStartOverOpen(true);
@@ -84,6 +88,7 @@ export function PromptsPage() {
     const options: ComposePromptsOptions = {
       ...composeOptions,
       briefOverride: brief,
+      intent: 'resolve-conflicts',
     };
 
     setRegeneratingAction('resolve-conflict');

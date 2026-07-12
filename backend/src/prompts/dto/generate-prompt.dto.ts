@@ -1,5 +1,6 @@
 import { IsArray, IsBoolean, IsIn, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PROMPT_GENERATE_INTENTS } from '@logo-platform/shared';
 import { BriefContextDto } from '../../design-brain/dto/brain.dto';
 
 export class GeneratePromptDto {
@@ -65,6 +66,10 @@ export class GeneratePromptDto {
   @IsOptional()
   @IsIn(['territory-primary', 'territory-construction', 'territory-typography'])
   preferredTerritoryId?: 'territory-primary' | 'territory-construction' | 'territory-typography';
+
+  @IsOptional()
+  @IsIn([...PROMPT_GENERATE_INTENTS])
+  intent?: (typeof PROMPT_GENERATE_INTENTS)[number];
 }
 
 export class SearchPrinciplesDto {

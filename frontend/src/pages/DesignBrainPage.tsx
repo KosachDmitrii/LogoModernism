@@ -11,6 +11,7 @@ import {
   Check,
   X,
   ExternalLink,
+  BookOpen,
 } from 'lucide-react';
 import {
   approveBrainResearch,
@@ -19,14 +20,20 @@ import {
   getBrainStats,
   getBrainTasteProfile,
   listBrainPrinciples,
+  listBrainPrincipleCategories,
   listBrainResearchCandidates,
   previewBrainResearch,
   rejectBrainResearch,
   runBrainResearch,
 } from '../api';
 import type { BrainResearchCandidate } from '../types';
+import type { LearnedPrinciplesSort } from '../types';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
+import { BrainPrinciplesCard } from '../components/brain/BrainPrinciplesCard';
+import { BrainPrinciplesFilters } from '../components/brain/BrainPrinciplesFilters';
+import { BrainPrinciplesPagination, BRAIN_PRINCIPLES_PAGE_SIZE } from '../components/brain/BrainPrinciplesPagination';
+import { BrainTasteProfileCard } from '../components/brain/BrainTasteProfileCard';
 import {
   useBrainIngestStore,
   useIsBrainIngesting,
@@ -37,20 +44,55 @@ import { useBrainPdfIngestProgress } from '../hooks/useBrainPdfIngestProgress';
 import { useT, type MessageKey } from '../i18n';
 import { formatError } from '../lib/api-error';
 
-type Tab = 'overview' | 'learn' | 'research';
+type Tab = 'overview' | 'principles' | 'learn' | 'research';
 
 export function DesignBrainPage() {
   const t = useT();
   const [tab, setTab] = useState<Tab>('overview');
+  const [principlesPage, setPrinciplesPage] = useState(1);
+  const [principlesCategory, setPrinciplesCategory] = useState('');
+  const [principlesSort, setPrinciplesSort] = useState<LearnedPrinciplesSort>('influence_desc');
   const queryClient = useQueryClient();
 
   const { data: health, isLoading: healthLoading } = useQuery({ queryKey: ['brain-health'], queryFn: getBrainHealth });
   const { data: stats, isLoading: statsLoading } = useQuery({ queryKey: ['brain-stats'], queryFn: getBrainStats });
   const { data: taste, isLoading: tasteLoading } = useQuery({ queryKey: ['brain-taste'], queryFn: getBrainTasteProfile });
-  const { data: principles, isLoading: principlesLoading } = useQuery({
+  const { data: principlesData, isLoading: principlesLoading } = useQuery({
     queryKey: ['brain-principles'],
     queryFn: () => listBrainPrinciples(20),
   });
+  const principles = principlesData?.items;
+  const { data: principlesPageData, isLoading: allPrinciplesLoading } = useQuery({
+    queryKey: ['brain-principles-all', principlesPage, principlesCategory, principlesSort],
+    queryFn: () =>
+      listBrainPrinciples(
+        BRAIN_PRINCIPLES_PAGE_SIZE,
+        (principlesPage - 1) * BRAIN_PRINCIPLES_PAGE_SIZE,
+        {
+          category: principlesCategory || undefined,
+          sort: principlesSort,
+        },
+      ),
+    enabled: tab === 'principles',
+  });
+  const { data: principleCategories = [] } = useQuery({
+    queryKey: ['brain-principle-categories'],
+    queryFn: listBrainPrincipleCategories,
+    enabled: tab === 'principles',
+  });
+
+  const allPrinciples = principlesPageData?.items;
+  const filteredPrinciplesTotal = principlesPageData?.total ?? 0;
+  const totalPrinciplePages = Math.max(
+    1,
+    Math.ceil(filteredPrinciplesTotal / BRAIN_PRINCIPLES_PAGE_SIZE),
+  );
+
+  useEffect(() => {
+    if (principlesPage > totalPrinciplePages) {
+      setPrinciplesPage(totalPrinciplePages);
+    }
+  }, [principlesPage, totalPrinciplePages]);
   const { data: pendingResearch, isLoading: pendingResearchLoading, refetch: refetchPending } = useQuery({
     queryKey: ['brain-research-pending'],
     queryFn: () => listBrainResearchCandidates('pending'),
@@ -88,6 +130,8 @@ export function DesignBrainPage() {
       await queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
       queryClient.invalidateQueries({ queryKey: ['brain-stats'] });
       queryClient.invalidateQueries({ queryKey: ['brain-principles'] });
+      queryClient.invalidateQueries({ queryKey: ['brain-principles-all'] });
+      queryClient.invalidateQueries({ queryKey: ['brain-principle-categories'] });
     } catch (error) {
       setResearchError(formatError(error, t));
     } finally {
@@ -125,6 +169,7 @@ export function DesignBrainPage() {
     lastInvalidatedRef.current = latestFinishedAt;
     queryClient.invalidateQueries({ queryKey: ['brain-stats'] });
     queryClient.invalidateQueries({ queryKey: ['brain-principles'] });
+    queryClient.invalidateQueries({ queryKey: ['brain-principles-all'] });
   }, [latestFinishedAt, queryClient]);
 
   const handlePdfUpload = async (file: File) => {
@@ -139,8 +184,12 @@ export function DesignBrainPage() {
   const consolidate = useMutation({
     mutationFn: consolidateBrain,
     onSuccess: () => {
+      setPrinciplesPage(1);
       queryClient.invalidateQueries({ queryKey: ['brain-stats'] });
       queryClient.invalidateQueries({ queryKey: ['brain-principles'] });
+      queryClient.invalidateQueries({ queryKey: ['brain-principles-all'] });
+      queryClient.invalidateQueries({ queryKey: ['brain-principle-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['brain-principle-categories'] });
       queryClient.invalidateQueries({ queryKey: ['brain-taste'] });
     },
   });
@@ -169,6 +218,7 @@ export function DesignBrainPage() {
 
   const tabs: Array<{ id: Tab; labelKey: MessageKey; icon: typeof Brain }> = [
     { id: 'overview', labelKey: 'brain.tab.analytics', icon: Database },
+    { id: 'principles', labelKey: 'brain.tab.principles', icon: BookOpen },
     { id: 'learn', labelKey: 'brain.tab.upload', icon: Upload },
     { id: 'research', labelKey: 'brain.tab.research', icon: Globe },
   ];
@@ -179,21 +229,30 @@ export function DesignBrainPage() {
         page="brain"
         subtitle={t('brain.subtitle')}
       >
-        <div className="flex flex-wrap gap-2 mt-3 text-xs">
-          <StatusPill ok={health?.databaseConfigured} label={t('brain.status.postgresql')} />
-          <StatusPill ok={health?.embeddingConfigured} label={t('brain.status.embeddings')} />
-          <StatusPill ok={stats?.pgvectorEnabled} label={t('brain.status.pgvector')} />
-          <StatusPill ok={health?.tavilyConfigured} label={t('brain.status.tavily')} optional />
-          <StatusPill ok={health?.braveConfigured} label={t('brain.status.brave')} optional />
-          <StatusPill ok={health?.ocrConfigured} label={t('brain.status.ocr')} optional />
-          {health?.nightlyResearch && (
-            <span className="px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-300 text-xs">
-              {t('brain.status.nightlyResearch')}
-            </span>
-          )}
-        </div>
+        {!isLoading && (
+          <div className="flex flex-wrap gap-2 mt-3 text-xs">
+            <StatusPill ok={health?.databaseConfigured} label={t('brain.status.postgresql')} />
+            <StatusPill ok={health?.embeddingConfigured} label={t('brain.status.embeddings')} />
+            <StatusPill ok={stats?.pgvectorEnabled} label={t('brain.status.pgvector')} />
+            <StatusPill ok={health?.tavilyConfigured} label={t('brain.status.tavily')} optional />
+            <StatusPill ok={health?.braveConfigured} label={t('brain.status.brave')} optional />
+            <StatusPill ok={health?.ocrConfigured} label={t('brain.status.ocr')} optional />
+            {health?.nightlyResearch && (
+              <span className="px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-300 text-xs">
+                {t('brain.status.nightlyResearch')}
+              </span>
+            )}
+          </div>
+        )}
       </PageHeader>
 
+      {isLoading ? (
+        <div className="flex items-center justify-center gap-2 py-24 text-zinc-500">
+          <Loader2 size={20} className="animate-spin" />
+          {t('brain.loading')}
+        </div>
+      ) : (
+        <>
       <div className="flex gap-1 mb-8 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
         {tabs.map(({ id, labelKey, icon: Icon }) => {
           const isUploadTab = id === 'learn';
@@ -218,18 +277,16 @@ export function DesignBrainPage() {
                 {pendingResearch!.length}
               </span>
             )}
+            {id === 'principles' && (stats?.learnedPrinciples ?? 0) > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-violet-900/50 text-violet-200 text-[11px]">
+                {stats!.learnedPrinciples}
+              </span>
+            )}
           </button>
           );
         })}
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center gap-2 py-24 text-zinc-500">
-          <Loader2 size={20} className="animate-spin" />
-          {t('brain.loading')}
-        </div>
-      ) : (
-        <>
       {tab === 'overview' && (
         <div className="space-y-6">
           <div className="grid sm:grid-cols-4 gap-4">
@@ -267,76 +324,90 @@ export function DesignBrainPage() {
             );
           })()}
 
-          {taste && (
-            <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
-              <p className="text-xs font-medium text-zinc-400 mb-2">{t('brain.tasteProfile')}</p>
-              <p className="text-sm text-zinc-300">{taste.summary}</p>
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                {taste.preferredGeometry.map((g) => (
-                  <span key={g} className="text-xs px-2 py-0.5 rounded-full bg-emerald-900/30 text-emerald-300">
-                    +{g}
-                  </span>
-                ))}
-                {(taste.preferredColors ?? []).map((c) => (
-                  <span key={c} className="text-xs px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-300">
-                    {t('brain.taste.colorTag', { value: c })}
-                  </span>
-                ))}
-                {(taste.preferredRendering ?? []).map((r) => (
-                  <span key={r} className="text-xs px-2 py-0.5 rounded-full bg-violet-900/30 text-violet-300">
-                    {t('brain.taste.renderTag', { value: r })}
-                  </span>
-                ))}
-                {taste.avoidedPatterns.map((a) => (
-                  <span key={a} className="text-xs px-2 py-0.5 rounded-full bg-red-900/20 text-red-300">
-                    −{a}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+          {taste && <BrainTasteProfileCard taste={taste} />}
 
           {principles && principles.length > 0 && (
-            <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
-              <p className="text-xs font-medium text-zinc-400 mb-3">{t('brain.topPrinciples')}</p>
-              <div className="space-y-2">
-                {principles.slice(0, 8).map((p) => (
-                  <div key={p.id} className="flex items-start justify-between gap-3 text-xs">
-                    <div>
-                      <p className="text-zinc-300">{p.promptFragment}</p>
-                      <p className="text-zinc-600 mt-0.5">{p.ruleText}</p>
-                      {p.citations?.[0] && (
-                        <p className="text-zinc-700 mt-1 italic line-clamp-2">
-                          “{p.citations[0].quote}”
-                        </p>
-                      )}
-                    </div>
-                    <span className="text-violet-400 shrink-0">
-                      {t('brain.principleWeight', { weight: p.weight.toFixed(1) })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <BrainPrinciplesCard
+              principles={principles}
+              limit={8}
+              onViewAll={() => setTab('principles')}
+            />
           )}
+        </div>
+      )}
 
-          <button
-            type="button"
-            onClick={() => consolidate.mutate()}
-            disabled={consolidate.isPending}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-800 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
-          >
-            {consolidate.isPending ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            {t('brain.runConsolidate')}
-          </button>
-          {consolidate.data && (
-            <p className="text-xs text-zinc-500">
-              {t('brain.consolidateResult', {
-                merged: consolidate.data.mergedPrinciples,
-                pruned: consolidate.data.prunedPrinciples,
-                deduped: consolidate.data.deduplicatedExperiences,
-              })}
-            </p>
+      {tab === 'principles' && (
+        <div className="space-y-4">
+          <BrainPrinciplesFilters
+            categories={principleCategories}
+            category={principlesCategory}
+            sort={principlesSort}
+            onCategoryChange={(value) => {
+              setPrinciplesCategory(value);
+              setPrinciplesPage(1);
+            }}
+            onSortChange={(value) => {
+              setPrinciplesSort(value);
+              setPrinciplesPage(1);
+            }}
+          />
+
+          {allPrinciplesLoading ? (
+            <div className="flex items-center justify-center gap-2 py-24 text-zinc-500">
+              <Loader2 size={20} className="animate-spin" />
+              {t('brain.principlesLoading')}
+            </div>
+          ) : filteredPrinciplesTotal > 0 && allPrinciples && allPrinciples.length > 0 ? (
+            <BrainPrinciplesCard
+              principles={allPrinciples}
+              totalCount={filteredPrinciplesTotal}
+              rankOffset={(principlesPage - 1) * BRAIN_PRINCIPLES_PAGE_SIZE}
+              titleKey="brain.allPrinciples"
+              hintKey="brain.allPrinciplesHint"
+              footer={
+                <div className="pt-2 space-y-3 border-t border-zinc-800">
+                  <BrainPrinciplesPagination
+                    page={principlesPage}
+                    totalItems={filteredPrinciplesTotal}
+                    onPageChange={setPrinciplesPage}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => consolidate.mutate()}
+                    disabled={consolidate.isPending}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-800 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
+                  >
+                    {consolidate.isPending ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <RefreshCw size={16} />
+                    )}
+                    {consolidate.isPending ? t('brain.consolidateRunning') : t('brain.runConsolidate')}
+                  </button>
+                  <p className="text-xs text-zinc-600">{t('brain.consolidateHint')}</p>
+                  {consolidate.data && (
+                    <p className="text-xs text-zinc-500">
+                      {t('brain.consolidateResult', {
+                        merged: consolidate.data.mergedPrinciples,
+                        pruned: consolidate.data.prunedPrinciples,
+                        deduped: consolidate.data.deduplicatedExperiences,
+                      })}
+                    </p>
+                  )}
+                </div>
+              }
+            />
+          ) : (
+            <div className="p-8 rounded-xl bg-zinc-900/60 border border-zinc-800 text-center">
+              <p className="text-sm text-zinc-400">
+                {principlesCategory ? t('brain.principlesFilterEmpty') : t('brain.principlesEmpty')}
+              </p>
+              <p className="text-xs text-zinc-600 mt-2">
+                {principlesCategory
+                  ? t('brain.principlesFilterEmptyHint')
+                  : t('brain.principlesEmptyHint')}
+              </p>
+            </div>
           )}
         </div>
       )}

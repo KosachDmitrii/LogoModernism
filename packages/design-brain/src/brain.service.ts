@@ -11,7 +11,10 @@ import type {
   BrainSearchResult,
   BrainSourceType,
   BrainStats,
+  LearnedPrincipleCategoryCount,
   LearnedPrincipleRecord,
+  LearnedPrinciplesPage,
+  LearnedPrinciplesSort,
   TasteProfile,
 } from '@logo-platform/shared';
 import { prisma } from '@logo-platform/database';
@@ -33,8 +36,10 @@ import {
 } from './ingest/pdf-ingest-jobs';
 import { ensureBrainSchema, isPgvectorEnabled } from './storage/pgvector';
 import {
+  countLearnedPrinciples,
   getExperienceById,
   listExperiences,
+  listLearnedPrincipleCategories,
   listLearnedPrinciples,
 } from './storage/experience.repository';
 import { getRelatedExperiences, semanticSearch } from './retrieval/semantic-search';
@@ -223,9 +228,24 @@ export class DesignBrainService {
     return getExperienceById(client, id);
   }
 
-  async listPrinciples(limit?: number): Promise<LearnedPrincipleRecord[]> {
+  async listPrinciples(
+    limit?: number,
+    offset?: number,
+    options?: { category?: string; sort?: LearnedPrinciplesSort },
+  ): Promise<LearnedPrinciplesPage> {
     const client = await this.getClient();
-    return listLearnedPrinciples(client, limit);
+    const pageLimit = limit ?? 100;
+    const pageOffset = offset ?? 0;
+    const [items, total] = await Promise.all([
+      listLearnedPrinciples(client, pageLimit, pageOffset, options),
+      countLearnedPrinciples(client, options?.category),
+    ]);
+    return { items, total };
+  }
+
+  async listPrincipleCategories(): Promise<LearnedPrincipleCategoryCount[]> {
+    const client = await this.getClient();
+    return listLearnedPrincipleCategories(client);
   }
 
   async getTasteProfile(): Promise<TasteProfile> {

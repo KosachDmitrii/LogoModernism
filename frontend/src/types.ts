@@ -249,6 +249,7 @@ export interface GenerateResponse {
   prompts: ComposedPrompt[];
   recommendations: Recommendation[];
   bestPrompt: ComposedPrompt;
+  meta?: { intent: string };
   brainPowered?: boolean;
   partnerMode?: boolean;
   creativeTerritories?: CreativeTerritory[];
@@ -420,6 +421,18 @@ export interface BrainCapabilities {
 export interface PrincipleCitation {
   url: string;
   quote: string;
+}
+
+export interface LearnedPrincipleCategoryCount {
+  category: string;
+  count: number;
+}
+
+export type LearnedPrinciplesSort = 'influence_desc' | 'influence_asc' | 'category';
+
+export interface LearnedPrinciplesPage {
+  items: LearnedPrincipleRecord[];
+  total: number;
 }
 
 export interface LearnedPrincipleRecord {

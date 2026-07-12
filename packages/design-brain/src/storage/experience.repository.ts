@@ -2,6 +2,7 @@ import type {
   BrainExperienceRecord,
   BrainSourceType,
   LearnedPrincipleRecord,
+  LearnedPrinciplesSort,
   PrincipleCitation,
 } from '@logo-platform/shared';
 import type { BrainExperience, LearnedPrinciple, Prisma, PrismaClient } from '@logo-platform/database';
@@ -171,10 +172,56 @@ export async function upsertLearnedPrinciple(
 export async function listLearnedPrinciples(
   prisma: PrismaClient,
   limit = 100,
+  offset = 0,
+  options?: { category?: string; sort?: LearnedPrinciplesSort },
 ): Promise<LearnedPrincipleRecord[]> {
+  const where = options?.category ? { category: options.category } : undefined;
+  const orderBy = principlesOrderBy(options?.sort);
+
   const rows = await prisma.learnedPrinciple.findMany({
-    orderBy: [{ weight: 'desc' }, { confidence: 'desc' }],
+    where,
+    orderBy,
     take: limit,
+    skip: offset,
   });
   return rows.map(toLearnedPrincipleRecord);
+}
+
+export async function countLearnedPrinciples(
+  prisma: PrismaClient,
+  category?: string,
+): Promise<number> {
+  return prisma.learnedPrinciple.count({
+    where: category ? { category } : undefined,
+  });
+}
+
+export async function listLearnedPrincipleCategories(
+  prisma: PrismaClient,
+): Promise<Array<{ category: string; count: number }>> {
+  const rows = await prisma.learnedPrinciple.groupBy({
+    by: ['category'],
+    _count: { category: true },
+    orderBy: { category: 'asc' },
+  });
+  return rows.map((row) => ({
+    category: row.category,
+    count: row._count.category,
+  }));
+}
+
+function principlesOrderBy(sort: LearnedPrinciplesSort = 'influence_desc') {
+  switch (sort) {
+    case 'influence_asc':
+      return [{ weight: 'asc' as const }, { confidence: 'asc' as const }];
+    case 'category':
+      return [
+        { category: 'asc' as const },
+        { weight: 'desc' as const },
+        { confidence: 'desc' as const },
+      ];
+    case 'influence_desc':
+    default:
+      return [{ weight: 'desc' as const }, { confidence: 'desc' as const }];
+  }
 }

@@ -255,6 +255,8 @@ export interface PromptGenerationRequest {
   /** When false, skip Brain and use rule-based pipeline only */
   useBrain?: boolean;
   preferredTerritoryId?: import('./brain-partner').CreativeTerritoryId;
+  /** Declares why the client invoked generate (logging / analytics; does not change pipeline). */
+  intent?: import('./prompt-generate-intent').PromptGenerateIntent;
 }
 
 export type InspirationMode =
