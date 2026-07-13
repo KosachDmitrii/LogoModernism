@@ -220,6 +220,12 @@ function toEnrichmentContext(context: ReasoningContext): EnrichmentContext {
     markType: context.markType,
     typographyStyle: context.typographyStyle,
     colorPalette: context.briefContext?.colorPalette,
+    clientNotes: context.briefContext?.clientNotes,
+    constraints: context.briefContext?.constraints,
+    composition: context.briefContext?.composition,
+    minimalismLevel: context.minimalismLevel,
+    geometry: context.briefContext?.geometry,
+    preferredShapes: context.briefContext?.preferredShapes,
   };
 }
 

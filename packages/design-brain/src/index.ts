@@ -27,7 +27,7 @@ export { expandResearchQueries } from './research/query-expander';
 export { runBrainPromptPipeline, type BrainPipelineResult } from './reasoning/brain-prompt-pipeline';
 export { runBrainPartnerPipeline } from './reasoning/brain-partner-pipeline';
 export { buildCreativeTerritories, selectCreativeTerritory } from './reasoning/creative-strategy';
-export { evaluateConstraintCompliance, constraintFeedback } from './reasoning/constraint-gate';
+export { evaluateConstraintCompliance, constraintFeedback, evaluateRequestPromptCompliance, buildComplianceArchitecture } from './reasoning/constraint-gate';
 export { resolveCatalogIntelligence } from './retrieval/catalog-intelligence';
 export { normalizeStructuredFeedback, structuredFeedbackMetadata } from './learning/structured-feedback';
 export { reasonDesignDecision } from './reasoning/brain-reasoning';

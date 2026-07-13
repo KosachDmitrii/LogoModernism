@@ -16,6 +16,8 @@ import {
   isCombinationMark,
   stylePreferenceOverrides,
   finalizeLogoPromptText,
+  resolvePromptSpec,
+  filterCatalogInspirationFragments,
 } from '@logo-platform/shared';
 import { CATEGORY_ORDER } from './design-rules-engine';
 import { scorePrompt } from './prompt-scorer';
@@ -125,11 +127,23 @@ function filterPrinciplesForCatalog(
 
 export function composePrompt(input: ComposeInput): ComposedPrompt {
   const fragments: string[] = [];
-  const hasCatalog = Boolean(input.catalogInspiration?.length);
-  const catalogText = (input.catalogInspiration ?? []).join(' ').toLowerCase();
   const brandName = normalizeBrandName(input.companyName);
   const markType = resolveMarkTypeForBrand(input.markType, brandName, input.typographyStyle);
   const typographyStyle = resolveTypographyStyleForBrand(input.typographyStyle, brandName);
+  const promptSpec = resolvePromptSpec({
+    companyName: brandName,
+    markType,
+    typographyStyle,
+    colorPalette: input.briefContext?.colorPalette,
+    clientNotes: input.briefContext?.clientNotes,
+    constraints: input.briefContext?.constraints,
+  });
+  const catalogInspiration = filterCatalogInspirationFragments(
+    input.catalogInspiration ?? [],
+    promptSpec,
+  );
+  const hasCatalog = catalogInspiration.length > 0;
+  const catalogText = catalogInspiration.join(' ').toLowerCase();
   const isWordmark = markType === 'wordmark';
   const isLettermark = markType === 'lettermark';
   const isConstructed = typographyStyle === 'constructed';
@@ -170,8 +184,8 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     fragments.push(NO_BRAND_TEXT_FRAGMENT);
   }
 
-  if (input.catalogInspiration?.length) {
-    fragments.push(input.catalogInspiration.join('. '));
+  if (catalogInspiration.length) {
+    fragments.push(catalogInspiration.join('. '));
   }
 
   for (const category of CATEGORY_ORDER) {
@@ -256,6 +270,8 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
   const optimized = optimizePrompt(rawText, principles, stylePreferenceOverrides(input.briefContext));
   const text = finalizeLogoPromptText(optimized, {
     clientNotes: input.briefContext?.clientNotes,
+    constraints: input.briefContext?.constraints,
+    composition: input.briefContext?.composition,
     companyName: brandName,
     markType,
     colorPalette: input.briefContext?.colorPalette,
@@ -316,11 +332,12 @@ export function buildPromptFromTemplate(
 ): ComposedPrompt {
   const rawText = templateFragments.join('. ');
   const optimized = optimizePrompt(rawText, principles);
-  const scores = scorePrompt(optimized, principles, dna);
+  const text = finalizeLogoPromptText(optimized);
+  const scores = scorePrompt(text, principles, dna);
 
   return {
     id: randomUUID(),
-    text: optimized,
+    text,
     industry,
     selectedPrinciples: principles,
     scores,

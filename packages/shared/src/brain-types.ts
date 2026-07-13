@@ -137,7 +137,7 @@ export interface BriefInterviewQuestion {
   id: string;
   prompt: string;
   why: string;
-  field: keyof BriefContext | 'clientNotes';
+  field: keyof BriefContext | 'clientNotes' | 'markType';
   options?: string[];
 }
 
@@ -179,6 +179,9 @@ export interface BriefContext {
   allowShadows?: boolean;
   allowPhotoreal?: boolean;
   clientNotes?: string;
+  knowledgeInsights?: string;
+  bestPromptHint?: string;
+  critiqueNote?: string;
 }
 
 export interface DesignDecisionPrinciple {

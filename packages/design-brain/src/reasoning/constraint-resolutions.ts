@@ -234,6 +234,101 @@ export function buildViolationResolutions(
         resolutions: [keepBriefRecompose('Expand the prompt with construction, typography, and constraint details.')],
       };
 
+    case 'composition_axis_conflict':
+      return {
+        briefSide: briefSide(
+          'constraints',
+          request.briefContext?.constraints?.trim() || 'Composition preferences from brief',
+        ),
+        outputSide: outputSide(
+          'promptText',
+          'Symmetric and dynamic/italic language mixed',
+          excerptAround(promptText, 'symmet', 72),
+        ),
+        resolutions: [
+          keepBriefRecompose(
+            'Choose one composition axis — either symmetric/balanced construction or dynamic italic/skewed energy, not both.',
+          ),
+          {
+            id: 'prefer_symmetry_recompose',
+            compose: {
+              appendConstraints:
+                'Composition must be symmetric and balanced — remove italic, oblique, skew, and dynamic tension language.',
+            },
+          },
+          {
+            id: 'prefer_dynamic_recompose',
+            compose: {
+              appendConstraints:
+                'Composition may be dynamic and forward-leaning — remove rigid bilateral symmetry requirements.',
+            },
+          },
+        ],
+      };
+
+    case 'curve_policy_conflict': {
+      const term = details.term ?? 'curves';
+      return {
+        briefSide: briefSide('constraints', 'Avoid curves / geometric only'),
+        outputSide: outputSide('promptText', `Mentions "${term}"`, excerptAround(promptText, term.split(/\s+/)[0] ?? term)),
+        resolutions: [
+          keepBriefRecompose(
+            'Geometric construction only — remove script, cursive, swash, arched, and flowing curve references.',
+          ),
+          {
+            id: 'allow_curves_in_brief',
+            briefPatch: {
+              appendClientNotes: '[Constraint resolution] Curves and arched forms are allowed for this project.',
+              appendConstraints: 'Curved or arched letterforms may be used when structurally justified.',
+            },
+            compose: { appendConstraints: 'Curved or arched forms are allowed in typography and construction.' },
+          },
+        ],
+      };
+    }
+
+    case 'mark_architecture_conflict':
+    case 'mark_type_text_conflict':
+      return {
+        briefSide: briefSide('markType', request.markType ?? (brand ? 'brand with typography' : 'symbol-only')),
+        outputSide: outputSide(
+          'promptText',
+          'Symbol-only language with brand brief',
+          excerptAround(promptText, 'symbol', 72),
+        ),
+        resolutions: [
+          keepBriefRecompose(
+            'Align mark architecture — remove symbol-only directives when the brief includes a brand name and typography.',
+          ),
+          {
+            id: 'allow_wordmark',
+            briefPatch: {
+              markType: 'wordmark',
+              appendClientNotes: '[Constraint resolution] Typography-led wordmark direction confirmed.',
+            },
+            compose: { appendConstraints: 'Typography-led wordmark — no abstract symbol-only directives.' },
+          },
+        ],
+      };
+
+    case 'palette_territory_conflict': {
+      const term = details.term ?? 'multicolor';
+      return {
+        briefSide: briefSide('colorPalette', paletteLabel(colorPalette)),
+        outputSide: outputSide('promptText', `Mentions "${term}"`, excerptAround(promptText, term.split(/\s+/)[0] ?? term)),
+        resolutions: [
+          keepBriefRecompose(
+            'Strict monochrome — remove two-color, multicolor, and territory palette overrides from the prompt.',
+          ),
+          {
+            id: 'allow_two_color',
+            briefPatch: { colorPalette: 'two_color', appendConstraints: 'Accent color allowed within a two-color system.' },
+            compose: { appendConstraints: 'Use a restrained two-color palette with one accent.' },
+          },
+        ],
+      };
+    }
+
     default:
       return {
         resolutions: [keepBriefRecompose('Recompose prompts to satisfy all brief constraints.')],

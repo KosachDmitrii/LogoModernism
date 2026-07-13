@@ -1,6 +1,6 @@
 import type { DesignDecision } from '@logo-platform/shared';
-import type { AbstractionLevel, DesignStrategy } from '@logo-platform/shared';
-import { polishLogoPrompt } from '@logo-platform/shared';
+import type { AbstractionLevel, DesignStrategy, BrainGenerateRequest } from '@logo-platform/shared';
+import { buildPolishOptionsFromRequest, polishLogoPrompt } from '@logo-platform/shared';
 
 const DEFAULT_MODERNIST_AVOID = [
   'gradients',
@@ -15,7 +15,7 @@ export function solveConstraints(
   decision: DesignDecision,
   strategy: DesignStrategy,
   abstractionLevel: AbstractionLevel = 'stylized',
-  minimalismLevel?: number,
+  requestOrMinimalism?: BrainGenerateRequest | number,
 ): DesignDecision {
   const avoidSet = new Set<string>();
 
@@ -32,11 +32,19 @@ export function solveConstraints(
     return true;
   });
 
-  const polished = polishLogoPrompt(decision.promptText, {
-    colorPalette: strategy.colorSystem.toLowerCase().includes('black and white') ? 'black_white' : undefined,
-    abstractionLevel,
-    minimalismLevel,
-  });
+  const polishOptions =
+    typeof requestOrMinimalism === 'object' && requestOrMinimalism !== null
+      ? {
+          ...buildPolishOptionsFromRequest(requestOrMinimalism),
+          abstractionLevel,
+        }
+      : {
+          colorPalette: strategy.colorSystem.toLowerCase().includes('black and white') ? 'black_white' : undefined,
+          abstractionLevel,
+          minimalismLevel: typeof requestOrMinimalism === 'number' ? requestOrMinimalism : undefined,
+        };
+
+  const polished = polishLogoPrompt(decision.promptText, polishOptions);
 
   return {
     ...decision,

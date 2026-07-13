@@ -10,12 +10,16 @@ import {
   bodyRecommendsTerm,
   bodyRequiresTypography,
   buildComplianceScanContext,
+  detectActivePromptConflicts,
   FLAT_VECTOR_POSITIVE_TERMS,
   hasExplicitBrandName,
   isStyleAntiPatternMotif,
   MONOCHROME_POSITIVE_TERMS,
   normalizeBrandName,
+  resolvePromptSpec,
   stylePreferenceOverrides,
+  analyzeClientVisualIntent,
+  buildDesignStrategy,
 } from '@logo-platform/shared';
 import { enrichViolation, type ViolationContext } from './constraint-resolutions';
 
@@ -150,6 +154,29 @@ export function evaluateConstraintCompliance(
     });
   }
 
+  const promptSpec = resolvePromptSpec({
+    companyName: brand,
+    markType: decision.markType ?? request.markType,
+    typographyStyle: decision.typographyStyle ?? request.typographyStyle,
+    colorPalette: request.briefContext?.colorPalette,
+    clientNotes: request.briefContext?.clientNotes,
+    constraints: request.briefContext?.constraints,
+    composition: request.briefContext?.composition,
+  });
+
+  for (const conflict of detectActivePromptConflicts(text, promptSpec)) {
+    pushViolation(
+      violations,
+      ctx,
+      {
+        code: conflict.code,
+        severity: conflict.severity,
+        message: conflict.message,
+      },
+      conflict.term ? { term: conflict.term } : {},
+    );
+  }
+
   const errors = violations.filter((v) => v.severity === 'error').length;
   const warnings = violations.filter((v) => v.severity === 'warning').length;
   const score = Math.max(0, 1 - errors * 0.25 - warnings * 0.08);
@@ -165,4 +192,56 @@ export function constraintFeedback(report: ConstraintReport): string[] {
   return report.violations.map((v) =>
     v.suggestion ? `${v.message}. ${v.suggestion}` : v.message,
   );
+}
+
+function defaultDesignDecision(request: BrainGenerateRequest): DesignDecision {
+  return {
+    markType: request.markType ?? 'combination',
+    typographyStyle: request.typographyStyle,
+    geometry: [],
+    construction: [],
+    composition: [],
+    typography: [],
+    era: request.preferredEra ?? 'swiss',
+    principles: [],
+    antiPatterns: [],
+    catalogReferences: request.catalogReferenceIds ?? [],
+    reasoning: 'Rules pipeline compliance check',
+    promptText: '',
+    confidence: 0.7,
+  };
+}
+
+export function buildComplianceArchitecture(
+  request: BrainGenerateRequest,
+): BrainArchitecture {
+  const clientIntent = analyzeClientVisualIntent({
+    industry: request.industry,
+    companyName: request.companyName,
+    briefContext: request.briefContext,
+  });
+  const designStrategy = buildDesignStrategy(clientIntent, {
+    markType: request.markType,
+    colorPalette: request.briefContext?.colorPalette,
+    minimalismLevel: request.minimalismLevel,
+  });
+
+  return {
+    clientIntent,
+    designStrategy,
+    agentContributions: [],
+    interviewQuestions: [],
+    visualReferences: [],
+  };
+}
+
+export function evaluateRequestPromptCompliance(
+  prompt: ComposedPrompt,
+  request: BrainGenerateRequest,
+  decision?: DesignDecision,
+  architecture?: BrainArchitecture,
+): ConstraintReport {
+  const arch = architecture ?? buildComplianceArchitecture(request);
+  const resolvedDecision = decision ?? defaultDesignDecision(request);
+  return evaluateConstraintCompliance(resolvedDecision, prompt, arch, request);
 }

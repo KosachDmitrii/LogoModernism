@@ -198,6 +198,23 @@ export const en = {
   'prompts.conflict.resolution.allowTypography': 'Allow typography — switch brief to combination mark',
   'prompts.conflict.resolution.useBriefMarkType': 'Use mark type from brief',
   'prompts.conflict.resolution.useBrainMarkType': 'Use mark type chosen by brain',
+  'prompts.conflict.resolution.preferSymmetry': 'Prefer symmetry — remove italic and dynamic tension language',
+  'prompts.conflict.resolution.preferDynamic': 'Prefer dynamic energy — relax rigid symmetry requirements',
+  'prompts.conflict.resolution.allowCurves': 'Allow curves — relax geometric-only constraint in brief',
+  'prompts.conflict.violation.brandMissing': 'Prompt must include the brand name from the brief',
+  'prompts.conflict.violation.symbolOnlyMarkType': 'Symbol-only brief cannot use wordmark or lettermark',
+  'prompts.conflict.violation.symbolOnlyText': 'Symbol-only brief must not require typography in the prompt',
+  'prompts.conflict.violation.paletteViolation': 'Monochrome brief conflicts with multicolor language in the prompt',
+  'prompts.conflict.violation.paletteTerritoryConflict': 'Monochrome brief conflicts with two-color or territory palette language',
+  'prompts.conflict.violation.shadowsForbidden': 'Brief disallows shadows but the prompt mentions them',
+  'prompts.conflict.violation.photorealForbidden': 'Brief requires flat vector but the prompt mentions photoreal or 3D language',
+  'prompts.conflict.violation.forbiddenMotif': 'Client-forbidden motif appears in the prompt',
+  'prompts.conflict.violation.markTypeMismatch': 'Brain mark type differs from the brief',
+  'prompts.conflict.violation.promptTooShort': 'Prompt is unusually short for reliable image generation',
+  'prompts.conflict.violation.compositionAxisConflict': 'Prompt mixes symmetric and dynamic or italic composition',
+  'prompts.conflict.violation.curvePolicyConflict': 'Brief avoids curves but the prompt still references script or arches',
+  'prompts.conflict.violation.markArchitectureConflict': 'Prompt mixes brand typography with symbol-only directives',
+  'prompts.conflict.violation.markTypeTextConflict': 'Wordmark brief conflicts with symbol-only language in the prompt',
 
   // brief
   'brief.optionalIntro':
@@ -208,6 +225,8 @@ export const en = {
   'brief.tab.reviewDescription': 'Edit & generate prompts',
   'brief.readinessLabel': 'Brief: {label}',
   'brief.readyToGenerate': 'Brief is ready — you can generate prompts',
+  'brief.composeLowReadinessConfirm':
+    'Brief readiness is below 50%. Generate anyway? Filling more sections usually improves prompt quality.',
   'brief.backToProject': 'Project',
   'brief.composePrompts': 'Compose Prompts',
 

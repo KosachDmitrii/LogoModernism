@@ -27,6 +27,9 @@ export function runPromptPipeline(request: PromptGenerationRequest): PipelineRes
     markType: request.markType,
     typographyStyle: request.typographyStyle,
     colorPalette: request.briefContext?.colorPalette,
+    clientNotes: request.briefContext?.clientNotes,
+    constraints: request.briefContext?.constraints,
+    composition: request.briefContext?.composition,
   };
 
   const baseSelection = selectDesignRules({

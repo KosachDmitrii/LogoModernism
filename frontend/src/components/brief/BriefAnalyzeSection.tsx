@@ -4,7 +4,7 @@ import { Loader2, MessageCircleQuestion, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import { useAppStore } from '../../store';
 import { runBriefInterview } from '../../api';
-import type { BriefInterviewResponse } from '../../types';
+import type { BriefInterviewResponse, DesignBrief } from '../../types';
 import { designBriefToBriefContext, parseMarkTypeFromBrief } from '../../lib/brief-mappers';
 import { useT } from '../../i18n';
 import { formatError } from '../../lib/api-error';
@@ -47,6 +47,18 @@ export function BriefAnalyzeSection() {
     }
     if (field === 'geometry') {
       updateDesignBrief({ geometry: value });
+      return;
+    }
+    if (field === 'markType') {
+      updateDesignBrief({ markType: value as DesignBrief['markType'] });
+      return;
+    }
+    if (field === 'colorPalette') {
+      updateDesignBrief({ colorPalette: value as DesignBrief['colorPalette'] });
+      return;
+    }
+    if (field === 'constraints') {
+      updateDesignBrief({ constraints: value });
       return;
     }
     if (field in designBrief) {

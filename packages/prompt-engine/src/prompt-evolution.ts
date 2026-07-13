@@ -3,6 +3,25 @@ import { getPrincipleById } from '@logo-platform/knowledge-base';
 import { selectDesignRules } from './design-rules-engine';
 import { composePrompt } from './prompt-composer';
 
+function briefContextFromPrompt(prompt: ComposedPrompt) {
+  const style = prompt.metadata?.stylePreferences;
+  if (!style || typeof style !== 'object') return undefined;
+  const prefs = style as {
+    colorPalette?: string;
+    colorSelections?: string[];
+    allowShadows?: boolean;
+    allowPhotoreal?: boolean;
+    clientNotes?: string;
+  };
+  return {
+    colorPalette: prefs.colorPalette as import('@logo-platform/shared').BriefContext['colorPalette'],
+    colorSelections: prefs.colorSelections,
+    allowShadows: prefs.allowShadows,
+    allowPhotoreal: prefs.allowPhotoreal,
+    clientNotes: prefs.clientNotes,
+  };
+}
+
 const MUTATION_FIELDS: Array<{
   field: EvolutionMutation['field'];
   alternatives: string[];
@@ -33,6 +52,8 @@ export function evolvePrompt(
       preferredEra: weakPrompt.dna.era,
       minimalismLevel: Math.min(10, weakPrompt.dna.minimalism + 1),
       variationSeed: seed,
+      colorPalette: briefContextFromPrompt(weakPrompt)?.colorPalette,
+      clientNotes: briefContextFromPrompt(weakPrompt)?.clientNotes,
     });
 
     for (const mutation of mutations) {
@@ -46,19 +67,14 @@ export function evolvePrompt(
       }
     }
 
-    const clientNotes =
-      typeof weakPrompt.metadata?.stylePreferences === 'object' &&
-      weakPrompt.metadata.stylePreferences &&
-      'clientNotes' in weakPrompt.metadata.stylePreferences
-        ? (weakPrompt.metadata.stylePreferences as { clientNotes?: string }).clientNotes
-        : undefined;
+    const briefContext = briefContextFromPrompt(weakPrompt);
 
     const newPrompt = composePrompt({
       industry: weakPrompt.industry,
       principles: selection.principles,
       dna: selection.dna,
       variationIndex: seed,
-      briefContext: clientNotes ? { clientNotes } : undefined,
+      briefContext,
     });
 
     evolved.push(newPrompt);

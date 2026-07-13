@@ -14,3 +14,5 @@ export * from './brain-partner';
 export * from './constraint-conflict';
 export * from './prompt-compliance';
 export * from './prompt-generate-intent';
+export * from './prompt-spec';
+export * from './prompt-brief-context';

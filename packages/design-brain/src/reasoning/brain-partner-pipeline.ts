@@ -4,6 +4,12 @@ import type {
   CreativeTerritory,
   DesignCriticResult,
 } from '@logo-platform/shared';
+import {
+  buildPolishOptionsFromRequest,
+  finalizeLogoPromptText,
+  resolveTerritoryColorApproach,
+  appendUniqueConstraintSentences,
+} from '@logo-platform/shared';
 import type { PrismaClient } from '@logo-platform/database';
 import { critiqueLogo } from '@logo-platform/ai-engines';
 import { resolveCatalogIntelligence } from '../retrieval/catalog-intelligence';
@@ -70,7 +76,7 @@ function enrichRequestWithPartnerFeedback(
 ): BrainGenerateRequest {
   const constraintText = constraintReport ? constraintFeedback(constraintReport).join('. ') : '';
   const critiqueText = critiqueFeedback.join('. ');
-  const extra = [constraintText, critiqueText].filter(Boolean).join('. ');
+  const extra = [constraintText, critiqueText].filter(Boolean);
   const existing = request.briefContext?.constraints ?? '';
 
   return {
@@ -78,7 +84,7 @@ function enrichRequestWithPartnerFeedback(
     preferredTerritoryId: request.preferredTerritoryId,
     briefContext: {
       ...request.briefContext,
-      constraints: [existing, extra].filter(Boolean).join('. '),
+      constraints: appendUniqueConstraintSentences(existing, extra),
     },
     minimalismLevel: Math.min(10, (request.minimalismLevel ?? 8) + (critiqueFeedback.length ? 1 : 0)),
   };
@@ -87,17 +93,33 @@ function enrichRequestWithPartnerFeedback(
 function applyCreativeTerritory(
   pipeline: BrainPipelineResult,
   territory: CreativeTerritory,
+  request: BrainGenerateRequest,
 ): BrainPipelineResult {
+  const colorApproach = resolveTerritoryColorApproach(
+    territory.colorApproach,
+    request.briefContext?.colorPalette,
+  );
   const territoryFragment = [
     `Creative direction: ${territory.thesis}`,
     `Construction focus: ${territory.constructionFocus}`,
     `Typography focus: ${territory.typographyFocus}`,
-    `Color approach: ${territory.colorApproach}`,
+    `Color approach: ${colorApproach}`,
   ].join('. ');
+
+  const mergedText = `${pipeline.bestPrompt.text} ${territoryFragment}`.trim();
+  const polishOptions = buildPolishOptionsFromRequest(request);
+  const polishedText = finalizeLogoPromptText(mergedText, {
+    ...polishOptions,
+    clientNotes: request.briefContext?.clientNotes,
+    companyName: request.companyName,
+    markType: pipeline.decision.markType,
+    colorPalette: request.briefContext?.colorPalette,
+    abstractionLevel: pipeline.brainArchitecture.clientIntent.abstractionLevel,
+  });
 
   const bestPrompt: ComposedPrompt = {
     ...pipeline.bestPrompt,
-    text: `${pipeline.bestPrompt.text} ${territoryFragment}`.trim(),
+    text: polishedText,
     metadata: {
       ...pipeline.bestPrompt.metadata,
       creativeTerritory: territory,
@@ -246,7 +268,7 @@ export async function runBrainPartnerPipeline(
     const pipeline = await runBrainPromptPipeline(prisma, currentRequest);
     const territories = buildCreativeTerritories(pipeline.brainArchitecture, currentRequest);
     const selectedTerritory = selectCreativeTerritory(territories, currentRequest);
-    const withTerritory = applyCreativeTerritory(pipeline, selectedTerritory);
+    const withTerritory = applyCreativeTerritory(pipeline, selectedTerritory, currentRequest);
 
     lastPipeline = withTerritory;
     lastTerritories = territories;
@@ -254,7 +276,7 @@ export async function runBrainPartnerPipeline(
 
     lastConstraint = evaluateConstraintCompliance(
       pipeline.decision,
-      pipeline.bestPrompt,
+      withTerritory.bestPrompt,
       pipeline.brainArchitecture,
       currentRequest,
     );
