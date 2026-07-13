@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useT } from '../../i18n';
 
 export const BRAIN_PRINCIPLES_PAGE_SIZE = 50;
+export const BRAIN_TOP_PRINCIPLES_LIMIT = 10;
 
 interface BrainPrinciplesPaginationProps {
   page: number;

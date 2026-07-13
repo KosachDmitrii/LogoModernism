@@ -483,7 +483,7 @@ export const en = {
   'brain.taste.rendering': 'Rendering style',
   'brain.taste.avoid': 'Avoid',
   'brain.taste.empty': 'No taste signals yet — Brain uses modernist defaults.',
-  'brain.topPrinciples': 'Top learned principles',
+  'brain.topPrinciples': 'Top 10 learned principles',
   'brain.topPrinciplesHint':
     'Rules extracted from PDFs, research, and feedback. Influence level shows how often Brain applies each rule.',
   'brain.principlesViewAll': 'View all rules',

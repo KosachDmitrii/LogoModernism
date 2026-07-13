@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Brain } from 'lucide-react';
+import { Brain, Loader2, RefreshCw } from 'lucide-react';
 import type {
   BrainConsolidateResult,
   LearnedPrincipleCategoryCount,
@@ -29,6 +29,7 @@ interface BrainKnowledgeGraphProps {
   isConsolidating?: boolean;
   consolidateResult?: BrainConsolidateResult | null;
   onCategorySelect?: (category: string) => void;
+  onConsolidate?: () => void;
 }
 
 export function BrainKnowledgeGraph({
@@ -40,6 +41,7 @@ export function BrainKnowledgeGraph({
   isConsolidating = false,
   consolidateResult = null,
   onCategorySelect,
+  onConsolidate,
 }: BrainKnowledgeGraphProps) {
   const t = useT();
   const prevCountsRef = useRef<Record<string, number>>({});
@@ -266,6 +268,34 @@ export function BrainKnowledgeGraph({
       </div>
 
       <p className="text-[11px] text-zinc-600 pt-0">{t('brain.graph.clickHint')}</p>
+
+      {onConsolidate && (
+        <div className="space-y-2 pt-2 border-t border-zinc-800/80">
+          <button
+            type="button"
+            onClick={onConsolidate}
+            disabled={isConsolidating}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-800 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
+          >
+            {isConsolidating ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <RefreshCw size={16} />
+            )}
+            {isConsolidating ? t('brain.consolidateRunning') : t('brain.runConsolidate')}
+          </button>
+          <p className="text-xs text-zinc-600">{t('brain.consolidateHint')}</p>
+          {consolidateResult && (
+            <p className="text-xs text-zinc-500">
+              {t('brain.consolidateResult', {
+                merged: consolidateResult.mergedPrinciples,
+                pruned: consolidateResult.prunedPrinciples,
+                deduped: consolidateResult.deduplicatedExperiences,
+              })}
+            </p>
+          )}
+        </div>
+      )}
 
       <style>{`
         .brain-graph-core-active svg {

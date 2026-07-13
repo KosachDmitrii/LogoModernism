@@ -488,7 +488,7 @@ export const ru: Record<MessageKey, string> = {
   'brain.taste.rendering': 'Стиль рендера',
   'brain.taste.avoid': 'Избегать',
   'brain.taste.empty': 'Сигналов вкуса пока нет — Brain использует модернистские значения по умолчанию.',
-  'brain.topPrinciples': 'Топ выученных принципов',
+  'brain.topPrinciples': 'Топ-10 выученных принципов',
   'brain.topPrinciplesHint':
     'Правила из PDF, research и обратной связи. Уровень влияния показывает, как часто Brain применяет каждое правило.',
   'brain.principlesViewAll': 'Смотреть все правила',

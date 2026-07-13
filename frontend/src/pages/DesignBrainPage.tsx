@@ -6,7 +6,6 @@ import {
   Globe,
   Loader2,
   Database,
-  RefreshCw,
   FileText,
   Check,
   X,
@@ -32,7 +31,7 @@ import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
 import { BrainPrinciplesCard } from '../components/brain/BrainPrinciplesCard';
 import { BrainPrinciplesFilters } from '../components/brain/BrainPrinciplesFilters';
-import { BrainPrinciplesPagination, BRAIN_PRINCIPLES_PAGE_SIZE } from '../components/brain/BrainPrinciplesPagination';
+import { BrainPrinciplesPagination, BRAIN_PRINCIPLES_PAGE_SIZE, BRAIN_TOP_PRINCIPLES_LIMIT } from '../components/brain/BrainPrinciplesPagination';
 import { BrainTasteProfileCard } from '../components/brain/BrainTasteProfileCard';
 import { BrainKnowledgeGraph } from '../components/brain/BrainKnowledgeGraph';
 import {
@@ -60,7 +59,7 @@ export function DesignBrainPage() {
   const { data: taste, isLoading: tasteLoading } = useQuery({ queryKey: ['brain-taste'], queryFn: getBrainTasteProfile });
   const { data: principlesData, isLoading: principlesLoading } = useQuery({
     queryKey: ['brain-principles'],
-    queryFn: () => listBrainPrinciples(20),
+    queryFn: () => listBrainPrinciples(BRAIN_TOP_PRINCIPLES_LIMIT),
   });
   const principles = principlesData?.items;
   const { data: principlesPageData, isLoading: allPrinciplesLoading } = useQuery({
@@ -311,6 +310,7 @@ export function DesignBrainPage() {
             isIngesting={isPdfIngesting}
             isConsolidating={consolidate.isPending}
             consolidateResult={consolidate.data ?? null}
+            onConsolidate={() => consolidate.mutate()}
             onCategorySelect={(category) => {
               setPrinciplesCategory(category);
               setPrinciplesPage(1);
@@ -358,7 +358,8 @@ export function DesignBrainPage() {
           {principles && principles.length > 0 && (
             <BrainPrinciplesCard
               principles={principles}
-              limit={8}
+              limit={BRAIN_TOP_PRINCIPLES_LIMIT}
+              totalCount={principlesData?.total}
               onViewAll={() => setTab('principles')}
             />
           )}
@@ -394,35 +395,12 @@ export function DesignBrainPage() {
               titleKey="brain.allPrinciples"
               hintKey="brain.allPrinciplesHint"
               footer={
-                <div className="pt-2 space-y-3 border-t border-zinc-800">
+                <div className="pt-2 border-t border-zinc-800">
                   <BrainPrinciplesPagination
                     page={principlesPage}
                     totalItems={filteredPrinciplesTotal}
                     onPageChange={setPrinciplesPage}
                   />
-                  <button
-                    type="button"
-                    onClick={() => consolidate.mutate()}
-                    disabled={consolidate.isPending}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-800 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
-                  >
-                    {consolidate.isPending ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <RefreshCw size={16} />
-                    )}
-                    {consolidate.isPending ? t('brain.consolidateRunning') : t('brain.runConsolidate')}
-                  </button>
-                  <p className="text-xs text-zinc-600">{t('brain.consolidateHint')}</p>
-                  {consolidate.data && (
-                    <p className="text-xs text-zinc-500">
-                      {t('brain.consolidateResult', {
-                        merged: consolidate.data.mergedPrinciples,
-                        pruned: consolidate.data.prunedPrinciples,
-                        deduped: consolidate.data.deduplicatedExperiences,
-                      })}
-                    </p>
-                  )}
                 </div>
               }
             />
