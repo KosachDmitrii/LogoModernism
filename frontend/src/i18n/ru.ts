@@ -22,6 +22,7 @@ export const ru: Record<MessageKey, string> = {
   'common.generationFailed': 'Ошибка генерации',
   'common.imageGenerationFailed': 'Ошибка генерации изображения',
   'common.failedToLoadSavedPrompts': 'Не удалось загрузить сохранённые промпты',
+  'prompts.card.logoUnavailable': 'Изображение недоступно — сгенерируйте заново на странице Промпты',
   'common.failedToSavePrompt': 'Не удалось сохранить промпт',
   'common.generating': 'Генерация…',
   'common.uploading': 'Загрузка…',

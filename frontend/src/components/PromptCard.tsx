@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
 import { Copy, Check, ImageIcon, Loader2, Download, Heart } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
-import type { ComposedPrompt, LogoFeedback } from '../types';
+import type { ComposedPrompt, GeneratedImage, LogoFeedback } from '../types';
 import { ScoreBar } from './ScoreBar';
 import { BriefCoverageMap } from './brief/BriefCoverageMap';
 import { BrainExplainability } from './prompts/BrainExplainability';
@@ -190,38 +190,18 @@ export function PromptCard({
           onClick={(e) => e.stopPropagation()}
         >
           {logos.map((image, index) => (
-            <div
+            <LogoImageTile
               key={image.id}
-              className="rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950"
+              image={image}
+              promptId={prompt.id}
+              index={index}
             >
-              <div className="rounded-lg overflow-hidden border-b border-zinc-800 bg-white">
-                <img
-                  src={resolveApiUrl(image.url)}
-                  alt={t('prompts.card.generatedLogoAlt', { index: index + 1 })}
-                  className="w-full aspect-square object-contain bg-white"
-                />
-              </div>
-              <div className="px-2 py-1.5 flex items-center justify-between bg-zinc-950">
-                <span className="text-[11px] text-zinc-500 uppercase tracking-wide truncate">
-                  {imageProviderLabel(image.provider, image.model, t)}
-                </span>
-                <a
-                  href={resolveApiUrl(image.url)}
-                  download={`logo-${prompt.id}-${index + 1}.png`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-zinc-400 hover:text-zinc-200 shrink-0"
-                >
-                  <Download size={14} />
-                </a>
-              </div>
-              <div className="px-2 pb-2">
-                <LogoFeedbackBar
-                  promptId={prompt.id}
-                  logo={image}
-                  onUpdated={(feedback) => handleLogoFeedback(image.id, feedback)}
-                />
-              </div>
-            </div>
+              <LogoFeedbackBar
+                promptId={prompt.id}
+                logo={image}
+                onUpdated={(feedback) => handleLogoFeedback(image.id, feedback)}
+              />
+            </LogoImageTile>
           ))}
         </div>
       )}
@@ -265,5 +245,56 @@ export function PromptCard({
         <p className="text-xs text-red-400 mt-1">{t('common.failedToSavePrompt')}</p>
       )}
     </article>
+  );
+}
+
+function LogoImageTile({
+  image,
+  promptId,
+  index,
+  children,
+}: {
+  image: GeneratedImage;
+  promptId: string;
+  index: number;
+  children: ReactNode;
+}) {
+  const t = useT();
+  const [failed, setFailed] = useState(false);
+  const src = resolveApiUrl(image.url);
+
+  return (
+    <div className="rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
+      <div className="rounded-lg overflow-hidden border-b border-zinc-800 bg-white">
+        {failed ? (
+          <div className="flex aspect-square items-center justify-center bg-zinc-100 px-3 text-center text-[11px] text-zinc-500">
+            {t('prompts.card.logoUnavailable')}
+          </div>
+        ) : (
+          <img
+            src={src}
+            alt={t('prompts.card.generatedLogoAlt', { index: index + 1 })}
+            className="w-full aspect-square object-contain bg-white"
+            onError={() => setFailed(true)}
+          />
+        )}
+      </div>
+      <div className="px-2 py-1.5 flex items-center justify-between bg-zinc-950">
+        <span className="text-[11px] text-zinc-500 uppercase tracking-wide truncate">
+          {imageProviderLabel(image.provider, image.model, t)}
+        </span>
+        {!failed && (
+          <a
+            href={src}
+            download={`logo-${promptId}-${index + 1}.png`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-zinc-400 hover:text-zinc-200 shrink-0"
+          >
+            <Download size={14} />
+          </a>
+        )}
+      </div>
+      <div className="px-2 pb-2">{children}</div>
+    </div>
   );
 }

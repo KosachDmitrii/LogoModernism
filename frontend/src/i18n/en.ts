@@ -20,6 +20,7 @@ export const en = {
   'common.generationFailed': 'Generation failed',
   'common.imageGenerationFailed': 'Image generation failed',
   'common.failedToLoadSavedPrompts': 'Failed to load saved prompts',
+  'prompts.card.logoUnavailable': 'Image unavailable — regenerate on the Prompts page',
   'common.failedToSavePrompt': 'Failed to save prompt',
   'common.generating': 'Generating…',
   'common.uploading': 'Uploading…',
