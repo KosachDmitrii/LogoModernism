@@ -3,6 +3,9 @@ import {
   normalizeBrandName,
   resolveMarkTypeForBrand,
   resolveTypographyStyleForBrand,
+  resolvePromptSpec,
+  filterCatalogInspirationFragments,
+  filterCatalogPrincipleIds,
 } from '@logo-platform/shared';
 import {
   designPrinciples,
@@ -66,6 +69,9 @@ export interface RuleSelectionInput {
   markType?: LogoMarkType;
   typographyStyle?: TypographyStyle;
   colorPalette?: string;
+  clientNotes?: string;
+  constraints?: string;
+  composition?: string;
 }
 
 export interface RuleSelectionResult {
@@ -204,11 +210,24 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
     narrative: input.catalogNarrative,
     typographyStyle,
   });
+  const promptSpec = resolvePromptSpec({
+    companyName: brandName,
+    markType,
+    typographyStyle,
+    colorPalette: input.colorPalette,
+    clientNotes: input.clientNotes,
+    constraints: input.constraints,
+    composition: input.composition,
+  });
+  const catalogInspiration = catalogContext
+    ? filterCatalogInspirationFragments(catalogContext.inspirationFragments, promptSpec)
+    : undefined;
+  const catalogPrincipleIds = filterCatalogPrincipleIds(
+    catalogContext?.principleIds ?? [],
+    promptSpec,
+  );
   const lockedPrincipleIds = filterPrincipleIdsForMarkType(
-    [
-      ...(input.analysisPrincipleIds ?? []),
-      ...(catalogContext?.principleIds ?? []),
-    ],
+    [...(input.analysisPrincipleIds ?? []), ...catalogPrincipleIds],
     markType,
   );
   if (lockedPrincipleIds.length) {
@@ -317,7 +336,7 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
     dna,
     recommendations,
     conflicts,
-    catalogInspiration: catalogContext?.inspirationFragments,
+    catalogInspiration,
   };
 }
 

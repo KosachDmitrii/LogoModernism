@@ -201,6 +201,9 @@ export function designBriefToBriefContext(brief: {
   allowShadows?: boolean;
   allowPhotoreal?: boolean;
   clientNotes?: string;
+  knowledgeInsights?: string;
+  bestPromptHint?: string;
+  critiqueNote?: string;
 }): BriefContextPayload | undefined {
   const ctx: BriefContextPayload = {};
   const set = (key: keyof BriefContextPayload, value?: string) => {
@@ -231,6 +234,9 @@ export function designBriefToBriefContext(brief: {
     ctx.allowPhotoreal = true;
   }
   set('clientNotes', brief.clientNotes);
+  set('knowledgeInsights', brief.knowledgeInsights);
+  set('bestPromptHint', brief.bestPromptHint);
+  set('critiqueNote', brief.critiqueNote);
 
   return Object.keys(ctx).length > 0 ? ctx : undefined;
 }

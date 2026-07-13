@@ -21,6 +21,7 @@ import {
   stylePreferenceOverrides,
   finalizeLogoPromptText,
   buildClientAvoidFragments,
+  buildPolishOptionsFromRequest,
 } from '@logo-platform/shared';
 import { getPrincipleById, designPrinciples } from '@logo-platform/knowledge-base';
 import { appendAntiPatterns, optimizePrompt, scorePrompt } from '@logo-platform/prompt-engine';
@@ -35,6 +36,7 @@ import {
   mergePrincipleSets,
 } from './prompt-enrichment';
 import { buildBrainArchitecture, solveConstraints } from './brain-architecture';
+import { evaluateRequestPromptCompliance } from './constraint-gate';
 
 export interface BrainPipelineResult {
   prompts: ComposedPrompt[];
@@ -71,6 +73,9 @@ function buildRetrievalQuery(request: BrainGenerateRequest): string {
     brief?.allowShadows ? 'shadows allowed' : '',
     brief?.allowPhotoreal ? 'photoreal allowed' : '',
     brief?.clientNotes,
+    brief?.knowledgeInsights,
+    brief?.bestPromptHint,
+    brief?.critiqueNote,
     request.preferredEra,
   ]
     .filter(Boolean)
@@ -168,16 +173,13 @@ function decisionToComposedPrompt(
     clientIntent: architecture.clientIntent,
   });
   const optimized = optimizePrompt(directed, principles, stylePreferenceOverrides(request.briefContext));
-  const finalText = finalizeLogoPromptText(optimized, {
-    clientNotes: request.briefContext?.clientNotes,
+  const polishOptions = {
+    ...buildPolishOptionsFromRequest(request),
     companyName: request.companyName,
     markType: decision.markType,
-    colorPalette: request.briefContext?.colorPalette,
     abstractionLevel: architecture.clientIntent.abstractionLevel,
-    minimalismLevel: request.minimalismLevel,
-    geometry: request.briefContext?.geometry,
-    preferredShapes: request.briefContext?.preferredShapes,
-  });
+  };
+  const finalText = finalizeLogoPromptText(optimized, polishOptions);
   const scores = scorePrompt(finalText, principles, dna);
 
   return {
@@ -196,7 +198,7 @@ function decisionToComposedPrompt(
       reasoning: decision.reasoning,
       confidence: decision.confidence,
       basePromptLength: basePrompt.text.length,
-      enrichedPromptLength: optimized.length,
+      enrichedPromptLength: finalText.length,
       stylePreferences: request.briefContext
         ? {
             colorPalette: request.briefContext.colorPalette,
@@ -266,7 +268,7 @@ export async function runBrainPromptPipeline(
     decision,
     architecture.designStrategy,
     architecture.clientIntent.abstractionLevel,
-    request.minimalismLevel,
+    request,
   );
 
   const prompts: ComposedPrompt[] = [];
@@ -281,14 +283,34 @@ export async function runBrainPromptPipeline(
 
   prompts.sort((a, b) => b.scores.promptQuality - a.scores.promptQuality);
 
+  const bestPrompt = prompts[0]!;
+  const constraintReport = evaluateRequestPromptCompliance(
+    bestPrompt,
+    request,
+    constrainedDecision,
+    architecture,
+  );
+  const promptsWithReport = prompts.map((prompt) =>
+    prompt.id === bestPrompt.id
+      ? {
+          ...prompt,
+          metadata: {
+            ...prompt.metadata,
+            constraintReport,
+          },
+        }
+      : prompt,
+  );
+
   return {
-    prompts: prompts.slice(0, variationCount),
-    bestPrompt: prompts[0]!,
+    prompts: promptsWithReport.slice(0, variationCount),
+    bestPrompt: promptsWithReport[0]!,
     recommendations: buildRecommendations(learned),
     decision: constrainedDecision,
     retrievedExperiences: searchResult.results,
     tasteProfile,
     brainArchitecture: architecture,
     brainPowered: true,
+    constraintReport,
   };
 }

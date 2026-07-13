@@ -2,8 +2,19 @@ import type { ConstraintResolution, DesignBrief } from '../types';
 import type { ComposePromptsOptions } from '../hooks/useComposePrompts';
 
 function joinConstraints(existing: string, additions: string[]): string {
-  const parts = [existing, ...additions].map((part) => part.trim()).filter(Boolean);
-  return parts.join('. ');
+  const parts = `${existing ?? ''}. ${additions.join('. ')}`
+    .split(/\.\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const part of parts) {
+    const key = part.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(part);
+  }
+  return unique.join('. ');
 }
 
 export function applyConstraintResolution(

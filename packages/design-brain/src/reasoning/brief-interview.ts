@@ -88,7 +88,7 @@ export function buildBriefInterview(
       id: 'mark-type',
       prompt: 'Wordmark, lettermark, or combination mark (symbol + name)?',
       why: 'Mark architecture drives the entire composition system.',
-      field: 'personality',
+      field: 'markType',
       options: ['wordmark', 'lettermark', 'combination'],
     });
   }

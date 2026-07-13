@@ -20,6 +20,12 @@ export interface EnrichmentContext {
   markType?: string;
   typographyStyle?: string;
   colorPalette?: string;
+  clientNotes?: string;
+  constraints?: string;
+  composition?: string;
+  minimalismLevel?: number;
+  geometry?: string;
+  preferredShapes?: string;
 }
 
 export function buildBasePromptFromRules(request: BrainGenerateRequest): ComposedPrompt {
@@ -37,6 +43,9 @@ export function buildBasePromptFromRules(request: BrainGenerateRequest): Compose
     markType: request.markType,
     typographyStyle: request.typographyStyle,
     colorPalette: request.briefContext?.colorPalette,
+    clientNotes: request.briefContext?.clientNotes,
+    constraints: request.briefContext?.constraints,
+    composition: request.briefContext?.composition,
     variationSeed: 42,
   });
 
@@ -137,6 +146,12 @@ export function mergeEnrichedPrompt(
     companyName: context.companyName,
     markType: context.markType as import('@logo-platform/shared').LogoMarkType,
     colorPalette: context.colorPalette,
+    clientNotes: context.clientNotes ?? clientNotes,
+    constraints: context.constraints,
+    composition: context.composition,
+    minimalismLevel: context.minimalismLevel,
+    geometry: context.geometry,
+    preferredShapes: context.preferredShapes,
   })
     .replace(/\.\s*\./g, '.')
     .trim();

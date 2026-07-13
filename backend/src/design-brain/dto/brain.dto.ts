@@ -71,6 +71,18 @@ export class BriefContextDto {
   @IsOptional()
   @IsString()
   clientNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  knowledgeInsights?: string;
+
+  @IsOptional()
+  @IsString()
+  bestPromptHint?: string;
+
+  @IsOptional()
+  @IsString()
+  critiqueNote?: string;
 }
 
 export class BrainFeedbackDto {

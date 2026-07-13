@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Loader2, Type } from 'lucide-react';
 import { analyzeBrandDNA } from '../../api';
@@ -35,6 +36,12 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
 
   const markType = (designBrief.markType || 'combination') as MarkType;
   const typographyStyle = (designBrief.typographyStyle || 'standard') as TypographyStyle;
+
+  useEffect(() => {
+    if (!designBrief.markType) {
+      updateDesignBrief({ markType: 'combination' });
+    }
+  }, [designBrief.markType, updateDesignBrief]);
 
   const brandName = companyName.trim();
   const requiresName =

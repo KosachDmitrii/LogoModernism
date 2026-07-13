@@ -202,6 +202,23 @@ export const ru: Record<MessageKey, string> = {
   'prompts.conflict.resolution.allowTypography': 'Разрешить типографику — combination mark в брифе',
   'prompts.conflict.resolution.useBriefMarkType': 'Использовать тип знака из брифа',
   'prompts.conflict.resolution.useBrainMarkType': 'Использовать тип знака, выбранный brain',
+  'prompts.conflict.resolution.preferSymmetry': 'Предпочесть симметрию — убрать italic и динамику',
+  'prompts.conflict.resolution.preferDynamic': 'Предпочесть динамику — ослабить жёсткую симметрию',
+  'prompts.conflict.resolution.allowCurves': 'Разрешить кривые — ослабить правило «только геометрия»',
+  'prompts.conflict.violation.brandMissing': 'В промпте должно быть имя бренда из брифа',
+  'prompts.conflict.violation.symbolOnlyMarkType': 'Symbol-only бриф не может использовать wordmark или lettermark',
+  'prompts.conflict.violation.symbolOnlyText': 'Symbol-only бриф не должен требовать типографику в промпте',
+  'prompts.conflict.violation.paletteViolation': 'Монохромный бриф конфликтует с многоцветным языком в промпте',
+  'prompts.conflict.violation.paletteTerritoryConflict': 'Монохромный бриф конфликтует с two-color или territory palette',
+  'prompts.conflict.violation.shadowsForbidden': 'Бриф запрещает тени, но промпт их упоминает',
+  'prompts.conflict.violation.photorealForbidden': 'Бриф требует flat vector, но промпт содержит photoreal / 3D',
+  'prompts.conflict.violation.forbiddenMotif': 'В промпте есть запрещённый клиентом мотив',
+  'prompts.conflict.violation.markTypeMismatch': 'Тип знака brain отличается от брифа',
+  'prompts.conflict.violation.promptTooShort': 'Промпт слишком короткий для стабильной генерации',
+  'prompts.conflict.violation.compositionAxisConflict': 'Промпт смешивает симметрию и динамику / italic',
+  'prompts.conflict.violation.curvePolicyConflict': 'Бриф без кривых, но промпт ссылается на script или arches',
+  'prompts.conflict.violation.markArchitectureConflict': 'Промпт смешивает типографику бренда и symbol-only директивы',
+  'prompts.conflict.violation.markTypeTextConflict': 'Wordmark бриф конфликтует с symbol-only языком в промпте',
 
   // brief
   'brief.optionalIntro':
@@ -212,6 +229,8 @@ export const ru: Record<MessageKey, string> = {
   'brief.tab.reviewDescription': 'Редактирование и генерация',
   'brief.readinessLabel': 'Бриф: {label}',
   'brief.readyToGenerate': 'Бриф готов — можно генерировать промпты',
+  'brief.composeLowReadinessConfirm':
+    'Готовность брифа ниже 50%. Всё равно сгенерировать? Заполненные секции обычно улучшают качество промпта.',
   'brief.backToProject': 'Проект',
   'brief.composePrompts': 'Собрать промпты',
 

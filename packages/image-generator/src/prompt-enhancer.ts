@@ -169,6 +169,22 @@ function applyImageStyleOverrides(text: string, request: ImageGenerationRequest)
   return result.replace(/\s+,/g, ',').replace(/,\s*,+/g, ', ').replace(/\s+/g, ' ').trim();
 }
 
+function finalizeEnhancedPrompt(
+  text: string,
+  request: ImageGenerationRequest,
+  markType?: LogoMarkType,
+): string {
+  return applyImageStyleOverrides(
+    polishLogoPrompt(text, {
+      companyName: normalizeBrandName(request.companyName),
+      markType: markType ?? request.markType,
+      colorPalette: request.colorPalette,
+      maxLength: 3600,
+    }),
+    request,
+  );
+}
+
 export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
   const base = sanitizeLiteralIndustryLanguage(request.prompt.trim());
   const brandName = normalizeBrandName(request.companyName);
@@ -189,10 +205,7 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
     const text = base.toLowerCase().includes('logo')
       ? `${base}. ${suffix} ${NO_BRAND_TEXT_INSTRUCTION}`
       : `Abstract symbol-only logo: ${base}. ${suffix} ${NO_BRAND_TEXT_INSTRUCTION}`;
-    return applyImageStyleOverrides(
-      polishLogoPrompt(text, { companyName: brandName, colorPalette: request.colorPalette, maxLength: 3600 }),
-      request,
-    );
+    return finalizeEnhancedPrompt(text, request);
   }
 
   if (isConstructed) {
@@ -200,14 +213,14 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
     const text = base.toLowerCase().includes('constructed')
       ? `${base}${company}. ${suffix}`
       : `Constructed typography logo${company}: ${base}. ${suffix}`;
-    return applyImageStyleOverrides(withExactSpelling(text, brandName, markType), request);
+    return finalizeEnhancedPrompt(withExactSpelling(text, brandName, markType), request, markType);
   }
 
   if (markType === 'lettermark' && brandName) {
     const text = base.toLowerCase().includes('lettermark')
       ? `${base}${company}. ${lettermarkSuffix(brandName)}`
       : `Lettermark logo${company}: ${base}. ${lettermarkSuffix(brandName)}`;
-    return applyImageStyleOverrides(withExactSpelling(text, brandName, 'lettermark'), request);
+    return finalizeEnhancedPrompt(withExactSpelling(text, brandName, 'lettermark'), request, 'lettermark');
   }
 
   if (markType === 'wordmark') {
@@ -217,29 +230,25 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
     const text = base.toLowerCase().includes('wordmark')
       ? `${base}${company}. ${suffix}`
       : `Typographic wordmark logo${company}: ${base}. ${suffix}`;
-    return applyImageStyleOverrides(withExactSpelling(text, brandName, 'wordmark'), request);
+    return finalizeEnhancedPrompt(withExactSpelling(text, brandName, 'wordmark'), request, 'wordmark');
   }
 
   const suffix = renderSuffixForPrompt(base, markType, detailed, request, brandName);
 
   if (base.toLowerCase().includes('logo')) {
-    return applyImageStyleOverrides(
-      polishLogoPrompt(
-        ensureModernistFormLanguage(withExactSpelling(`${base}${company}. ${suffix}`, brandName, markType)),
-        { companyName: brandName, markType, colorPalette: request.colorPalette, maxLength: 3600 },
-      ),
+    return finalizeEnhancedPrompt(
+      ensureModernistFormLanguage(withExactSpelling(`${base}${company}. ${suffix}`, brandName, markType)),
       request,
+      markType,
     );
   }
 
-  return applyImageStyleOverrides(
-    polishLogoPrompt(
-      ensureModernistFormLanguage(
-        withExactSpelling(`Minimal geometric logo${company}: ${base}. ${suffix}`, brandName, markType),
-      ),
-      { companyName: brandName, markType, colorPalette: request.colorPalette, maxLength: 3600 },
+  return finalizeEnhancedPrompt(
+    ensureModernistFormLanguage(
+      withExactSpelling(`Minimal geometric logo${company}: ${base}. ${suffix}`, brandName, markType),
     ),
     request,
+    markType,
   );
 }
 

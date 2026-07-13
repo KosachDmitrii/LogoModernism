@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { PromptGenerationRequest } from '@logo-platform/shared';
 import { normalizeBrandName } from '@logo-platform/shared';
 import { designBrain } from '@logo-platform/design-brain';
+import { evaluateRequestPromptCompliance } from '@logo-platform/design-brain';
 import { runPromptPipeline, critiqueDesign, evolvePrompt } from '@logo-platform/prompt-engine';
 import { ImagesService } from '../images/images.service';
 import { PromptRecordsService } from './prompt-records.service';
@@ -41,7 +42,35 @@ export class PromptsService {
       }
     }
 
-    return runPromptPipeline(request);
+    return this.attachRulesCompliance(runPromptPipeline(request), request);
+  }
+
+  private attachRulesCompliance(
+    result: ReturnType<typeof runPromptPipeline>,
+    request: PromptGenerationRequest,
+  ) {
+    const constraintReport = evaluateRequestPromptCompliance(result.bestPrompt, {
+      industry: request.industry,
+      companyName: normalizeBrandName(request.companyName),
+      variationCount: request.variationCount,
+      inspirationMode: request.inspirationMode,
+      preferredEra: request.preferredEra,
+      minimalismLevel: request.minimalismLevel,
+      markType: request.markType,
+      typographyStyle: request.typographyStyle,
+      analysisPrincipleIds: request.analysisPrincipleIds,
+      catalogReferenceIds: request.catalogReferenceIds,
+      catalogNarrative: request.catalogNarrative,
+      briefContext: request.briefContext,
+    });
+    const bestPrompt = {
+      ...result.bestPrompt,
+      metadata: { ...result.bestPrompt.metadata, constraintReport },
+    };
+    const prompts = result.prompts.map((prompt) =>
+      prompt.id === bestPrompt.id ? bestPrompt : prompt,
+    );
+    return { ...result, prompts, bestPrompt, constraintReport };
   }
 
   async generateAndPersist(request: PromptGenerationRequest) {

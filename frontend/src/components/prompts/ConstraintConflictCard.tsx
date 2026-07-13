@@ -29,11 +29,36 @@ const RESOLUTION_LABEL_KEYS: Record<string, MessageKey> = {
   allow_typography: 'prompts.conflict.resolution.allowTypography',
   use_brief_mark_type: 'prompts.conflict.resolution.useBriefMarkType',
   use_brain_mark_type: 'prompts.conflict.resolution.useBrainMarkType',
+  prefer_symmetry_recompose: 'prompts.conflict.resolution.preferSymmetry',
+  prefer_dynamic_recompose: 'prompts.conflict.resolution.preferDynamic',
+  allow_curves_in_brief: 'prompts.conflict.resolution.allowCurves',
 };
 
 function fieldLabel(fieldKey: string, t: ReturnType<typeof useT>): string {
   const key = FIELD_LABEL_KEYS[fieldKey];
   return key ? t(key) : fieldKey;
+}
+
+const VIOLATION_MESSAGE_KEYS: Record<string, MessageKey> = {
+  brand_missing: 'prompts.conflict.violation.brandMissing',
+  symbol_only_mark_type: 'prompts.conflict.violation.symbolOnlyMarkType',
+  symbol_only_text: 'prompts.conflict.violation.symbolOnlyText',
+  palette_violation: 'prompts.conflict.violation.paletteViolation',
+  palette_territory_conflict: 'prompts.conflict.violation.paletteTerritoryConflict',
+  shadows_forbidden: 'prompts.conflict.violation.shadowsForbidden',
+  photoreal_forbidden: 'prompts.conflict.violation.photorealForbidden',
+  forbidden_motif: 'prompts.conflict.violation.forbiddenMotif',
+  mark_type_mismatch: 'prompts.conflict.violation.markTypeMismatch',
+  prompt_too_short: 'prompts.conflict.violation.promptTooShort',
+  composition_axis_conflict: 'prompts.conflict.violation.compositionAxisConflict',
+  curve_policy_conflict: 'prompts.conflict.violation.curvePolicyConflict',
+  mark_architecture_conflict: 'prompts.conflict.violation.markArchitectureConflict',
+  mark_type_text_conflict: 'prompts.conflict.violation.markTypeTextConflict',
+};
+
+function violationMessage(violation: Violation, t: ReturnType<typeof useT>): string {
+  const key = VIOLATION_MESSAGE_KEYS[violation.code];
+  return key ? t(key) : violation.message;
 }
 
 function resolutionLabel(resolutionId: string, t: ReturnType<typeof useT>): string {
@@ -97,7 +122,7 @@ export function ConstraintConflictCard({
               violation.severity === 'error' ? 'text-red-200/90' : 'text-amber-200/90',
             )}
           >
-            {violation.message}
+            {violationMessage(violation, t)}
           </p>
           {violation.suggestion && (
             <p className="text-zinc-500 mt-1 leading-relaxed">{violation.suggestion}</p>

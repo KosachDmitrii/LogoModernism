@@ -38,10 +38,14 @@ export class ImagesService {
     return this.toPersistedResult(result);
   }
 
-  async generateFromPromptObject(prompt: ComposedPrompt, provider?: GenerateImageDto['provider']) {
+  async generateFromPromptObject(
+    prompt: ComposedPrompt,
+    provider?: GenerateImageDto['provider'],
+    companyName?: string,
+  ) {
     const result = await generateImages({
       prompt: prompt.text,
-      companyName: prompt.industry,
+      companyName: normalizeBrandName(companyName),
       provider,
       count: 1,
     });

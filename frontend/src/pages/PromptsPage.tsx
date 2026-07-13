@@ -19,6 +19,7 @@ import type { ConstraintResolution } from '../types';
 import { useT, type MessageKey } from '../i18n';
 import { formatError } from '../lib/api-error';
 import { readPromptsWizardReturnStep, resolveInitialPromptsWizardStep } from '../lib/brief-navigation';
+import { getBriefReadiness } from '../lib/brief-readiness';
 import { toPromptGenerateIntent } from '../lib/prompt-generate-intent';
 
 const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
@@ -63,6 +64,11 @@ export function PromptsPage() {
     action?: PartnerRegenerateAction,
   ) => {
     if (!industry.trim() || compose.isPending) return;
+    const readiness = getBriefReadiness(designBrief);
+    if (designBrief.sources.length > 0 && readiness.score < 50) {
+      const proceed = window.confirm(t('brief.composeLowReadinessConfirm'));
+      if (!proceed) return;
+    }
     if (action) setRegeneratingAction(action);
     compose.mutate(
       { ...options, intent: options?.intent ?? toPromptGenerateIntent(action) },

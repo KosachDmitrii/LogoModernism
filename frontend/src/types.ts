@@ -236,6 +236,9 @@ export type BriefContextPayload = {
   allowShadows?: boolean;
   allowPhotoreal?: boolean;
   clientNotes?: string;
+  knowledgeInsights?: string;
+  bestPromptHint?: string;
+  critiqueNote?: string;
 };
 
 export interface Recommendation {

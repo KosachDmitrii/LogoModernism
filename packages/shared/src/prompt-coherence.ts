@@ -3,9 +3,12 @@ import type { AbstractionLevel } from './client-visual-intent';
 import { exactBrandSpellingFragment, normalizeBrandName, hasExplicitBrandName, ensureSymbolOnlyDirectives, stripTextualMarkLanguage } from './brand-text';
 import { ensureModernistFormLanguage, sanitizeLiteralIndustryLanguage, buildAbstractIndustryFragment } from './industry-form-language';
 import { COMPLIANCE_METADATA_PATTERNS, stripComplianceMetadata } from './prompt-compliance';
+import { applyPromptSpecToText, resolvePromptSpec } from './prompt-spec';
 
 export interface PolishPromptOptions {
   clientNotes?: string;
+  constraints?: string;
+  composition?: string;
   companyName?: string;
   markType?: LogoMarkType;
   colorPalette?: string;
@@ -839,9 +842,18 @@ function cleanupEmptyLabeledSections(body: string): string {
 
 export function polishLogoPrompt(text: string, options: PolishPromptOptions = {}): string {
   const maxLength = options.maxLength ?? DEFAULT_MAX_LENGTH;
+  const promptSpec = resolvePromptSpec({
+    companyName: options.companyName,
+    markType: options.markType,
+    colorPalette: options.colorPalette,
+    clientNotes: options.clientNotes,
+    constraints: options.constraints,
+    composition: options.composition,
+  });
   const { body: rawBody, avoidSuffix } = splitAvoidSection(text);
 
   let body = stripPipelineMetadata(rawBody);
+  body = applyPromptSpecToText(body, promptSpec);
   body = sanitizeLiteralIndustryLanguage(body);
   body = resolveColorContradictions(body, options.colorPalette);
   body = resolveComplexityContradictions(body, options.minimalismLevel);
@@ -864,6 +876,7 @@ export function polishLogoPrompt(text: string, options: PolishPromptOptions = {}
   body = cleanupEmptyLabeledSections(body);
   body = ensureBrandSpellingConstraint(body, options.companyName, options.markType);
   body = enforceSymbolOnlyPrompt(body, options);
+  body = applyPromptSpecToText(body, promptSpec);
   body = dedupeArtDirection(body);
   body = stripClientPreferencesFromBody(body);
 
@@ -907,6 +920,9 @@ export function finalizeLogoPromptText(
     companyName: opts.companyName,
     markType: opts.markType,
     colorPalette: opts.colorPalette,
+    clientNotes: opts.clientNotes,
+    constraints: opts.constraints,
+    composition: opts.composition,
     abstractionLevel: opts.abstractionLevel,
     minimalismLevel: opts.minimalismLevel,
     geometry: opts.geometry,
@@ -939,6 +955,9 @@ export function finalizeLogoPromptText(
     companyName: opts.companyName,
     markType: opts.markType,
     colorPalette: opts.colorPalette,
+    clientNotes: opts.clientNotes,
+    constraints: opts.constraints,
+    composition: opts.composition,
     abstractionLevel: opts.abstractionLevel,
     minimalismLevel: opts.minimalismLevel,
     geometry: opts.geometry,
