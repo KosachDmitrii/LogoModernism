@@ -1,99 +1,126 @@
-import type { ComposedPrompt, PromptGenerationRequest } from '@logo-platform/shared';
+import type { CompileResult } from '@logo-platform/brief-compiler';
+import type { ComposedPrompt, LogoDNA, PromptGenerationRequest } from '@logo-platform/shared';
 import { normalizeBrandName } from '@logo-platform/shared';
-import { promptTemplates, getPrincipleById } from '@logo-platform/knowledge-base';
-import { selectDesignRules } from './design-rules-engine';
-import { composePrompt, composePromptVariations, buildPromptFromTemplate } from './prompt-composer';
+import { compileBrief } from '@logo-platform/brief-compiler';
+import { randomUUID } from 'node:crypto';
 import { evolvePrompt, critiqueDesign } from './prompt-evolution';
+import { scorePrompt } from './prompt-scorer';
 
 export interface PipelineResult {
   prompts: ComposedPrompt[];
-  recommendations: ReturnType<typeof selectDesignRules>['recommendations'];
+  recommendations: [];
   bestPrompt: ComposedPrompt;
 }
 
-export function runPromptPipeline(request: PromptGenerationRequest): PipelineResult {
-  const variationCount = Math.min(request.variationCount ?? 5, 100);
-  const companyName = normalizeBrandName(request.companyName);
+function mapEra(era: string): LogoDNA['era'] {
+  const lower = era.toLowerCase();
+  if (lower.includes('bauhaus')) return 'bauhaus';
+  if (lower.includes('1960') || lower.includes('1970') || lower.includes('corporate')) {
+    return 'corporate_identity';
+  }
+  if (lower.includes('international') || lower.includes('swiss') || lower.includes('typographic')) {
+    return 'swiss';
+  }
+  return 'swiss';
+}
 
-  const sharedInput = {
+function dnaFromCompile(compile: CompileResult, request: PromptGenerationRequest): LogoDNA {
+  const { resolved } = compile;
+  const minimalism =
+    resolved.minimalism === 'ultra' ? 9 : resolved.minimalism === 'moderate' ? 6 : 8;
+
+  return {
+    geometry: resolved.shapes,
+    construction: [resolved.construction],
+    balance: ['optically balanced'],
+    complexity:
+      resolved.minimalism === 'ultra'
+        ? 'minimal'
+        : resolved.minimalism === 'moderate'
+          ? 'medium'
+          : 'minimal',
+    era: mapEra(resolved.era),
+    typography: [
+      resolved.typographyStyle === 'constructed'
+        ? 'constructed geometric letterforms'
+        : 'custom neo-grotesque',
+    ],
+    recognition: request.companyName ? 8 : 6,
+    minimalism: request.minimalismLevel ?? minimalism,
+    visualWeight: ['medium'],
+    harmony: ['geometric'],
+  };
+}
+
+function toComposedPrompt(
+  request: PromptGenerationRequest,
+  text: string,
+  index: number,
+  compile: CompileResult,
+): ComposedPrompt {
+  const dna = dnaFromCompile(compile, request);
+  const scores = scorePrompt(text, [], dna);
+
+  return {
+    id: randomUUID(),
+    text,
+    industry: request.industry,
+    selectedPrinciples: [],
+    scores,
+    dna,
+    metadata: {
+      era: dna.era,
+      variationIndex: index,
+      markType: request.markType,
+      typographyStyle: request.typographyStyle,
+      brainPowered: true,
+      reasoning: 'Brief compiler v1',
+      confidence: scores.promptQuality / 10,
+    },
+  };
+}
+
+export function runPromptPipeline(request: PromptGenerationRequest): PipelineResult {
+  const companyName = normalizeBrandName(request.companyName);
+  const compile = compileBrief({
     industry: request.industry,
     companyName,
-    preferredEra: request.preferredEra,
-    minimalismLevel: request.minimalismLevel ?? 8,
+    variationCount: request.variationCount,
     inspirationMode: request.inspirationMode,
+    preferredEra: request.preferredEra,
+    minimalismLevel: request.minimalismLevel,
+    markType: request.markType,
+    typographyStyle: request.typographyStyle,
     analysisPrincipleIds: request.analysisPrincipleIds,
     catalogReferenceIds: request.catalogReferenceIds,
     catalogNarrative: request.catalogNarrative,
-    markType: request.markType,
-    typographyStyle: request.typographyStyle,
-    colorPalette: request.briefContext?.colorPalette,
-    clientNotes: request.briefContext?.clientNotes,
-    constraints: request.briefContext?.constraints,
-    composition: request.briefContext?.composition,
-  };
-
-  const baseSelection = selectDesignRules({
-    ...sharedInput,
-    variationSeed: 42,
+    briefContext: request.briefContext,
+    preferredTerritoryId: request.preferredTerritoryId,
   });
 
-  const prompts = composePromptVariations(
-    {
-      industry: request.industry,
-      companyName,
-      principles: baseSelection.principles,
-      dna: baseSelection.dna,
-      inspirationMode: request.inspirationMode,
-      catalogInspiration: baseSelection.catalogInspiration,
-      markType: request.markType,
-      typographyStyle: request.typographyStyle,
-      briefContext: request.briefContext,
-    },
-    variationCount,
-    (seed) =>
-      selectDesignRules({
-        ...sharedInput,
-        variationSeed: seed * 7919 + (request.analysisPrincipleIds?.length ?? 0) * 31 + (request.catalogReferenceIds?.length ?? 0) * 17,
-      }),
-  );
+  if (!compile.validation.passed) {
+    throw new Error(`Brief compiler validation failed: ${compile.validation.violations.join('; ')}`);
+  }
 
-  let bestPrompt = prompts[0];
+  let prompts = compile.prompts.map((p: { positive: string }, index: number) =>
+    toComposedPrompt(request, p.positive, index, compile),
+  );
+  let bestPrompt = prompts[0]!;
 
   if (bestPrompt.scores.promptQuality < 7) {
     const evolved = evolvePrompt(bestPrompt, 2);
     if (evolved[0]?.scores.promptQuality > bestPrompt.scores.promptQuality) {
       bestPrompt = evolved[0];
-      prompts.unshift(...evolved.filter((p) => p.id !== bestPrompt.id));
+      prompts = [bestPrompt, ...evolved.filter((p) => p.id !== bestPrompt.id)];
     }
   }
 
+  const variationCount = Math.min(request.variationCount ?? 5, prompts.length);
   return {
     prompts: prompts.slice(0, variationCount),
-    recommendations: baseSelection.recommendations,
+    recommendations: [],
     bestPrompt,
   };
 }
 
-export function generateFromTemplate(templateId: string, industry: string): ComposedPrompt | null {
-  const template = promptTemplates.find((t) => t.id === templateId);
-  if (!template) return null;
-
-  const principles = template.principleIds
-    .map((id) => getPrincipleById(id))
-    .filter((p): p is NonNullable<typeof p> => Boolean(p));
-
-  const selection = selectDesignRules({ industry, variationSeed: 1 });
-
-  return buildPromptFromTemplate(
-    template.templateFragments,
-    principles.length ? principles : selection.principles,
-    industry,
-    selection.dna,
-  );
-}
-
-export { selectDesignRules } from './design-rules-engine';
-export { composePrompt, composePromptVariations } from './prompt-composer';
-export { optimizePrompt, detectPromptIssues } from './prompt-optimizer';
-export { scorePrompt } from './prompt-scorer';
-export { evolvePrompt, critiqueDesign, suggestMutations } from './prompt-evolution';
+export { critiqueDesign };

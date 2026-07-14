@@ -7,11 +7,10 @@ import {
   resolveMarkTypeForBrand,
   sanitizeLiteralIndustryLanguage,
   ensureModernistFormLanguage,
-  polishLogoPrompt,
   stripTextualMarkLanguage,
   ensureSymbolOnlyDirectives,
 } from '@logo-platform/shared';
-import { searchPrinciples } from '@logo-platform/knowledge-base';
+import { searchPrinciples, scrubCatalogSignificanceLeaks } from '@logo-platform/knowledge-base';
 import { composePrompt, selectDesignRules, significantTokens } from '@logo-platform/prompt-engine';
 
 export interface EnrichmentContext {
@@ -142,19 +141,7 @@ export function mergeEnrichedPrompt(
     enriched = ensureSymbolOnlyDirectives(enriched);
   }
 
-  return polishLogoPrompt(enriched, {
-    companyName: context.companyName,
-    markType: context.markType as import('@logo-platform/shared').LogoMarkType,
-    colorPalette: context.colorPalette,
-    clientNotes: context.clientNotes ?? clientNotes,
-    constraints: context.constraints,
-    composition: context.composition,
-    minimalismLevel: context.minimalismLevel,
-    geometry: context.geometry,
-    preferredShapes: context.preferredShapes,
-  })
-    .replace(/\.\s*\./g, '.')
-    .trim();
+  return scrubCatalogSignificanceLeaks(enriched.replace(/\.\s*\./g, '.').trim());
 }
 
 export function sanitizeDecision(

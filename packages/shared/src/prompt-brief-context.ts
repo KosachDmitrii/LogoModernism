@@ -1,12 +1,27 @@
 import type { BriefContext, BrainGenerateRequest } from './brain-types';
 import type { LogoMarkType, TypographyStyle } from './types';
-import type { PolishPromptOptions } from './prompt-coherence';
 import type { ResolvePromptSpecInput } from './prompt-spec';
+
+export interface PolishPromptOptions {
+  companyName?: string;
+  markType?: LogoMarkType;
+  typographyStyle?: TypographyStyle;
+  industry?: string;
+  colorPalette?: string;
+  clientNotes?: string;
+  constraints?: string;
+  composition?: string;
+  minimalismLevel?: number;
+  geometry?: string;
+  preferredShapes?: string;
+  maxLength?: number;
+}
 
 export interface PromptBriefInput {
   companyName?: string;
   markType?: LogoMarkType;
   typographyStyle?: TypographyStyle;
+  industry?: string;
   briefContext?: BriefContext;
   minimalismLevel?: number;
 }
@@ -37,6 +52,7 @@ export function buildPolishOptionsFromBrief(input: PromptBriefInput): PolishProm
   return {
     companyName: input.companyName,
     markType: input.markType,
+    industry: input.industry,
     colorPalette: brief?.colorPalette,
     clientNotes: brief?.clientNotes,
     constraints: brief?.constraints,
@@ -53,6 +69,7 @@ export function buildPolishOptionsFromRequest(request: BrainGenerateRequest): Po
     companyName: request.companyName,
     markType: request.markType,
     typographyStyle: request.typographyStyle,
+    industry: request.industry,
     briefContext: request.briefContext,
     minimalismLevel: request.minimalismLevel,
   });
@@ -86,6 +103,50 @@ export function resolveTerritoryColorApproach(
   return designColorSystem;
 }
 
+const PARTNER_FEEDBACK_DROP_SENTENCE =
+  /^(?:monochrome brief|prompt must include brand name|monochrome brief conflicts|monochrome brief must not|client forbids motif|brief (?:disallows|requires)|enriched prompt is unusually short|requested mark type|symbol-only brief)/i;
+
+const PARTNER_FEEDBACK_NOISE_PATTERNS = [
+  /\bgeneric stock sans(?:-serif)?\b/gi,
+  /\bliteral oven\b/gi,
+  /\bliteral flame\b/gi,
+  /\bliteral pizza\b/gi,
+  /\bcontrolled two[- ]?color palette\b/gi,
+  /\bcolor approach:\s*controlled\b/gi,
+];
+
+function cleanPartnerFeedbackSentence(sentence: string): string {
+  let cleaned = sentence.trim();
+  for (const pattern of PARTNER_FEEDBACK_NOISE_PATTERNS) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  return cleaned
+    .replace(/\bavoid\s*$/i, '')
+    .replace(/—\s*$/i, '')
+    .replace(/,\s*,+/g, ', ')
+    .replace(/^\s*,\s*/, '')
+    .replace(/,\s*$/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/** Strip diagnostic partner-retry noise before merging into brief constraints. */
+export function sanitizePartnerConstraintAdditions(additions: string[]): string[] {
+  const sentences = additions
+    .flatMap((chunk) => chunk.split(/\.\s+/))
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const result: string[] = [];
+  for (const sentence of sentences) {
+    if (PARTNER_FEEDBACK_DROP_SENTENCE.test(sentence)) continue;
+    const cleaned = cleanPartnerFeedbackSentence(sentence);
+    if (cleaned.length < 12) continue;
+    result.push(cleaned);
+  }
+  return result;
+}
+
 /** Append constraint directives without duplicate sentences. */
 export function appendUniqueConstraintSentences(
   existing: string | undefined,
@@ -107,4 +168,39 @@ export function appendUniqueConstraintSentences(
   }
 
   return unique.join('. ');
+}
+
+const GEOMETRY_SCORE_CLAUSE =
+  /(?:^|\b)[\w][\w\s/-]{0,48}\(\d{1,2}\s*\/\s*10\)\s*:/i;
+const GEOMETRY_SCORE_REASON_NOISE =
+  /\b(?:general geometric foundation|matches preferred shape|aligns with \w+ for)\b/i;
+
+export function sanitizeBriefNarrativeForPrompt(narrative: string): string {
+  const trimmed = narrative.trim().replace(/\.+$/, '');
+  if (!trimmed) return '';
+
+  const clauses = trimmed
+    .split(/\.\s+/)
+    .map((clause) => clause.trim().replace(/\.+$/, ''))
+    .filter((clause) => clause.length > 0)
+    .filter((clause) => {
+      if (GEOMETRY_SCORE_CLAUSE.test(clause)) return false;
+      if (/\(\d{1,2}\s*\/\s*10\)/.test(clause)) return false;
+      if (GEOMETRY_SCORE_REASON_NOISE.test(clause) && clause.length < 120) return false;
+      return true;
+    });
+
+  return clauses.join('. ').trim();
+}
+
+export function hasLockedGeometryPreference(geometry?: string, preferredShapes?: string): boolean {
+  const hay = `${geometry ?? ''} ${preferredShapes ?? ''}`.toLowerCase();
+  return /\b(?:circle|square|triangle|angular|radial|grid|hexagon|arc|line)\b/.test(hay);
+}
+
+export function detectGeometryAxisConflict(haystack: string): boolean {
+  const hay = haystack.toLowerCase();
+  const angular = /\b(?:angular|triangle|square|chevron|diagonal)\b/.test(hay);
+  const circular = /\b(?:circle|circular|round|radial|curve|arc|organic)\b/.test(hay);
+  return angular && circular;
 }

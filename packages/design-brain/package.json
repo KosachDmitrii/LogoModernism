@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@logo-platform/ai-engines": "*",
+    "@logo-platform/brief-compiler": "*",
     "@logo-platform/database": "*",
     "@logo-platform/image-generator": "*",
     "@logo-platform/knowledge-base": "*",

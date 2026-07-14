@@ -46,6 +46,7 @@ const IDENTITY_TERMS = [
 ];
 
 const CHARACTER_TERMS = [
+  'friendly yet professional',
   'playful yet professional',
   'brand character',
   'strong silhouette',
@@ -99,10 +100,10 @@ export function buildArtDirectionFragments(input: ArtDirectionInput): string[] {
   }
 
   const fragments = [
-    'Art direction: symbol and wordmark share one geometric system — matching stroke weight, corner radius, and curve language',
+    'Art direction: symbol and wordmark share one geometric system — matching stroke weight and consistent corner treatment',
     'Custom wordmark typography with at least one modified distinctive glyph',
     'Unified vertical lockup — symbol and typography designed together as one corporate identity mark',
-    'Strong silhouette readable at small sizes, playful yet professional brand character',
+    'Strong silhouette readable at small sizes, friendly yet professional brand character',
   ];
 
   if (input.personality === 'playful' || input.personality === 'approachable') {

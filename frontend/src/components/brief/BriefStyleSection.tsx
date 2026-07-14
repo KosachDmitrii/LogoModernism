@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Loader2, Palette } from 'lucide-react';
+import { defaultPaletteColors, paletteNeedsColorSelections, resolveColorSelections } from '@logo-platform/shared';
 import { analyzeComposition } from '../../api';
 import { useAppStore } from '../../store';
 import { applyStyleToBrief } from '../../lib/apply-brief';
@@ -7,6 +9,7 @@ import type { DesignBrief } from '../../types';
 import { parseMarkTypeFromBrief } from '../../lib/brief-mappers';
 import { useT, type MessageKey } from '../../i18n';
 import { formatError } from '../../lib/api-error';
+import { BriefColorSelections } from './BriefColorSelections';
 
 const COLOR_OPTIONS: Array<{ value: DesignBrief['colorPalette']; labelKey: MessageKey }> = [
   { value: '', labelKey: 'brief.style.autoFromRules' },
@@ -14,7 +17,14 @@ const COLOR_OPTIONS: Array<{ value: DesignBrief['colorPalette']; labelKey: Messa
   { value: 'monochrome', labelKey: 'brief.style.monochrome' },
   { value: 'two_color', labelKey: 'brief.style.twoColor' },
   { value: 'limited', labelKey: 'brief.style.limited' },
+  { value: 'multi_color', labelKey: 'brief.style.multiColor' },
+  { value: 'custom', labelKey: 'brief.style.customColors' },
 ];
+
+function defaultColorSelections(palette: DesignBrief['colorPalette']): string[] {
+  if (!paletteNeedsColorSelections(palette)) return [];
+  return defaultPaletteColors(palette);
+}
 
 export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => void }) {
   const t = useT();
@@ -34,12 +44,39 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
         colorPalette: designBrief.colorPalette,
         composition: typeof layout === 'string' ? layout : undefined,
       });
-      updateDesignBrief(brief);
+      updateDesignBrief({
+        ...brief,
+        colorSelections: resolveColorSelections(designBrief.colorPalette, designBrief.colorSelections),
+      });
       onStepComplete?.();
     },
   });
 
-  const canApply = Boolean(industry.trim()) && Boolean(designBrief.colorPalette);
+  const needsColors = paletteNeedsColorSelections(designBrief.colorPalette);
+  const colorSelections = resolveColorSelections(designBrief.colorPalette, designBrief.colorSelections);
+
+  useEffect(() => {
+    if (!needsColors) return;
+    const resolved = resolveColorSelections(designBrief.colorPalette, designBrief.colorSelections);
+    const stored = designBrief.colorSelections;
+    if (
+      stored.length !== resolved.length ||
+      stored.some((color, index) => color !== resolved[index])
+    ) {
+      updateDesignBrief({ colorSelections: resolved });
+    }
+  }, [designBrief.colorPalette, designBrief.colorSelections, needsColors, updateDesignBrief]);
+
+  const colorSlotsReady =
+    !needsColors ||
+    designBrief.colorSelections.length >=
+      (designBrief.colorPalette === 'two_color'
+        ? 2
+        : designBrief.colorPalette === 'limited'
+          ? 2
+          : 1);
+
+  const canApply = Boolean(industry.trim()) && Boolean(designBrief.colorPalette) && colorSlotsReady;
 
   return (
     <div className="space-y-3">
@@ -47,14 +84,17 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
         <label className="block text-xs font-medium text-zinc-500 mb-1">{t('brief.style.colorPalette')}</label>
         <select
           value={designBrief.colorPalette}
-          onChange={(e) =>
+          onChange={(e) => {
+            const colorPalette = e.target.value as DesignBrief['colorPalette'];
             updateDesignBrief({
-              colorPalette: e.target.value as DesignBrief['colorPalette'],
-              colorSelections: [],
+              colorPalette,
+              colorSelections: paletteNeedsColorSelections(colorPalette)
+                ? defaultColorSelections(colorPalette)
+                : [],
               allowShadows: false,
               allowPhotoreal: false,
-            })
-          }
+            });
+          }}
           className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
         >
           {COLOR_OPTIONS.map((option) => (
@@ -64,6 +104,12 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
           ))}
         </select>
       </div>
+
+      <BriefColorSelections
+        palette={designBrief.colorPalette}
+        selections={colorSelections}
+        onChange={(next) => updateDesignBrief({ colorSelections: next })}
+      />
 
       <button
         type="button"
@@ -87,6 +133,9 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
       )}
       {industry.trim() && !designBrief.colorPalette && (
         <p className="text-xs text-zinc-600">{t('brief.style.choosePalette')}</p>
+      )}
+      {needsColors && !colorSlotsReady && (
+        <p className="text-xs text-amber-400/90">{t('brief.style.pickColorsBeforeApply')}</p>
       )}
 
       {analysis.isError && (

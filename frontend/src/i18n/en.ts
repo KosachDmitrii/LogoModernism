@@ -326,6 +326,18 @@ export const en = {
   'brief.style.corporateBlue': 'Corporate blue',
   'brief.style.redAccent': 'Red accent',
   'brief.style.customColors': 'Custom selected colors',
+  'brief.style.pickColors': 'Pick colors',
+  'brief.style.pickColorsHint': 'Select at least {count} colors',
+  'brief.style.pickColorsBeforeApply': 'Pick all required colors before applying style.',
+  'brief.style.addColor': 'Add color',
+  'brief.style.removeColor': 'Remove color',
+  'brief.style.colorSlot': 'Color {index}',
+  'brief.style.colorBlack': 'Black',
+  'brief.style.colorWhite': 'White',
+  'brief.style.colorRed': 'Red',
+  'brief.style.colorNavy': 'Navy',
+  'brief.style.colorYellow': 'Yellow',
+  'brief.style.colorTeal': 'Teal',
 
   'brief.references.intro':
     'Pick logos from Müller Logo Modernism as visual inspiration. References feed geometry, era, and principles into your brief.',

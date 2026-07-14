@@ -5,6 +5,7 @@ import { LOGO_CATALOG as CURATED_CATALOG } from './entries';
 import { CATALOG_TAXONOMY, CASE_STUDY_IDS, DESIGNER_PROFILE_IDS } from './taxonomy';
 import { resolveRepoRoot } from './repo-root';
 import { getCatalogPrincipleIdsFromContext } from './catalog-prompt';
+import { setCatalogSignificanceCorpus } from './catalog-likeness';
 import { rankCatalogByIndustry } from './catalog-industry';
 
 const IMPORTED_FILE = 'data/catalog-pipeline/imported-catalog.json';
@@ -20,7 +21,9 @@ function loadImportedCatalog(): LogoReference[] {
 }
 
 export function getFullCatalog(): LogoReference[] {
-  return [...CURATED_CATALOG, ...loadImportedCatalog()];
+  const full = [...CURATED_CATALOG, ...loadImportedCatalog()];
+  setCatalogSignificanceCorpus(full);
+  return full;
 }
 
 export { CATALOG_TAXONOMY, CASE_STUDY_IDS, DESIGNER_PROFILE_IDS };
@@ -147,8 +150,18 @@ export function getCatalogPrincipleIds(referenceIds: string[]): string[] {
   return getCatalogPrincipleIdsFromContext(referenceIds);
 }
 
-export { buildCatalogPromptContext, getCatalogPrincipleIdsFromContext } from './catalog-prompt';
+export {
+  buildCatalogPromptContext,
+  getCatalogPrincipleIdsFromContext,
+} from './catalog-prompt';
 export type { CatalogPromptContext } from './catalog-prompt';
+export {
+  HIGH_RISK_TRADEMARK_NAMES,
+  isHighRiskCatalogEntry,
+  scrubCatalogSignificanceLeaks,
+  sanitizeCatalogNarrativeForPrompt,
+  softenTrademarkLikenessLanguage,
+} from './catalog-likeness';
 export {
   rankCatalogByIndustry,
   getCatalogRecommendations,

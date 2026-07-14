@@ -24,8 +24,8 @@ export {
 } from './research/research.service';
 export { getTrustedDomains } from './research/web-search';
 export { expandResearchQueries } from './research/query-expander';
-export { runBrainPromptPipeline, type BrainPipelineResult } from './reasoning/brain-prompt-pipeline';
-export { runBrainPartnerPipeline } from './reasoning/brain-partner-pipeline';
+export type { BrainPipelineResult } from './reasoning/brain-compiler-pipeline';
+export { runBriefCompilerPipeline } from './reasoning/brain-compiler-pipeline';
 export { buildCreativeTerritories, selectCreativeTerritory } from './reasoning/creative-strategy';
 export { evaluateConstraintCompliance, constraintFeedback, evaluateRequestPromptCompliance, buildComplianceArchitecture } from './reasoning/constraint-gate';
 export { resolveCatalogIntelligence } from './retrieval/catalog-intelligence';

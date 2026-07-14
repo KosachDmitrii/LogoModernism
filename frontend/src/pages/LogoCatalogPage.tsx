@@ -16,6 +16,7 @@ import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
 import { useT, type MessageKey } from '../i18n';
 import { industryLabel, markTypeLabel } from '../lib/translate-labels';
+import { sanitizeCatalogTagList, sanitizeBriefTagField } from '@logo-platform/shared';
 
 interface CatalogEntry {
   id: string;
@@ -157,17 +158,22 @@ export function LogoCatalogPage() {
     const sources = designBrief.sources.includes('Logo Catalog')
       ? designBrief.sources
       : [...designBrief.sources, 'Logo Catalog'];
+    const cleanGeometry = sanitizeCatalogTagList(selected.geometry ?? []);
+    const cleanConstruction = sanitizeCatalogTagList(selected.construction ?? []);
     updateDesignBrief({
       catalogReferenceIds: next,
       principleIds,
       era: selected.era.replace(/_/g, ' '),
-      narrative: selected.significance ?? designBrief.narrative,
-      geometry: selected.geometry?.length ? mergeTags(designBrief.geometry, selected.geometry) : designBrief.geometry,
-      construction: selected.construction?.length
-        ? mergeTags(designBrief.construction, selected.construction)
+      // Do not copy catalog significance into narrative — it leaks as Design brief note
+      // and can instruct trademark likeness (e.g. interlocking Cs). Structure comes via refs.
+      geometry: cleanGeometry.length
+        ? sanitizeBriefTagField(mergeTags(designBrief.geometry, cleanGeometry))
+        : designBrief.geometry,
+      construction: cleanConstruction.length
+        ? sanitizeBriefTagField(mergeTags(designBrief.construction, cleanConstruction))
         : designBrief.construction,
-      preferredShapes: selected.geometry?.length
-        ? mergeTags(designBrief.preferredShapes, selected.geometry)
+      preferredShapes: cleanGeometry.length
+        ? sanitizeBriefTagField(mergeTags(designBrief.preferredShapes, cleanGeometry))
         : designBrief.preferredShapes,
       sources,
     });

@@ -13,7 +13,6 @@ import {
   stylePreferenceOverrides,
   sanitizeLiteralIndustryLanguage,
   ensureModernistFormLanguage,
-  polishLogoPrompt,
 } from '@logo-platform/shared';
 
 const ICON_SUFFIX =
@@ -174,15 +173,7 @@ function finalizeEnhancedPrompt(
   request: ImageGenerationRequest,
   markType?: LogoMarkType,
 ): string {
-  return applyImageStyleOverrides(
-    polishLogoPrompt(text, {
-      companyName: normalizeBrandName(request.companyName),
-      markType: markType ?? request.markType,
-      colorPalette: request.colorPalette,
-      maxLength: 3600,
-    }),
-    request,
-  );
+  return applyImageStyleOverrides(text, request);
 }
 
 export function enhanceLogoPrompt(request: ImageGenerationRequest): string {

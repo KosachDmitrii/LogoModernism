@@ -6,6 +6,8 @@ import {
   detectPromptTextConflicts,
   filterCatalogInspirationFragments,
   resolvePromptSpec,
+  sanitizeLiteralIndustryLanguage,
+  sanitizePartnerConstraintAdditions,
 } from '@logo-platform/shared';
 
 describe('resolvePromptSpec', () => {
@@ -71,6 +73,36 @@ describe('applyPromptSpecToText', () => {
     expect(result.toLowerCase()).not.toContain('script');
     expect(result.toLowerCase()).not.toContain('swash');
   });
+
+  it('strips two-color territory language when prompt already enforces monochrome', () => {
+    const spec = resolvePromptSpec({
+      companyName: 'Burger Company',
+      markType: 'combination',
+    });
+
+    const raw =
+      'Color: strict black and white only. Color approach: Controlled two-color palette. Creative direction: warm craft.';
+    const result = applyPromptSpecToText(raw, spec);
+
+    expect(result.toLowerCase()).not.toContain('two-color');
+    expect(result.toLowerCase()).not.toContain('two color');
+    expect(result.toLowerCase()).toContain('strict black and white');
+  });
+
+  it('strips two-color language for monochrome brief palette', () => {
+    const spec = resolvePromptSpec({
+      companyName: 'Burger Company',
+      markType: 'combination',
+      colorPalette: 'black_white',
+    });
+
+    const raw =
+      'Combination mark for "Burger Company". Color approach: Controlled two-color palette. Color: strict black and white only.';
+    const result = applyPromptSpecToText(raw, spec);
+
+    expect(result.toLowerCase()).not.toContain('two-color');
+    expect(result.toLowerCase()).not.toContain('controlled two');
+  });
 });
 
 describe('filterCatalogInspirationFragments', () => {
@@ -124,3 +156,40 @@ describe('detectActivePromptConflicts', () => {
     expect(conflicts.some((c) => c.code === 'composition_axis_conflict')).toBe(false);
   });
 });
+
+describe('sanitizePartnerConstraintAdditions', () => {
+  it('drops diagnostic violations and strips leaked literal phrases', () => {
+    const result = sanitizePartnerConstraintAdditions([
+      'Monochrome brief conflicts with multicolor or two-color language in the prompt',
+      'The color palette will be strictly black and white, generic stock sans-serif, literal oven',
+      'Add custom modified letterforms — avoid generic stock sans-serif',
+    ]);
+
+    expect(result.some((s) => /monochrome brief conflicts/i.test(s))).toBe(false);
+    expect(result.join(' ').toLowerCase()).not.toContain('literal oven');
+    expect(result.join(' ').toLowerCase()).not.toContain('generic stock sans');
+    expect(result.some((s) => /custom modified letterforms/i.test(s))).toBe(true);
+  });
+});
+
+describe('sanitizeLiteralIndustryLanguage', () => {
+  it('removes contradictory typography and literal food leaks from prompt tail', () => {
+    const raw =
+      'Custom neo-grotesque wordmark with modified letterforms. The color palette will be strictly black and white, generic stock sans-serif, literal oven. Industry direction (stylized): abstract form language, not literal clipart.';
+    const result = sanitizeLiteralIndustryLanguage(raw);
+
+    expect(result.toLowerCase()).not.toContain('generic stock sans');
+    expect(result.toLowerCase()).not.toContain('literal oven');
+    expect(result.toLowerCase()).toContain('neo-grotesque');
+  });
+
+  it('strips steering-clear-of constraint leaks without keeping literal oven', () => {
+    const raw =
+      'The color palette will be strictly black and white, evoking freshness, while steering clear of generic stock sans-serif fonts and disconnected floating symbols, literal oven.';
+    const result = sanitizeLiteralIndustryLanguage(raw);
+
+    expect(result.toLowerCase()).not.toContain('literal oven');
+    expect(result.toLowerCase()).not.toContain('generic stock sans');
+  });
+});
+

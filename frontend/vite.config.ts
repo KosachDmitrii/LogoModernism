@@ -1,6 +1,10 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -11,7 +15,14 @@ export default defineConfig({
       destructuring: true,
     },
   },
+  resolve: {
+    // Prefer TypeScript sources so new shared exports work without stale CJS dist cache.
+    alias: {
+      '@logo-platform/shared': path.resolve(repoRoot, 'packages/shared/src/index.ts'),
+    },
+  },
   optimizeDeps: {
+    exclude: ['@logo-platform/shared'],
     esbuildOptions: {
       supported: {
         destructuring: true,
@@ -23,9 +34,10 @@ export default defineConfig({
     watch: {
       ignored: [
         '**/tsconfig.tsbuildinfo',
-        '**/dist/**',
         '**/generated/**',
         '**/*.tsbuildinfo',
+        // Ignore package build outputs (shared is aliased to src, so this is safe).
+        '**/packages/*/dist/**',
       ],
     },
     proxy: {

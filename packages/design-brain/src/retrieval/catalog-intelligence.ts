@@ -21,17 +21,9 @@ export function resolveCatalogIntelligence(
     typographyStyle: request.typographyStyle,
   });
 
-  const narrative =
-    request.catalogNarrative ??
-    [
-      `Catalog intelligence for ${request.industry}:`,
-      ...recommendations.slice(0, 3).map(
-        (r) => `${r.name} (score ${r.industryScore.toFixed(2)}) — ${r.significance?.slice(0, 120) ?? r.markType}`,
-      ),
-      catalogContext?.inspirationFragments.slice(0, 2).join('; '),
-    ]
-      .filter(Boolean)
-      .join(' ');
+  // Never invent significance/score dumps into catalogNarrative — that becomes Design brief note.
+  // Manual user/catalog narrative (already sanitized downstream) is the only allowed value.
+  const narrative = request.catalogNarrative?.trim() || undefined;
 
   return {
     request: {
@@ -52,7 +44,7 @@ export function resolveCatalogIntelligence(
         name: r.name,
         industryScore: r.industryScore,
       })),
-      narrative,
+      narrative: narrative ?? catalogContext?.inspirationFragments.slice(0, 2).join('; ') ?? '',
       autoSelected: !hasManualRefs,
     },
   };

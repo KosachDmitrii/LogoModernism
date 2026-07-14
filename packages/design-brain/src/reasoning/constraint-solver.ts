@@ -1,6 +1,6 @@
 import type { DesignDecision } from '@logo-platform/shared';
 import type { AbstractionLevel, DesignStrategy, BrainGenerateRequest } from '@logo-platform/shared';
-import { buildPolishOptionsFromRequest, polishLogoPrompt } from '@logo-platform/shared';
+import { scrubCatalogSignificanceLeaks } from '@logo-platform/knowledge-base';
 
 const DEFAULT_MODERNIST_AVOID = [
   'gradients',
@@ -32,19 +32,7 @@ export function solveConstraints(
     return true;
   });
 
-  const polishOptions =
-    typeof requestOrMinimalism === 'object' && requestOrMinimalism !== null
-      ? {
-          ...buildPolishOptionsFromRequest(requestOrMinimalism),
-          abstractionLevel,
-        }
-      : {
-          colorPalette: strategy.colorSystem.toLowerCase().includes('black and white') ? 'black_white' : undefined,
-          abstractionLevel,
-          minimalismLevel: typeof requestOrMinimalism === 'number' ? requestOrMinimalism : undefined,
-        };
-
-  const polished = polishLogoPrompt(decision.promptText, polishOptions);
+  const polished = scrubCatalogSignificanceLeaks(decision.promptText);
 
   return {
     ...decision,

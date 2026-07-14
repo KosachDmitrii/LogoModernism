@@ -13,7 +13,7 @@ const INDUSTRY_NODES: IndustryFormNode[] = [
   {
     industryTags: ['food', 'restaurant', 'pizza', 'cafe', 'bakery', 'beverage', 'culinary'],
     abstractMotifs: ['round focal geometry', 'warm radial construction', 'communal circular weave', 'craft silhouette'],
-    stylizedMotifs: ['hearth arc geometry', 'shared table roundel', 'oven-arch negative space'],
+    stylizedMotifs: ['round focal arc geometry', 'communal circular weave', 'quarter-circle negative space'],
     recognizableMotifs: ['brick oven arch silhouette', 'flame teardrop', 'pizza peel crossbar'],
     tone: ['warm', 'communal', 'craft'],
     constructionBias: ['radial grid', 'baseline grid', 'interlaced weave'],
@@ -63,11 +63,18 @@ export function resolveIndustryNode(industry: string): IndustryFormNode | undefi
   );
 }
 
+const LITERAL_MOTIF_PATTERN =
+  /\b(?:stylized burger|burger symbol|burger element|food elements?|hearth|oven|brick[- ]?oven|pizza|flame|pepperoni|utensil|burger|cheese)\b/i;
+
+function isLiteralMotif(motif: string): boolean {
+  return LITERAL_MOTIF_PATTERN.test(motif);
+}
 export function motifsForAbstraction(
   node: IndustryFormNode,
   level: AbstractionLevel,
   desiredFromClient: string[] = [],
 ): string[] {
+  const filteredDesired = desiredFromClient.filter((motif) => !isLiteralMotif(motif));
   const base =
     level === 'abstract'
       ? node.abstractMotifs
@@ -75,7 +82,7 @@ export function motifsForAbstraction(
         ? node.recognizableMotifs
         : node.stylizedMotifs;
 
-  return [...new Set([...desiredFromClient, ...base])].slice(0, 5);
+  return [...new Set([...filteredDesired, ...base])].slice(0, 5);
 }
 
 export function buildIndustryDirection(
@@ -86,10 +93,10 @@ export function buildIndustryDirection(
 ): string {
   const node = resolveIndustryNode(industry);
   if (!node) {
-    const motifs = desiredMotifs.length
-      ? desiredMotifs.join(', ')
-      : 'category cues through form language and silhouette';
-    return `Industry direction for ${industry}: ${motifs}`;
+    const motifs = desiredMotifs.filter((m) => !isLiteralMotif(m));
+    return motifs.length
+      ? `Industry direction for ${industry}: ${motifs.join(', ')}`
+      : `Industry direction for ${industry}: category cues through form language and silhouette`;
   }
 
   const motifs = motifsForAbstraction(node, abstractionLevel, desiredMotifs).filter(

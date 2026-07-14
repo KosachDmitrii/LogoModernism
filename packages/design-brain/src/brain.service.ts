@@ -56,8 +56,7 @@ import {
   rejectResearchCandidate,
   runWebResearch,
 } from './research/research.service';
-import { runBrainPromptPipeline, type BrainPipelineResult } from './reasoning/brain-prompt-pipeline';
-import { runBrainPartnerPipeline } from './reasoning/brain-partner-pipeline';
+import { runBriefCompilerPipeline, type BrainPipelineResult } from './reasoning/brain-compiler-pipeline';
 import { runBriefInterview } from './reasoning/brain-architecture';
 import { generateWithCritiqueLoop } from './generation/critique-loop';
 
@@ -285,10 +284,7 @@ export class DesignBrainService {
 
   async generate(request: BrainGenerateRequest): Promise<BrainPipelineResult> {
     const client = await this.getClient();
-    if (process.env.BRAIN_PARTNER_MODE === 'legacy') {
-      return runBrainPromptPipeline(client, request);
-    }
-    return runBrainPartnerPipeline(client, request);
+    return runBriefCompilerPipeline(client, request);
   }
 
   async interviewBrief(input: {

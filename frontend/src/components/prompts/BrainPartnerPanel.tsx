@@ -15,6 +15,11 @@ import { ConstraintConflictCard } from './ConstraintConflictCard';
 import type { BrainPartnerState, ConstraintResolution, CreativeTerritory, CreativeTerritoryId } from '../../types';
 import { useT, type MessageKey } from '../../i18n';
 
+function formatConstraintScore(score: number): string {
+  const percent = score > 1 ? score : score * 100;
+  return `${Math.round(percent)}%`;
+}
+
 export interface ComposeTerritoryOptions {
   preferredTerritoryId?: CreativeTerritoryId;
 }
@@ -356,7 +361,7 @@ export function BrainPartnerPanel({
               )}
             >
               {partner.constraintReport.passed ? t('prompts.partner.passed') : t('prompts.partner.issuesFound')} ·{' '}
-              {(partner.constraintReport.score * 100).toFixed(0)}%
+              {formatConstraintScore(partner.constraintReport.score)}
             </span>
           </div>
           <p className="text-xs text-zinc-600 mb-3 leading-relaxed">{t('prompts.partner.constraintGateHint')}</p>

@@ -6,6 +6,11 @@ import {
   normalizeBrandName,
   resolveMarkTypeForBrand,
 } from './brand-text';
+import { splitAvoidSection } from './prompt-compliance';
+
+function splitAvoidForSpec(text: string): { body: string; avoidSuffix: string } {
+  return splitAvoidSection(text);
+}
 
 export type PromptMarkMode = 'symbol_only' | 'wordmark' | 'lettermark' | 'combination' | 'unspecified';
 
@@ -79,7 +84,14 @@ const SYMMETRY_STRIP_PATTERNS = [
 ];
 
 const MULTICOLOR_SIGNALS =
-  /\b(?:two[- ]?color|multi[- ]?color|controlled palette:\s*two|accent color|corporate blue)\b/i;
+  /\b(?:two[- ]?color(?:\s+palette)?|multi[- ]?color(?:\s+palette)?|controlled(?:\s+two[- ]?color)?\s+palette|controlled palette:\s*two|accent color|corporate blue)\b/i;
+
+const MONOCHROME_TEXT_SIGNALS =
+  /\b(?:strict black and white only|black and white only|monochrome only|strictly black and white)\b/i;
+
+function isEffectivelyMonochrome(text: string, spec: NormalizedPromptSpec): boolean {
+  return spec.strictMonochrome || MONOCHROME_TEXT_SIGNALS.test(text);
+}
 
 const CURVE_CATALOG_SOFTEN_PATTERNS = [
   /\b(?:script|calligraphic|cursive|swash)(?:\s+\w+){0,4}\b/gi,
@@ -182,7 +194,7 @@ function isCatalogReferenceBlock(fragment: string): boolean {
 }
 
 function catalogMarkTypeFromFragment(fragment: string): string | undefined {
-  const match = fragment.match(/\bMark type:\s*([a-z_]+)/i);
+  const match = fragment.match(/\b(?:Catalog lineage mark type|Mark type):\s*([a-z_]+)/i);
   return match?.[1]?.toLowerCase();
 }
 
@@ -253,6 +265,14 @@ export function applyPromptSpecToText(text: string, spec: NormalizedPromptSpec):
       result = result.replace(pattern, '');
     }
     result = dedupePhrase(result, 'abstract symbol mark');
+    // Catalog symbol refs must not override branded brief architecture.
+    const briefMark =
+      spec.markMode === 'wordmark'
+        ? 'wordmark'
+        : spec.markMode === 'lettermark'
+          ? 'lettermark'
+          : 'combination';
+    result = result.replace(/\bMark type:\s*symbol\b/gi, `Mark type: ${briefMark}`);
   }
 
   if (spec.markMode === 'wordmark' && spec.brandName) {
@@ -276,12 +296,27 @@ export function applyPromptSpecToText(text: string, spec: NormalizedPromptSpec):
     result = softenCurveCatalogLanguage(result);
   }
 
-  if (spec.strictMonochrome) {
-    result = result
-      .replace(/\bColor approach:\s*Controlled palette:\s*two color\b/gi, '')
-      .replace(/\bColor approach:\s*[^.]+\./gi, '')
+  if (isEffectivelyMonochrome(result, spec)) {
+    const { body, avoidSuffix } = splitAvoidForSpec(result);
+    let cleanedBody = body
+      .replace(/\bColor approach:\s*Controlled(?:\s+two[- ]?color)?\s+palette\b/gi, '')
+      .replace(/\bColor approach:\s*Controlled palette:\s*two[- ]?color\b/gi, '')
+      .replace(/\bColor approach:\s*[^.]+\./gi, (match) =>
+        MULTICOLOR_SIGNALS.test(match) ? '' : match,
+      )
       .replace(MULTICOLOR_SIGNALS, '')
       .replace(/\bColor:\s*only,\s*/gi, 'Color: ');
+    // Redundant avoid when body already locks monochrome.
+    let cleanedAvoid = avoidSuffix
+      .replace(/\bAvoid:\s*/i, '')
+      .split(',')
+      .map((item) => item.trim().replace(/\.$/, ''))
+      .filter(Boolean)
+      .filter((item) => !/^(?:multi[- ]?color|two[- ]?color|accent color|corporate blue)$/i.test(item))
+      .join(', ');
+    result = cleanedAvoid
+      ? `${cleanedBody.replace(/\.\s*$/, '')}. Avoid: ${cleanedAvoid}.`
+      : cleanedBody;
   }
 
   result = result.replace(/\babstract symbol mark for\s+"[^"]+"/gi, (match) => {
@@ -306,6 +341,15 @@ export function detectPromptTextConflicts(
         severity: 'error',
         message: 'Prompt mixes brand name with symbol-only directives',
         autoResolvable: true,
+      });
+    }
+    if (/\bmark type:\s*symbol\b/i.test(lower) && /\b(?:wordmark|lettermark|combination mark|neo-grotesque wordmark)\b/i.test(lower)) {
+      conflicts.push({
+        code: 'mark_architecture_conflict',
+        severity: 'error',
+        message: 'Catalog symbol mark type conflicts with branded wordmark/combination language',
+        autoResolvable: true,
+        term: 'Mark type: symbol',
       });
     }
   }
@@ -339,7 +383,7 @@ export function detectPromptTextConflicts(
     });
   }
 
-  if (spec.strictMonochrome && MULTICOLOR_SIGNALS.test(text)) {
+  if (isEffectivelyMonochrome(text, spec) && MULTICOLOR_SIGNALS.test(text)) {
     const termMatch = text.match(MULTICOLOR_SIGNALS);
     conflicts.push({
       code: 'palette_territory_conflict',

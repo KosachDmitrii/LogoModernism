@@ -18,6 +18,11 @@ import {
   getFullCatalog,
   buildCatalogPromptContext,
   getCatalogRecommendations,
+  scrubCatalogSignificanceLeaks,
+  sanitizeCatalogNarrativeForPrompt,
+  isHighRiskCatalogEntry,
+  softenTrademarkLikenessLanguage,
+  HIGH_RISK_TRADEMARK_NAMES,
 } from './catalog';
 
 export const designPrinciples: DesignRule[] = principlesData as DesignRule[];
@@ -41,6 +46,11 @@ export {
   getFullCatalog,
   buildCatalogPromptContext,
   getCatalogRecommendations,
+  scrubCatalogSignificanceLeaks,
+  sanitizeCatalogNarrativeForPrompt,
+  isHighRiskCatalogEntry,
+  softenTrademarkLikenessLanguage,
+  HIGH_RISK_TRADEMARK_NAMES,
 };
 
 export function getPrincipleById(id: string): DesignRule | undefined {

@@ -6,7 +6,7 @@ import { embedText } from '../embedding/embedding.service';
 import { createExperience } from '../storage/experience.repository';
 import { upsertExperienceEmbedding } from '../storage/pgvector';
 import { ingestFeedback } from '../ingest/ingest-feedback';
-import { runBrainPromptPipeline } from '../reasoning/brain-prompt-pipeline';
+import { runBriefCompilerPipeline } from '../reasoning/brain-compiler-pipeline';
 
 function enrichRequestWithCritique(
   request: BrainCritiqueGenerateRequest,
@@ -71,11 +71,11 @@ export async function generateWithCritiqueLoop(
   const maxRetries = Math.min(request.maxRetries ?? 3, 5);
   const qualityThreshold = request.qualityThreshold ?? 7;
   let currentRequest = { ...request };
-  let lastPipeline = await runBrainPromptPipeline(prisma, currentRequest);
+  let lastPipeline = await runBriefCompilerPipeline(prisma, currentRequest);
   let lastCritique = critiqueLogo({ prompt: lastPipeline.bestPrompt });
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    lastPipeline = await runBrainPromptPipeline(prisma, currentRequest);
+    lastPipeline = await runBriefCompilerPipeline(prisma, currentRequest);
     lastCritique = critiqueLogo({ prompt: lastPipeline.bestPrompt });
 
     if (lastCritique.overallScore >= qualityThreshold) {

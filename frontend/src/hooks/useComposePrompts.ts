@@ -94,7 +94,8 @@ export function useComposePrompts() {
         preferredEra: era,
         analysisPrincipleIds,
         catalogReferenceIds,
-        catalogNarrative: catalogReferenceIds ? activeBrief.narrative || undefined : undefined,
+        // Do not send brief.narrative as catalogNarrative — significances/scores leak as Design brief note.
+        // Catalog structure comes from catalogReferenceIds alone.
         markType: logoMarkType,
         typographyStyle: brandName ? typographyStyle : parseTypographyStyle(activeBrief.typographyStyle),
         briefContext,

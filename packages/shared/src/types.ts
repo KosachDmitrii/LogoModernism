@@ -230,6 +230,7 @@ export interface ComposedPrompt {
     creativeTerritory?: import('./brain-partner').CreativeTerritory;
     constraintReport?: import('./brain-partner').ConstraintReport;
     partnerCritique?: DesignCriticResult;
+    negativePrompt?: string;
   };
 }
 

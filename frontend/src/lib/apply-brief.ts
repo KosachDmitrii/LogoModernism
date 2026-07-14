@@ -1,5 +1,7 @@
 import type { DesignBrief } from '../types';
 import { complexityToMinimalism, dedupeTags, eraToInspiration, isMultiWordCompanyName, joinTags } from './brief-mappers';
+import { sanitizeCatalogTagList, sanitizeCompositionField } from '@logo-platform/shared';
+
 
 type BriefPatch = Partial<DesignBrief>;
 
@@ -94,7 +96,6 @@ export function applyBrandDNAToBrief(
       if (isLettermark && !lettermarkUsesInitials && /\b(monogram|initials?)\b/i.test(line)) return false;
       return true;
     }),
-    ...(result.typography?.constructionRules?.slice(0, 2) ?? []),
   ]);
 
   const brief = mergeBrief(
@@ -113,7 +114,7 @@ export function applyBrandDNAToBrief(
       primaryEmotion: result.psychologyProfile?.primaryEmotion ?? '',
       narrative: result.narrative ?? '',
       typography: joinTags(typographyTags),
-      composition: joinTags(compositionTags),
+      composition: sanitizeCompositionField(joinTags(compositionTags)),
       constraints: joinTags(result.constraints ?? []),
       principleIds: mergePrincipleIds(current.principleIds ?? [], result.principleIds ?? []),
     },
@@ -141,7 +142,7 @@ export function applyGeometryToBrief(
     ?? [];
   if (selected.length === 0) return current;
 
-  const shapeNames = joinTags(selected.map((r) => r.name));
+  const shapeNames = joinTags(sanitizeCatalogTagList(selected.map((r) => r.name)));
 
   return mergeBrief(
     current,
@@ -154,11 +155,7 @@ export function applyGeometryToBrief(
       ]
         .filter(Boolean)
         .join(', '),
-      narrative: selected
-        .map((r) =>
-          r.score != null ? `${r.name} (${r.score}/10): ${r.reason}` : `${r.name}: ${r.reason}`,
-        )
-        .join('. '),
+      // Do not write score dumps into narrative — they leak as "Design brief note: Circle (6/10):…"
       principleIds: mergePrincipleIds(
         current.principleIds ?? [],
         principleIdsFromShapeNames(selected.map((r) => r.name)),
@@ -203,9 +200,9 @@ export function applyStyleToBrief(
     {
       colorPalette: patch.colorPalette ?? current.colorPalette,
       composition: patch.composition
-        ? joinTags([current.composition, patch.composition])
+        ? sanitizeCompositionField(joinTags([current.composition, patch.composition]))
         : current.composition,
-      colorSelections: [],
+      colorSelections: current.colorSelections,
       allowShadows: false,
       allowPhotoreal: false,
     },
@@ -231,7 +228,9 @@ export function applyPipelineToBrief(
         ? joinTags([brand.brief.typography, result.typography.primaryRecommendation.name])
         : brand.brief.typography,
       composition: result.composition?.recommendedLayout?.name
-        ? joinTags([brand.brief.composition, result.composition.recommendedLayout.name])
+        ? sanitizeCompositionField(
+            joinTags([brand.brief.composition, result.composition.recommendedLayout.name]),
+          )
         : brand.brief.composition,
       bestPromptHint: result.prompts?.bestPrompt?.text ?? '',
       critiqueNote: result.critique

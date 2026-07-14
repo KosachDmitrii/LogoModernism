@@ -15,7 +15,6 @@ import {
   buildSymbolOnlyArtDirectionFragments,
   isCombinationMark,
   stylePreferenceOverrides,
-  finalizeLogoPromptText,
   resolvePromptSpec,
   filterCatalogInspirationFragments,
 } from '@logo-platform/shared';
@@ -103,7 +102,12 @@ function overlapsCatalog(fragment: string, catalogText: string): boolean {
 
 function isRedundantAvoid(pattern: string, principles: DesignRule[]): boolean {
   const ids = new Set(principles.map((p) => p.id));
-  const normalized = pattern.toLowerCase();
+  const normalized = pattern.toLowerCase().trim();
+
+  // Bare category tokens pollute Avoid lists and swallow trailing body clauses.
+  if (/^(?:color|colors|colour|colours|typography|geometry|construction|composition|effects?)$/i.test(normalized)) {
+    return true;
+  }
 
   if (normalized.includes('gradient') && (ids.has('color-no-gradient') || ids.has('fx-gradient-avoid'))) {
     return true;
@@ -177,7 +181,7 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     } else if (isWordmark || !markType) {
       fragments.push(`wordmark for "${brandName}"`);
     } else {
-      fragments.push(`for "${brandName}"`);
+      fragments.push(`combination mark for "${brandName}"`);
     }
     fragments.push(exactBrandSpellingFragment(brandName, markType ?? (isWordmark ? 'wordmark' : undefined)));
   } else {
@@ -268,14 +272,7 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
     input.briefContext,
   );
   const optimized = optimizePrompt(rawText, principles, stylePreferenceOverrides(input.briefContext));
-  const text = finalizeLogoPromptText(optimized, {
-    clientNotes: input.briefContext?.clientNotes,
-    constraints: input.briefContext?.constraints,
-    composition: input.briefContext?.composition,
-    companyName: brandName,
-    markType,
-    colorPalette: input.briefContext?.colorPalette,
-  });
+  const text = optimized;
   const scores = scorePrompt(text, principles, input.dna);
 
   return {
@@ -332,7 +329,7 @@ export function buildPromptFromTemplate(
 ): ComposedPrompt {
   const rawText = templateFragments.join('. ');
   const optimized = optimizePrompt(rawText, principles);
-  const text = finalizeLogoPromptText(optimized);
+  const text = optimized;
   const scores = scorePrompt(text, principles, dna);
 
   return {

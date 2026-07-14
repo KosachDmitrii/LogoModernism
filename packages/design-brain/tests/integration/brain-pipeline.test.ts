@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
 import type { PrismaClient } from '@logo-platform/database';
-import { runBrainPromptPipeline } from '../../src/reasoning/brain-prompt-pipeline';
+import { runBriefCompilerPipeline } from '../../src/reasoning/brain-compiler-pipeline';
 import { reasonDesignDecision } from '../../src/reasoning/brain-reasoning';
 import { buildBrainArchitecture } from '../../src/reasoning/brain-architecture';
 import {
@@ -41,7 +41,7 @@ describeIntegration('brain prompt pipeline (integration)', () => {
       confidence: 0.85,
     });
 
-    const result = await runBrainPromptPipeline(
+    const result = await runBriefCompilerPipeline(
       prisma,
       sampleGenerateRequest({ variationCount: 3 }),
     );
@@ -50,9 +50,9 @@ describeIntegration('brain prompt pipeline (integration)', () => {
     expect(result.prompts).toHaveLength(3);
     expect(result.bestPrompt.scores.promptQuality).toBeGreaterThan(0);
     expect(result.bestPrompt.metadata?.brainPowered).toBe(true);
-    expect(result.recommendations.length).toBeGreaterThan(0);
+    expect(result.recommendations).toHaveLength(0);
     expect(result.decision.promptText.length).toBeGreaterThan(20);
-    expect(result.decision.reasoning.length).toBeGreaterThan(10);
+    expect(result.decision.reasoning).toContain('Compiled deterministically');
   });
 
   it('uses taste profile avoided patterns in fallback decision', async () => {

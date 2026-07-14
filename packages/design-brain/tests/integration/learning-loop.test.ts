@@ -3,7 +3,7 @@ import type { PrismaClient } from '@logo-platform/database';
 import { consolidateBrain } from '../../src/learning/consolidate';
 import { computeTasteProfile } from '../../src/learning/taste-profile';
 import { ingestFeedback } from '../../src/ingest/ingest-feedback';
-import { runBrainPromptPipeline } from '../../src/reasoning/brain-prompt-pipeline';
+import { runBriefCompilerPipeline } from '../../src/reasoning/brain-compiler-pipeline';
 import {
   createTestPrisma,
   isBrainDbReady,
@@ -82,7 +82,7 @@ describeIntegration('learning loop (integration)', () => {
     expect(tasteBeforeGenerate.preferredMarkTypes).toContain('lettermark');
     expect(tasteBeforeGenerate.avoidedPatterns.length).toBeGreaterThan(0);
 
-    const pipeline = await runBrainPromptPipeline(
+    const pipeline = await runBriefCompilerPipeline(
       prisma,
       sampleGenerateRequest({ variationCount: 2 }),
     );
@@ -95,7 +95,7 @@ describeIntegration('learning loop (integration)', () => {
     expect(
       pipeline.retrievedExperiences.some((exp) => /Swiss|Grid|Typography/i.test(exp.title ?? '')),
     ).toBe(true);
-    expect(pipeline.decision.antiPatterns.length).toBeGreaterThan(0);
+    expect(pipeline.decision.antiPatterns).toHaveLength(0);
     expect(pipeline.brainArchitecture.clientIntent).toBeDefined();
     expect(pipeline.brainArchitecture.designStrategy).toBeDefined();
   });
@@ -104,7 +104,7 @@ describeIntegration('learning loop (integration)', () => {
     await ingestFeedback(prisma, sampleFeedback({ signalType: 'LIKE', score: 10 }));
 
     const first = await computeTasteProfile(prisma);
-    const secondPipeline = await runBrainPromptPipeline(
+    const secondPipeline = await runBriefCompilerPipeline(
       prisma,
       sampleGenerateRequest({ variationCount: 1 }),
     );

@@ -1,5 +1,6 @@
 import type { ClientVisualIntent } from './client-visual-intent';
 import { buildIndustryDirection } from './industry-graph';
+import { splitAvoidSection } from './prompt-compliance';
 
 /** Penalized in prompt scoring — pulls image models toward clipart. */
 export const LITERAL_INDUSTRY_PENALTY_TERMS = [
@@ -57,6 +58,10 @@ const LITERAL_PHRASE_REPLACEMENTS: Array<{ pattern: RegExp; replacement: string 
   { pattern: /\bpizza icon\b/gi, replacement: 'abstract symbol' },
   { pattern: /\bfood beverage brand\b/gi, replacement: '' },
   { pattern: /\bfood & beverage brand\b/gi, replacement: '' },
+  { pattern: /\bstylized burger symbol\b/gi, replacement: 'abstract geometric symbol' },
+  { pattern: /\bstylized burger element\b/gi, replacement: 'abstract geometric focal element' },
+  { pattern: /\bburger symbol\b/gi, replacement: 'abstract round focal symbol' },
+  { pattern: /\bburger element\b/gi, replacement: 'abstract round focal element' },
 ];
 
 const MODERNIST_FORM_PHRASES = [
@@ -102,19 +107,53 @@ export function buildAbstractIndustryFragment(
 }
 
 function isNegativeLiteralContext(text: string, index: number): boolean {
-  const window = text.slice(Math.max(0, index - 40), index).toLowerCase();
-  return /\b(?:no|not|never|avoid|without)\s+(?:literal\s+)?/.test(window);
+  const window = text.slice(Math.max(0, index - 56), index).toLowerCase();
+  return /\b(?:no|not|never|avoid|without|steering clear of|stay away from|clear of)\s+(?:literal\s+)?/.test(
+    window,
+  );
 }
 
-function splitAvoidSection(text: string): { body: string; avoidSuffix: string } {
-  const idx = text.search(/\bAvoid:\s*/i);
-  if (idx === -1) {
-    return { body: text, avoidSuffix: '' };
+const LEAKED_CONSTRAINT_SENTENCES = [
+  /\bThe color palette will be[^.]+\./gi,
+  /\bwhile steering clear of[^.]+\./gi,
+];
+
+const CUSTOM_TYPOGRAPHY_SIGNALS =
+  /\b(?:neo-grotesque|modified letterforms?|custom letterforms?|custom wordmark|custom type|modified glyph)\b/i;
+
+const STYLIZED_INDUSTRY_SIGNALS =
+  /\b(?:stylized|abstract form language|not literal clipart|category cues through abstract)\b/i;
+
+const LEAKED_CONSTRAINT_PHRASES = [
+  /\bliteral oven\b/gi,
+  /\bliteral flame\b/gi,
+  /\bliteral pizza\b/gi,
+];
+
+function stripLeakedConstraintPhrases(body: string): string {
+  let result = body;
+  for (const pattern of LEAKED_CONSTRAINT_PHRASES) {
+    result = result.replace(pattern, (match, ...args) => {
+      const offset = typeof args[args.length - 2] === 'number' ? args[args.length - 2] : 0;
+      if (isNegativeLiteralContext(result, offset)) return match;
+      return '';
+    });
   }
-  return {
-    body: text.slice(0, idx).trim(),
-    avoidSuffix: text.slice(idx).trim(),
-  };
+  return result;
+}
+
+function stripContradictoryTypographyNoise(body: string): string {
+  if (!CUSTOM_TYPOGRAPHY_SIGNALS.test(body)) return body;
+  return body.replace(/\bgeneric stock sans(?:-serif)?\b/gi, (match, ...args) => {
+    const offset = typeof args[args.length - 2] === 'number' ? args[args.length - 2] : 0;
+    if (isNegativeLiteralContext(body, offset)) return match;
+    return '';
+  });
+}
+
+function stripLiteralFoodLeaks(body: string): string {
+  if (!STYLIZED_INDUSTRY_SIGNALS.test(body)) return body;
+  return stripLeakedConstraintPhrases(body);
 }
 
 function sanitizeBodyLiteralLanguage(body: string): string {
@@ -128,11 +167,20 @@ function sanitizeBodyLiteralLanguage(body: string): string {
     });
   }
 
+  result = stripContradictoryTypographyNoise(result);
+  result = stripLiteralFoodLeaks(result);
+  result = stripLeakedConstraintPhrases(result);
+  for (const pattern of LEAKED_CONSTRAINT_SENTENCES) {
+    result = result.replace(pattern, '');
+  }
+
   return result
     .replace(/\s{2,}/g, ' ')
     .replace(/,\s*,+/g, ', ')
+    .replace(/,\s*\./g, '.')
     .replace(/\.\s*\./g, '.')
     .replace(/^\s*,\s*/, '')
+    .replace(/,\s*$/, '')
     .trim();
 }
 

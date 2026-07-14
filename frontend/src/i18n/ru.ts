@@ -330,6 +330,18 @@ export const ru: Record<MessageKey, string> = {
   'brief.style.corporateBlue': 'Корпоративный синий',
   'brief.style.redAccent': 'Красный акцент',
   'brief.style.customColors': 'Выбранные цвета',
+  'brief.style.pickColors': 'Выберите цвета',
+  'brief.style.pickColorsHint': 'Выберите минимум {count} цвета',
+  'brief.style.pickColorsBeforeApply': 'Выберите все нужные цвета перед применением стиля.',
+  'brief.style.addColor': 'Добавить цвет',
+  'brief.style.removeColor': 'Удалить цвет',
+  'brief.style.colorSlot': 'Цвет {index}',
+  'brief.style.colorBlack': 'Чёрный',
+  'brief.style.colorWhite': 'Белый',
+  'brief.style.colorRed': 'Красный',
+  'brief.style.colorNavy': 'Тёмно-синий',
+  'brief.style.colorYellow': 'Жёлтый',
+  'brief.style.colorTeal': 'Бирюзовый',
 
   'brief.references.intro':
     'Выберите логотипы из Müller Logo Modernism как визуальное вдохновение. Референсы добавляют геометрию, эру и принципы в бриф.',

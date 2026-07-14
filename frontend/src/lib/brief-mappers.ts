@@ -1,4 +1,5 @@
 import type { BriefContextPayload } from '../types';
+import { sanitizeBriefTagField, sanitizeCompositionField, resolveColorSelections } from '@logo-platform/shared';
 
 export function eraToInspiration(era: string): string {
   const map: Record<string, string> = {
@@ -213,19 +214,21 @@ export function designBriefToBriefContext(brief: {
   set('personality', brief.personality);
   set('primaryEmotion', brief.primaryEmotion);
   set('complexity', brief.complexity);
+  // User/Brand DNA narrative only — never dump for catalog Design brief note via duplicate path.
   set('narrative', brief.narrative);
   set('typography', brief.typography);
-  set('composition', brief.composition);
+  set('composition', sanitizeCompositionField(brief.composition) || 'symmetry');
   set('constraints', brief.constraints);
-  set('geometry', brief.geometry);
-  set('construction', brief.construction);
-  set('preferredShapes', brief.preferredShapes);
+  set('geometry', sanitizeBriefTagField(brief.geometry));
+  set('construction', sanitizeBriefTagField(brief.construction));
+  set('preferredShapes', sanitizeBriefTagField(brief.preferredShapes));
 
   if (brief.colorPalette && brief.colorPalette !== '' && brief.colorPalette !== 'auto') {
     ctx.colorPalette = brief.colorPalette as BriefContextPayload['colorPalette'];
-  }
-  if (brief.colorSelections?.length) {
-    ctx.colorSelections = brief.colorSelections;
+    const colors = resolveColorSelections(brief.colorPalette, brief.colorSelections);
+    if (colors.length > 0) {
+      ctx.colorSelections = colors;
+    }
   }
   if (brief.allowShadows) {
     ctx.allowShadows = true;
@@ -234,9 +237,7 @@ export function designBriefToBriefContext(brief: {
     ctx.allowPhotoreal = true;
   }
   set('clientNotes', brief.clientNotes);
-  set('knowledgeInsights', brief.knowledgeInsights);
-  set('bestPromptHint', brief.bestPromptHint);
-  set('critiqueNote', brief.critiqueNote);
+  // Omit knowledgeInsights / bestPromptHint / critiqueNote — diagnostic ID dumps pollute LLM brief.
 
   return Object.keys(ctx).length > 0 ? ctx : undefined;
 }
