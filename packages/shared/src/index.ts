@@ -2,6 +2,7 @@ export * from './types';
 export * from './image-types';
 export * from './lettermark-text';
 export * from './brand-text';
+export * from './typography-styles';
 export * from './brain-types';
 export * from './art-direction';
 export * from './industry-form-language';

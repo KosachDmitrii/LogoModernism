@@ -1,9 +1,10 @@
-import type { CatalogMarkType, Era, LogoReference } from '@logo-platform/shared';
+import type { CatalogMarkType, Era, LogoReference, TypographyStyle } from '@logo-platform/shared';
 import {
   sanitizeBriefNarrativeForPrompt,
   sanitizeCatalogTagList,
   sanitizeDesignerName,
   humanizeCatalogTag,
+  isConstructedTypographyStyle,
 } from '@logo-platform/shared';
 import {
   isHighRiskCatalogEntry,
@@ -213,7 +214,7 @@ function referenceToFragments(ref: LogoReference): string[] {
 
 export function buildCatalogPromptContext(
   referenceIds: string[],
-  options?: { narrative?: string; typographyStyle?: 'standard' | 'constructed' },
+  options?: { narrative?: string; typographyStyle?: TypographyStyle },
 ): CatalogPromptContext | null {
   if (!referenceIds.length) return null;
 
@@ -221,7 +222,7 @@ export function buildCatalogPromptContext(
     .map((id) => getCatalogEntry(id))
     .filter((ref): ref is LogoReference => Boolean(ref))
     .filter((ref) => {
-      if (options?.typographyStyle !== 'constructed') return true;
+      if (!isConstructedTypographyStyle(options?.typographyStyle)) return true;
       if (ref.markType === 'symbol' || ref.markType === 'emblem') return false;
       if (ref.catalogChapter === 'geometric' && ref.markType !== 'wordmark' && ref.markType !== 'lettermark') {
         return false;
@@ -240,7 +241,7 @@ export function buildCatalogPromptContext(
     inspirationFragments.push(`Design brief note: ${narrative}`);
   }
 
-  if (options?.typographyStyle === 'constructed') {
+  if (isConstructedTypographyStyle(options?.typographyStyle)) {
     inspirationFragments.push(
       'Catalog lineage for constructive typography — geometric letterforms from primitives, not a separate pictorial symbol',
     );

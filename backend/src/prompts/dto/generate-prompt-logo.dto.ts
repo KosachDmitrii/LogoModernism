@@ -19,8 +19,8 @@ export class GeneratePromptLogoDto {
 
   @IsOptional()
   @Transform(emptyToUndefined)
-  @IsIn(['standard', 'constructed'])
-  typographyStyle?: 'standard' | 'constructed';
+  @IsIn(['standard', 'constructed', 'modified_glyph', 'rebus', 'monogram_ligature'])
+  typographyStyle?: 'standard' | 'constructed' | 'modified_glyph' | 'rebus' | 'monogram_ligature';
 
   @IsOptional()
   @Transform(emptyToUndefined)

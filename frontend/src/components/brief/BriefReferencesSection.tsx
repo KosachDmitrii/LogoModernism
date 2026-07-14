@@ -41,6 +41,18 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
     <div className="space-y-3">
       <p className="text-[13px] text-zinc-500 leading-relaxed">{t('brief.references.intro')}</p>
 
+      <label className="flex items-start gap-2.5 p-3 rounded-lg border border-zinc-800 bg-zinc-900/40 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={designBrief.autoCatalogReferences}
+          onChange={(e) => updateDesignBrief({ autoCatalogReferences: e.target.checked })}
+          className="mt-0.5 rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500/40"
+        />
+        <span className="text-xs text-zinc-300 leading-relaxed">
+          {t('brief.references.autoCatalog')}
+        </span>
+      </label>
+
       <Link
         to="/logo-catalog"
         onClick={() => {

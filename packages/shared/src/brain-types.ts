@@ -1,3 +1,5 @@
+import type { TypographyStyle } from './types';
+
 export type BrainSourceType = 'PDF' | 'IMAGE' | 'FEEDBACK' | 'CATALOG' | 'TEXT';
 
 export type TasteSignalType = 'LIKE' | 'DISLIKE' | 'APPROVE' | 'REJECT' | 'RATING';
@@ -193,7 +195,7 @@ export interface DesignDecisionPrinciple {
 
 export interface DesignDecision {
   markType: 'wordmark' | 'lettermark' | 'combination';
-  typographyStyle?: 'standard' | 'constructed';
+  typographyStyle?: TypographyStyle;
   geometry: string[];
   construction: string[];
   composition: string[];
@@ -218,6 +220,20 @@ export interface TasteProfile {
   summary: string;
 }
 
+/** Knowledge signals merged into the brief compiler before schema render */
+export interface CompileKnowledgeContext {
+  /** One-line cue from semantic retrieval */
+  retrievalCue?: string;
+  /** Avoid terms from global taste profile */
+  tasteAvoidPatterns: string[];
+  /** Prompt fragments from selected design principles */
+  principleFragments: string[];
+  /** Direction cues that worked on prior projects for this client/sector */
+  projectWorkedCues: string[];
+  /** Avoid cues from missed dimensions on prior projects */
+  projectAvoidCues: string[];
+}
+
 export interface BrainGenerateRequest {
   industry: string;
   companyName?: string;
@@ -226,12 +242,18 @@ export interface BrainGenerateRequest {
   preferredEra?: string;
   minimalismLevel?: number;
   markType?: 'wordmark' | 'lettermark' | 'combination';
-  typographyStyle?: 'standard' | 'constructed';
+  typographyStyle?: TypographyStyle;
   analysisPrincipleIds?: string[];
   catalogReferenceIds?: string[];
+  /** When true and no manual refs, auto-pick catalog references from recommendations */
+  autoCatalogReferences?: boolean;
+  /** Explicit rebus wordmark — letter integrates image via negative space */
+  rebusWordmark?: boolean;
   catalogNarrative?: string;
   briefContext?: BriefContext;
   useBrain?: boolean;
+  /** Brain retrieval / taste / project memory enrichment for the compiler */
+  compileKnowledge?: CompileKnowledgeContext;
   /** Force a creative territory instead of auto-selection */
   preferredTerritoryId?: import('./brain-partner').CreativeTerritoryId;
 }

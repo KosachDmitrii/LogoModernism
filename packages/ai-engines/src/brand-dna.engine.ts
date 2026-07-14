@@ -1,5 +1,5 @@
 import type { Era, TypographyStyle } from '@logo-platform/shared';
-import { isMultiWordCompanyName, lettermarkTextFromName } from '@logo-platform/shared';
+import { isConstructedTypographyStyle, isMultiWordCompanyName, lettermarkTextFromName } from '@logo-platform/shared';
 import { getPrincipleById, searchPrinciples } from '@logo-platform/knowledge-base';
 import { analyzeLetterDNA } from './letter-dna.engine';
 import { analyzeTypography } from './typography-intelligence.engine';
@@ -104,7 +104,7 @@ export function analyzeBrandDNA(input: BrandDNAInput): BrandDNAProfile {
   const personality = input.personality ?? inferPersonality(industry);
   const markType = input.markType ?? inferMarkType(input.companyName);
   const typographyStyle = input.typographyStyle ?? 'standard';
-  const isConstructed = typographyStyle === 'constructed';
+  const isConstructed = isConstructedTypographyStyle(typographyStyle);
   const resolvedEra = input.preferredEra ?? inferEraFromKnowledgeBase(industry);
 
   const typography = analyzeTypography({
@@ -282,7 +282,7 @@ function collectTypographyPrincipleIds(
   industry: string,
   typographyStyle: TypographyStyle,
 ): string[] {
-  if (typographyStyle === 'constructed') {
+  if (isConstructedTypographyStyle(typographyStyle)) {
     const ids = new Set<string>([
       ...CONSTRUCTED_PRINCIPLE_IDS,
       `era-${era.replace(/_/g, '-')}`,
@@ -366,7 +366,7 @@ function buildBrandNarrative(
   letterDNA: ReturnType<typeof analyzeLetterDNA>,
   typographyStyle: TypographyStyle,
 ): string {
-  if (typographyStyle === 'constructed') {
+  if (isConstructedTypographyStyle(typographyStyle)) {
     const letterText =
       markType === 'lettermark' ? lettermarkTextFromName(input.companyName) : input.companyName;
     return (

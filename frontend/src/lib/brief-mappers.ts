@@ -1,5 +1,13 @@
 import type { BriefContextPayload } from '../types';
-import { sanitizeBriefTagField, sanitizeCompositionField, resolveColorSelections } from '@logo-platform/shared';
+import {
+  sanitizeBriefTagField,
+  sanitizeCompositionField,
+  resolveColorSelections,
+  deriveRebusWordmark,
+  isConstructedTypographyStyle,
+  isTypographyStyle,
+  type TypographyStyle,
+} from '@logo-platform/shared';
 
 export function eraToInspiration(era: string): string {
   const map: Record<string, string> = {
@@ -108,7 +116,6 @@ export function parseMarkTypeFromBrief(brief: {
 }
 
 const LOGO_MARK_TYPES = new Set(['wordmark', 'lettermark', 'combination']);
-const TYPOGRAPHY_STYLES = new Set(['standard', 'constructed']);
 
 /** Normalize mark type for image generation API (rejects invalid / empty values). */
 export function parseLogoMarkType(
@@ -128,10 +135,10 @@ export function parseLogoMarkType(
   return markType;
 }
 
-export function parseTypographyStyle(value: string | undefined): 'standard' | 'constructed' | undefined {
+export function parseTypographyStyle(value: string | undefined): TypographyStyle | undefined {
   const trimmed = value?.trim();
-  if (!trimmed || !TYPOGRAPHY_STYLES.has(trimmed)) return undefined;
-  return trimmed as 'standard' | 'constructed';
+  if (!trimmed || !isTypographyStyle(trimmed)) return undefined;
+  return trimmed;
 }
 
 export function splitTags(value: string): string[] {
@@ -146,16 +153,33 @@ export function parseTypographyStyleFromBrief(brief: {
   narrative?: string;
   constraints?: string;
   typography?: string;
-}): 'standard' | 'constructed' | undefined {
-  if (brief.typographyStyle === 'constructed' || brief.typographyStyle === 'standard') {
+}): TypographyStyle | undefined {
+  if (isTypographyStyle(brief.typographyStyle)) {
     return brief.typographyStyle;
   }
 
   const hay = `${brief.narrative ?? ''} ${brief.constraints ?? ''} ${brief.typography ?? ''}`.toLowerCase();
+  if (hay.includes('rebus wordmark') || hay.includes('typography style: rebus')) return 'rebus';
+  if (hay.includes('monogram ligature') || hay.includes('typography style: monogram_ligature')) {
+    return 'monogram_ligature';
+  }
+  if (hay.includes('modified glyph') || hay.includes('typography style: modified_glyph')) {
+    return 'modified_glyph';
+  }
   if (hay.includes('typography style: constructed') || hay.includes('constructed typography')) {
     return 'constructed';
   }
   return undefined;
+}
+
+export function parseRebusWordmark(brief: {
+  rebusWordmark?: boolean;
+  typographyStyle?: string;
+}): boolean {
+  return deriveRebusWordmark(
+    isTypographyStyle(brief.typographyStyle) ? brief.typographyStyle : undefined,
+    brief.rebusWordmark,
+  );
 }
 
 export function buildEffectiveIndustry(industry: string, extras: {
@@ -163,11 +187,11 @@ export function buildEffectiveIndustry(industry: string, extras: {
   construction?: string;
   narrative?: string;
   preferredShapes?: string;
-  typographyStyle?: 'standard' | 'constructed';
+  typographyStyle?: TypographyStyle;
 }): string {
   /** @deprecated Use base industry + briefContext API fields instead */
   const parts = [industry.trim()];
-  const skipGeometry = extras.typographyStyle === 'constructed';
+  const skipGeometry = isConstructedTypographyStyle(extras.typographyStyle);
 
   if (!skipGeometry) {
     const geometry = splitTags(extras.geometry ?? '');

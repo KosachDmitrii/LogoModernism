@@ -6,6 +6,7 @@ import {
   normalizeBrandName,
   resolveMarkTypeForBrand,
   resolveTypographyStyleForBrand,
+  isGeometricConstructedTypographyStyle,
   NO_BRAND_TEXT_INSTRUCTION,
   buildImageArtDirectionSuffix,
   isCombinationMark,
@@ -13,6 +14,9 @@ import {
   stylePreferenceOverrides,
   sanitizeLiteralIndustryLanguage,
   ensureModernistFormLanguage,
+  buildImageColorDirective,
+  usesMultipleLogoColors,
+  promptImpliesColorPalette,
 } from '@logo-platform/shared';
 
 const ICON_SUFFIX =
@@ -21,15 +25,18 @@ const ICON_SUFFIX =
   'no gradients, no shadows, no photorealism, centered composition.';
 
 const COMPACT_RENDER_SUFFIX =
-  ' Flat vector illustration, clean white background, monochrome, ' +
+  ' Flat vector illustration, clean white background, ' +
   'no gradients, no shadows, no photorealism, centered composition.';
 
-const CONSTRUCTED_SUFFIX =
-  ' Professional constructed typography logo, letters built from geometric primitives — ' +
-  'triangles, semicircles, and rectangles on a modular grid, dense stacked typographic block, ' +
-  'bold black letterforms on light background, letters are the entire logo, ' +
-  'not an off-the-shelf font, no separate icon, no roundel, no emblem, no pictorial symbol, ' +
-  'flat vector, clean white background, no gradients, no shadows, no photorealism, centered composition.';
+function constructedSuffix(colorDirective: string): string {
+  return (
+    ' Professional constructed typography logo, letters built from geometric primitives — ' +
+    'triangles, semicircles, and rectangles on a modular grid, dense stacked typographic block, ' +
+    `bold letterforms on light background (${colorDirective}), letters are the entire logo, ` +
+    'not an off-the-shelf font, no separate icon, no roundel, no emblem, no pictorial symbol, ' +
+    'flat vector, clean white background, no gradients, no shadows, no photorealism, centered composition.'
+  );
+}
 
 const ANTI_LITERAL_SUFFIX =
   ' Industry cues through abstract form language only — no literal clipart, stock icons, or photoreal objects.';
@@ -39,13 +46,16 @@ const SYMBOL_ONLY_SUFFIX =
   'flat vector style, clean white background, strong geometric silhouette, ' +
   'no gradients, no shadows, no photorealism, centered composition.';
 
-const WORDMARK_SUFFIX =
-  ' Professional typographic wordmark logo, letters spelling the brand name are the entire logo, ' +
-  'typography only, no icon, no symbol, no emblem, no pictorial mark above or beside the text, ' +
-  'flat vector letterforms, clean white background, black on white, ' +
-  'no gradients, no shadows, no photorealism, centered horizontal wordmark.';
+function wordmarkSuffix(colorDirective: string): string {
+  return (
+    ' Professional typographic wordmark logo, letters spelling the brand name are the entire logo, ' +
+    'typography only, no icon, no symbol, no emblem, no pictorial mark above or beside the text, ' +
+    `flat vector letterforms, clean white background (${colorDirective}), ` +
+    'no gradients, no shadows, no photorealism, centered horizontal wordmark.'
+  );
+}
 
-function lettermarkSuffix(companyName: string): string {
+function lettermarkSuffix(companyName: string, colorDirective: string): string {
   const text = lettermarkTextFromName(companyName);
   const usesInitials = isMultiWordCompanyName(companyName);
 
@@ -54,7 +64,7 @@ function lettermarkSuffix(companyName: string): string {
       ` Professional lettermark monogram logo built only from the initials "${text}", ` +
       'the letterforms themselves are the entire logo, do not spell the full brand name, ' +
       'no icon, no pictorial symbol, no emblem, no badge, no industry imagery, ' +
-      'flat vector letterforms, clean white background, black on white, ' +
+      `flat vector letterforms, clean white background (${colorDirective}), ` +
       'no gradients, no shadows, no photorealism, centered composition.'
     );
   }
@@ -63,7 +73,7 @@ function lettermarkSuffix(companyName: string): string {
     ` Professional lettermark logo built from the full word "${text}", ` +
     'the full word is the entire logo, do not abbreviate to initials, ' +
     'no icon, no pictorial symbol, no emblem, no badge, no industry imagery, ' +
-    'flat vector letterforms, clean white background, black on white, ' +
+    `flat vector letterforms, clean white background (${colorDirective}), ` +
     'no gradients, no shadows, no photorealism, centered composition.'
   );
 }
@@ -114,10 +124,11 @@ function renderSuffixForPrompt(
   brandName?: string,
 ): string {
   const style = stylePreferenceOverrides(request);
+  const colorDirective = buildImageColorDirective(request, base);
   const renderBase = [
     'Flat vector illustration',
     'clean white background',
-    'monochrome',
+    usesMultipleLogoColors(request, base) ? colorDirective : 'monochrome',
     !style.allowShadows ? 'no shadows' : '',
     !style.allowPhotoreal ? 'no photorealism' : '',
     'centered composition',
@@ -150,6 +161,7 @@ function renderSuffixForPrompt(
 
 function applyImageStyleOverrides(text: string, request: ImageGenerationRequest): string {
   const style = stylePreferenceOverrides(request);
+  const allowColor = style.allowMultipleColors || promptImpliesColorPalette(text);
   let result = text;
 
   if (style.allowShadows) {
@@ -161,8 +173,12 @@ function applyImageStyleOverrides(text: string, request: ImageGenerationRequest)
       .replace(/\bno photographic effects?\b/gi, '')
       .replace(/\bflat vector only\b/gi, 'vector-compatible identity');
   }
-  if (style.allowMultipleColors) {
+  if (allowColor) {
     result = result.replace(/\bsingle color\b/gi, '').replace(/\bone-color\b/gi, '');
+    result = result
+      .replace(/\bmonochrome\b/gi, '')
+      .replace(/\bblack on white\b/gi, '')
+      .replace(/\bblack letterforms on light background\b/gi, 'colored letterforms on light background');
   }
 
   return result.replace(/\s+,/g, ',').replace(/,\s*,+/g, ', ').replace(/\s+/g, ' ').trim();
@@ -186,8 +202,9 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
     ? (request.markType ?? detectedMarkType)
     : resolveMarkTypeForBrand(request.markType ?? detectedMarkType, brandName, typographyStyle);
   const detailed = isDetailedLogoPrompt(base);
-  const isConstructed =
-    typographyStyle === 'constructed' ||
+  const colorDirective = buildImageColorDirective(request, base);
+  const isGeometricConstructed =
+    isGeometricConstructedTypographyStyle(typographyStyle) ||
     base.toLowerCase().includes('constructed typography') ||
     base.toLowerCase().includes('constructed typographic');
 
@@ -199,25 +216,27 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
     return finalizeEnhancedPrompt(text, request);
   }
 
-  if (isConstructed) {
-    const suffix = detailed ? renderSuffixForPrompt(base, markType, detailed, request, brandName) : CONSTRUCTED_SUFFIX;
+  if (markType === 'lettermark' && brandName) {
+    const suffix = lettermarkSuffix(brandName, colorDirective);
+    const text = base.toLowerCase().includes('lettermark')
+      ? `${base}${company}. ${suffix}`
+      : `Lettermark logo${company}: ${base}. ${suffix}`;
+    return finalizeEnhancedPrompt(withExactSpelling(text, brandName, 'lettermark'), request, 'lettermark');
+  }
+
+  if (isGeometricConstructed) {
+    const constructed = constructedSuffix(colorDirective);
+    const suffix = detailed ? renderSuffixForPrompt(base, markType, detailed, request, brandName) : constructed;
     const text = base.toLowerCase().includes('constructed')
       ? `${base}${company}. ${suffix}`
       : `Constructed typography logo${company}: ${base}. ${suffix}`;
     return finalizeEnhancedPrompt(withExactSpelling(text, brandName, markType), request, markType);
   }
 
-  if (markType === 'lettermark' && brandName) {
-    const text = base.toLowerCase().includes('lettermark')
-      ? `${base}${company}. ${lettermarkSuffix(brandName)}`
-      : `Lettermark logo${company}: ${base}. ${lettermarkSuffix(brandName)}`;
-    return finalizeEnhancedPrompt(withExactSpelling(text, brandName, 'lettermark'), request, 'lettermark');
-  }
-
   if (markType === 'wordmark') {
     const suffix = detailed
       ? `${renderSuffixForPrompt(base, markType, detailed, request, brandName)}${buildImageArtDirectionSuffix({ markType: 'wordmark', companyName: brandName })}`
-      : WORDMARK_SUFFIX;
+      : wordmarkSuffix(colorDirective);
     const text = base.toLowerCase().includes('wordmark')
       ? `${base}${company}. ${suffix}`
       : `Typographic wordmark logo${company}: ${base}. ${suffix}`;

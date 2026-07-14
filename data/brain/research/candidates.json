@@ -1,7 +1,7 @@
 [
   {
     "id": "1d38db81-430b-4a56-a5f8-c83119498a49",
-    "status": "pending",
+    "status": "approved",
     "createdAt": "2026-07-13T13:10:14.669Z",
     "query": "manual",
     "sourceUrl": "https://developers.openai.com/cookbook/examples/multimodal/image-gen-models-prompting-guide?utm_source=chatgpt.com",
@@ -253,11 +253,20 @@
         "citationUrl": "https://developers.openai.com/cookbook/examples/multimodal/image-gen-models-prompting-guide?utm_source=chatgpt.com"
       }
     ],
-    "sourceScore": 0.86
+    "sourceScore": 0.86,
+    "reviewedAt": "2026-07-14T10:28:26.896Z",
+    "ingestResult": {
+      "experienceId": "cmrkicuy30009v3k8bst9mua9",
+      "sourceType": "TEXT",
+      "title": "GPT Image Generation Models Prompting Guide",
+      "chunksStored": 1,
+      "principlesExtracted": 15,
+      "summary": "Approved web research from https://developers.openai.com/cookbook/examples/multimodal/image-gen-models-prompting-guide?utm_source=chatgpt.com"
+    }
   },
   {
     "id": "795fc6f3-a8ab-4eb5-a4ae-0b2febff0bbb",
-    "status": "pending",
+    "status": "approved",
     "createdAt": "2026-07-13T13:08:33.304Z",
     "query": "manual",
     "sourceUrl": "https://developers.openai.com/cookbook/examples/multimodal/image-gen-models-prompting-guide?utm_source=chatgpt.com",
@@ -513,7 +522,16 @@
         "citationUrl": "https://developers.openai.com/cookbook/examples/multimodal/image-gen-models-prompting-guide?utm_source=chatgpt.com"
       }
     ],
-    "sourceScore": 0.86
+    "sourceScore": 0.86,
+    "reviewedAt": "2026-07-14T10:28:28.018Z",
+    "ingestResult": {
+      "experienceId": "cmrkicwnc000av3k81pdr8brp",
+      "sourceType": "TEXT",
+      "title": "GPT Image Generation Models Prompting Guide",
+      "chunksStored": 1,
+      "principlesExtracted": 15,
+      "summary": "Approved web research from https://developers.openai.com/cookbook/examples/multimodal/image-gen-models-prompting-guide?utm_source=chatgpt.com"
+    }
   },
   {
     "id": "818d4620-983b-48db-8d3c-fc65c1d5547a",

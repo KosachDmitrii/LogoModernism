@@ -1,3 +1,4 @@
+import type { TypographyStyle } from '@logo-platform/shared';
 import type {
   GenerateResponse,
   RecommendResponse,
@@ -37,9 +38,11 @@ export async function generatePrompts(body: {
   preferredEra?: string;
   analysisPrincipleIds?: string[];
   catalogReferenceIds?: string[];
+  autoCatalogReferences?: boolean;
+  rebusWordmark?: boolean;
   catalogNarrative?: string;
   markType?: 'wordmark' | 'lettermark' | 'combination';
-  typographyStyle?: 'standard' | 'constructed';
+  typographyStyle?: TypographyStyle;
   briefContext?: BriefContextPayload;
   useBrain?: boolean;
   preferredTerritoryId?: 'territory-primary' | 'territory-construction' | 'territory-typography';
@@ -120,7 +123,7 @@ export async function analyzeBrandDNA(body: {
   companyName: string;
   industry: string;
   markType?: 'wordmark' | 'lettermark' | 'combination';
-  typographyStyle?: 'standard' | 'constructed';
+  typographyStyle?: TypographyStyle;
 }) {
   const res = await fetch(`${API_BASE}/engines/brand-dna`, {
     method: 'POST',
@@ -262,7 +265,7 @@ export async function generatePromptLogo(
     companyName?: string;
     provider?: 'openai' | 'mock';
     markType?: 'wordmark' | 'lettermark' | 'combination';
-    typographyStyle?: 'standard' | 'constructed';
+    typographyStyle?: TypographyStyle;
   },
 ): Promise<{ image: GeneratedImage; logos: GeneratedImage[]; remaining: number }> {
   const payload: Record<string, string> = {};
@@ -287,7 +290,7 @@ export async function generateImageFromPrompt(body: {
   industry?: string;
   provider?: 'openai' | 'mock';
   markType?: 'wordmark' | 'lettermark' | 'combination';
-  typographyStyle?: 'standard' | 'constructed';
+  typographyStyle?: TypographyStyle;
 }): Promise<ImageGenerationResponse> {
   const res = await fetch(`${API_BASE}/images/generate-from-prompt`, {
     method: 'POST',

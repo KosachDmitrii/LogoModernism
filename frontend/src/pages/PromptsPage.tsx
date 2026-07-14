@@ -13,6 +13,7 @@ import { useComposePrompts, type ComposePromptsOptions } from '../hooks/useCompo
 import { useAppStore } from '../store';
 import { StartOverButton } from '../components/prompts/StartOverButton';
 import { StartOverDialog } from '../components/prompts/StartOverDialog';
+import { LowReadinessDialog } from '../components/prompts/LowReadinessDialog';
 import { BrainPartnerPanel, type PartnerRegenerateAction } from '../components/prompts/BrainPartnerPanel';
 import { applyConstraintResolutions } from '../lib/apply-constraint-resolution';
 import type { ConstraintResolution } from '../types';
@@ -48,6 +49,11 @@ export function PromptsPage() {
     return resolveInitialPromptsWizardStep(industryValue);
   });
   const [startOverOpen, setStartOverOpen] = useState(false);
+  const [lowReadinessOpen, setLowReadinessOpen] = useState(false);
+  const [pendingCompose, setPendingCompose] = useState<{
+    options?: ComposePromptsOptions;
+    action?: PartnerRegenerateAction;
+  } | null>(null);
   const [regeneratingAction, setRegeneratingAction] = useState<PartnerRegenerateAction | null>(null);
 
   const compose = useComposePrompts();
@@ -59,16 +65,11 @@ export function PromptsPage() {
     return false;
   };
 
-  const handleCompose = (
+  const runCompose = (
     options?: ComposePromptsOptions,
     action?: PartnerRegenerateAction,
   ) => {
     if (!industry.trim() || compose.isPending) return;
-    const readiness = getBriefReadiness(designBrief);
-    if (designBrief.sources.length > 0 && readiness.score < 50) {
-      const proceed = window.confirm(t('brief.composeLowReadinessConfirm'));
-      if (!proceed) return;
-    }
     if (action) setRegeneratingAction(action);
     compose.mutate(
       { ...options, intent: options?.intent ?? toPromptGenerateIntent(action) },
@@ -77,6 +78,33 @@ export function PromptsPage() {
         onSettled: () => setRegeneratingAction(null),
       },
     );
+  };
+
+  const handleCompose = (
+    options?: ComposePromptsOptions,
+    action?: PartnerRegenerateAction,
+  ) => {
+    if (!industry.trim() || compose.isPending) return;
+    const readiness = getBriefReadiness(designBrief);
+    if (designBrief.sources.length > 0 && readiness.score < 50) {
+      setPendingCompose({ options, action });
+      setLowReadinessOpen(true);
+      return;
+    }
+    runCompose(options, action);
+  };
+
+  const confirmLowReadiness = () => {
+    if (pendingCompose) {
+      runCompose(pendingCompose.options, pendingCompose.action);
+    }
+    setPendingCompose(null);
+    setLowReadinessOpen(false);
+  };
+
+  const cancelLowReadiness = () => {
+    setPendingCompose(null);
+    setLowReadinessOpen(false);
   };
 
   const handleStartOver = () => setStartOverOpen(true);
@@ -214,6 +242,11 @@ export function PromptsPage() {
         open={startOverOpen}
         onConfirm={confirmStartOver}
         onCancel={() => setStartOverOpen(false)}
+      />
+      <LowReadinessDialog
+        open={lowReadinessOpen}
+        onConfirm={confirmLowReadiness}
+        onCancel={cancelLowReadiness}
       />
     </>
   );

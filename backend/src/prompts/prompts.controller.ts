@@ -32,6 +32,8 @@ export class PromptsController {
       minimalismLevel: dto.minimalismLevel,
       analysisPrincipleIds: dto.analysisPrincipleIds,
       catalogReferenceIds: dto.catalogReferenceIds,
+      autoCatalogReferences: dto.autoCatalogReferences,
+      rebusWordmark: dto.rebusWordmark,
       catalogNarrative: dto.catalogNarrative,
       markType: dto.markType,
       typographyStyle: dto.typographyStyle,

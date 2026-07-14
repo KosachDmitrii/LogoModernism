@@ -29,8 +29,13 @@ export type Era =
 
 export type LogoMarkType = 'wordmark' | 'lettermark' | 'combination';
 
-/** Geometric letterforms built from primitives on a modular grid (Müller constructive typography) */
-export type TypographyStyle = 'standard' | 'constructed';
+/** Typography construction approach for wordmark / lettermark briefs */
+export type TypographyStyle =
+  | 'standard'
+  | 'constructed'
+  | 'modified_glyph'
+  | 'rebus'
+  | 'monogram_ligature';
 
 export interface DesignRule {
   id: string;
@@ -249,6 +254,10 @@ export interface PromptGenerationRequest {
   analysisPrincipleIds?: string[];
   /** Logo catalog reference IDs from Müller Logo Modernism */
   catalogReferenceIds?: string[];
+  /** When true and no manual refs, auto-pick catalog references from recommendations */
+  autoCatalogReferences?: boolean;
+  /** Explicit rebus wordmark — letter integrates image via negative space */
+  rebusWordmark?: boolean;
   /** Optional narrative from Design Brief (e.g. catalog significance) */
   catalogNarrative?: string;
   /** Design brief context from client */

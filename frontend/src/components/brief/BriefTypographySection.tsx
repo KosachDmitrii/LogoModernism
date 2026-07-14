@@ -4,23 +4,53 @@ import { Loader2, Type } from 'lucide-react';
 import { analyzeBrandDNA } from '../../api';
 import { useAppStore } from '../../store';
 import type { DesignBrief } from '../../types';
-import { useT } from '../../i18n';
+import { useT, type MessageKey } from '../../i18n';
 import { formatError } from '../../lib/api-error';
 import { markTypeLabel } from '../../lib/translate-labels';
+import {
+  deriveRebusWordmark,
+  isRebusTypographyStyle,
+  isTypographyStyle,
+  normalizeTypographyStyleForMarkType,
+  typographyStyleNeedsBrandName,
+  typographyStylesForMarkType,
+  type TypographyStyle,
+} from '@logo-platform/shared';
+
+type MarkType = 'wordmark' | 'lettermark' | 'combination';
 
 const MARK_TYPES = [
-  { value: 'wordmark', labelKey: 'brief.typography.wordmark' },
-  { value: 'lettermark', labelKey: 'brief.typography.lettermark' },
-  { value: 'combination', labelKey: 'brief.typography.combination' },
-] as const;
+  { value: 'wordmark', labelKey: 'brief.typography.wordmark', hintKey: 'brief.typography.markTypeHint.wordmark' },
+  { value: 'lettermark', labelKey: 'brief.typography.lettermark', hintKey: 'brief.typography.markTypeHint.lettermark' },
+  { value: 'combination', labelKey: 'brief.typography.combination', hintKey: 'brief.typography.markTypeHint.combination' },
+] as const satisfies ReadonlyArray<{ value: MarkType; labelKey: MessageKey; hintKey: MessageKey }>;
 
-const TYPOGRAPHY_STYLES = [
-  { value: 'standard', labelKey: 'brief.typography.standard' },
-  { value: 'constructed', labelKey: 'brief.typography.constructed' },
-] as const;
+const TYPOGRAPHY_STYLE_LABELS: Record<TypographyStyle, MessageKey> = {
+  standard: 'brief.typography.standard',
+  constructed: 'brief.typography.constructed',
+  modified_glyph: 'brief.typography.modifiedGlyph',
+  rebus: 'brief.typography.rebus',
+  monogram_ligature: 'brief.typography.monogramLigature',
+};
 
-type MarkType = (typeof MARK_TYPES)[number]['value'];
-type TypographyStyle = (typeof TYPOGRAPHY_STYLES)[number]['value'];
+const TYPOGRAPHY_STYLE_HINTS: Record<TypographyStyle, MessageKey> = {
+  standard: 'brief.typography.styleHint.standard',
+  constructed: 'brief.typography.styleHint.constructed',
+  modified_glyph: 'brief.typography.styleHint.modifiedGlyph',
+  rebus: 'brief.typography.styleHint.rebus',
+  monogram_ligature: 'brief.typography.styleHint.monogramLigature',
+};
+
+function syncTypographyPatch(
+  markType: MarkType,
+  typographyStyle: TypographyStyle,
+): Partial<DesignBrief> {
+  return {
+    markType,
+    typographyStyle,
+    rebusWordmark: deriveRebusWordmark(typographyStyle),
+  };
+}
 
 interface BriefTypographySectionProps {
   onStepComplete?: () => void;
@@ -35,7 +65,13 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
   const applyBrandDNA = useAppStore((s) => s.applyBrandDNA);
 
   const markType = (designBrief.markType || 'combination') as MarkType;
-  const typographyStyle = (designBrief.typographyStyle || 'standard') as TypographyStyle;
+  const rawTypographyStyle = designBrief.typographyStyle;
+  const typographyStyle = (
+    isTypographyStyle(rawTypographyStyle)
+      ? normalizeTypographyStyleForMarkType(rawTypographyStyle, markType)
+      : 'standard'
+  ) as TypographyStyle;
+  const availableStyles = typographyStylesForMarkType(markType);
 
   useEffect(() => {
     if (!designBrief.markType) {
@@ -43,15 +79,46 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
     }
   }, [designBrief.markType, updateDesignBrief]);
 
+  useEffect(() => {
+    const styleInput = isTypographyStyle(designBrief.typographyStyle)
+      ? designBrief.typographyStyle
+      : designBrief.rebusWordmark
+        ? 'rebus'
+        : undefined;
+    const normalized = normalizeTypographyStyleForMarkType(styleInput, markType);
+    const rebusWordmark = deriveRebusWordmark(normalized);
+    const nextMarkType = rebusWordmark ? 'wordmark' : markType;
+    const needsSync =
+      designBrief.typographyStyle !== normalized ||
+      designBrief.rebusWordmark !== rebusWordmark ||
+      (rebusWordmark && designBrief.markType !== 'wordmark');
+
+    if (needsSync) {
+      updateDesignBrief(syncTypographyPatch(nextMarkType, normalized));
+    }
+  }, [
+    designBrief.markType,
+    designBrief.rebusWordmark,
+    designBrief.typographyStyle,
+    markType,
+    updateDesignBrief,
+  ]);
+
   const brandName = companyName.trim();
   const requiresName =
-    markType === 'wordmark' || markType === 'lettermark' || typographyStyle === 'constructed';
+    markType === 'wordmark' ||
+    markType === 'lettermark' ||
+    typographyStyleNeedsBrandName(typographyStyle);
 
   const analysis = useMutation({
     mutationFn: () => {
       const brief = useAppStore.getState().designBrief;
       const selectedMarkType = (brief.markType || 'combination') as MarkType;
-      const selectedTypographyStyle = (brief.typographyStyle || 'standard') as TypographyStyle;
+      const selectedTypographyStyle = (
+        isTypographyStyle(brief.typographyStyle)
+          ? normalizeTypographyStyleForMarkType(brief.typographyStyle, selectedMarkType)
+          : 'standard'
+      ) as TypographyStyle;
       const name = useAppStore.getState().companyName.trim();
 
       return analyzeBrandDNA({
@@ -83,16 +150,26 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
       ? t('brief.typography.addCompanyName')
       : null;
 
+  const handleMarkTypeChange = (nextMarkType: MarkType) => {
+    const nextStyle = normalizeTypographyStyleForMarkType(typographyStyle, nextMarkType);
+    updateDesignBrief(syncTypographyPatch(nextMarkType, nextStyle));
+  };
+
+  const handleTypographyStyleChange = (nextStyle: TypographyStyle) => {
+    const nextMarkType = isRebusTypographyStyle(nextStyle) ? 'wordmark' : markType;
+    updateDesignBrief(syncTypographyPatch(nextMarkType, nextStyle));
+  };
+
+  const markTypeHint = MARK_TYPES.find((option) => option.value === markType)?.hintKey;
+
   return (
     <div className="space-y-3 relative z-10" onClick={(e) => e.stopPropagation()}>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3 items-start">
         <div>
           <label className="block text-xs text-zinc-500 mb-1">{t('brief.typography.markType')}</label>
           <select
             value={markType}
-            onChange={(e) =>
-              updateDesignBrief({ markType: e.target.value as DesignBrief['markType'] })
-            }
+            onChange={(e) => handleMarkTypeChange(e.target.value as MarkType)}
             className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs focus:outline-none focus:border-zinc-600"
           >
             {MARK_TYPES.map((option) => (
@@ -101,26 +178,37 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
               </option>
             ))}
           </select>
+          {markTypeHint && (
+            <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">{t(markTypeHint)}</p>
+          )}
         </div>
         <div>
           <label className="block text-xs text-zinc-500 mb-1">{t('brief.typography.typographyStyle')}</label>
           <select
             value={typographyStyle}
-            onChange={(e) =>
-              updateDesignBrief({
-                typographyStyle: e.target.value as DesignBrief['typographyStyle'],
-              })
-            }
+            onChange={(e) => {
+              const value = e.target.value;
+              if (isTypographyStyle(value)) {
+                handleTypographyStyleChange(value);
+              }
+            }}
             className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs focus:outline-none focus:border-zinc-600"
           >
-            {TYPOGRAPHY_STYLES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {t(option.labelKey)}
+            {availableStyles.map((value) => (
+              <option key={value} value={value}>
+                {t(TYPOGRAPHY_STYLE_LABELS[value])}
               </option>
             ))}
           </select>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+            {t(TYPOGRAPHY_STYLE_HINTS[typographyStyle])}
+          </p>
         </div>
       </div>
+
+      {isRebusTypographyStyle(typographyStyle) && !brandName && (
+        <p className="text-xs text-amber-300/80">{t('brief.typography.rebusNeedsName')}</p>
+      )}
 
       <button
         type="button"

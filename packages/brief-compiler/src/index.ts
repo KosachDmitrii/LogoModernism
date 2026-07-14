@@ -1,9 +1,11 @@
 export * from './types';
 export { compileBrief, createPromptExperience } from './compile';
 export { buildCanonicalBrief } from './ingress';
+export { buildKnowledgeEnrichment, mergeKnowledgeIntoBrief } from './knowledge-enrichment';
 export { resolveConflicts } from './resolver';
 export { planVariants } from './variant-planner';
 export { buildPromptSchema } from './schema';
 export { renderPositive, renderNegative } from './renderer';
 export { validateCompiled, computeReadiness } from './validator';
 export { extractReferenceProfile } from './reference-extractor';
+export { detectTypographicIntegration } from './typographic-integration';

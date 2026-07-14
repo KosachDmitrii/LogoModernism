@@ -1,4 +1,5 @@
 import { useAppStore } from '../store';
+import { isRebusTypographyStyle } from '@logo-platform/shared';
 import type { DesignBrief } from '../types';
 import { getEraSourceKey } from '../lib/brief-mappers';
 import { briefSourceLabel, markTypeLabel, typographyStyleLabel } from '../lib/translate-labels';
@@ -121,6 +122,14 @@ export function DesignBriefPanel() {
         <p className="text-xs text-zinc-300">
           <span className="text-zinc-500">{t('brief.panel.typographyStyle')}</span>{' '}
           {typographyStyleLabel(designBrief.typographyStyle, t)}
+        </p>
+      )}
+
+      {(isRebusTypographyStyle(
+        designBrief.typographyStyle === 'rebus' ? 'rebus' : undefined,
+      ) || designBrief.rebusWordmark) && (
+        <p className="text-xs text-violet-300/90 px-2 py-1.5 rounded-lg bg-violet-950/30 border border-violet-800/40">
+          {t('brief.typography.rebusActive')}
         </p>
       )}
 

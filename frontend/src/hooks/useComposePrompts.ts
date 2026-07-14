@@ -7,6 +7,7 @@ import {
   parseEraFromBrief,
   parseLogoMarkType,
   parseMarkTypeFromBrief,
+  parseRebusWordmark,
   parseTypographyStyle,
   parseTypographyStyleFromBrief,
 } from '../lib/brief-mappers';
@@ -71,6 +72,11 @@ export function useComposePrompts() {
       const analysisPrincipleIds = principleIds.length > 0 ? principleIds : undefined;
       const catalogIds = activeBrief.catalogReferenceIds ?? [];
       const catalogReferenceIds = catalogIds.length > 0 ? catalogIds : undefined;
+      const autoCatalogReferences = activeBrief.autoCatalogReferences || undefined;
+      const rebusWordmark = parseRebusWordmark(activeBrief) || undefined;
+      const preferredTerritoryId =
+        options?.preferredTerritoryId ??
+        (rebusWordmark ? 'territory-typography' : undefined);
       const markType = parseMarkTypeFromBrief(activeBrief);
       const typographyStyle = parseTypographyStyleFromBrief(activeBrief);
       const brandName = companyName.trim() || undefined;
@@ -94,12 +100,12 @@ export function useComposePrompts() {
         preferredEra: era,
         analysisPrincipleIds,
         catalogReferenceIds,
-        // Do not send brief.narrative as catalogNarrative — significances/scores leak as Design brief note.
-        // Catalog structure comes from catalogReferenceIds alone.
+        autoCatalogReferences,
+        rebusWordmark,
         markType: logoMarkType,
         typographyStyle: brandName ? typographyStyle : parseTypographyStyle(activeBrief.typographyStyle),
         briefContext,
-        preferredTerritoryId: options?.preferredTerritoryId,
+        preferredTerritoryId,
         intent: options?.intent,
       }).then((data) => ({ data, options }));
     },

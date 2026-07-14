@@ -10,6 +10,7 @@ import {
   isSymbolOnlyLogo,
   resolveMarkTypeForBrand,
   resolveTypographyStyleForBrand,
+  isConstructedTypographyStyle,
   NO_BRAND_TEXT_FRAGMENT,
   buildArtDirectionFragments,
   buildSymbolOnlyArtDirectionFragments,
@@ -150,7 +151,7 @@ export function composePrompt(input: ComposeInput): ComposedPrompt {
   const catalogText = catalogInspiration.join(' ').toLowerCase();
   const isWordmark = markType === 'wordmark';
   const isLettermark = markType === 'lettermark';
-  const isConstructed = typographyStyle === 'constructed';
+  const isConstructed = isConstructedTypographyStyle(typographyStyle);
   const markFilterOptions = { typographyStyle, companyName: brandName };
   const lettermarkText = brandName ? lettermarkTextFromName(brandName) : '';
   const lettermarkUsesInitials = brandName ? isMultiWordCompanyName(brandName) : false;

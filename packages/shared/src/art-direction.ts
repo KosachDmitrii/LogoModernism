@@ -336,3 +336,44 @@ export function appendStylePreferenceFragments(text: string, input?: StylePrefer
   if (!fragments.length) return text;
   return `${text.replace(/\s*\.?\s*$/, '')}. ${fragments.join('. ')}`;
 }
+
+const COLOR_PALETTE_IN_PROMPT =
+  /multi-color palette|two-color palette|limited palette|client-selected palette|use selected colors/i;
+const HEX_COLOR_IN_PROMPT = /#[0-9A-Fa-f]{3,8}/;
+
+export function promptImpliesColorPalette(text: string): boolean {
+  return COLOR_PALETTE_IN_PROMPT.test(text) || HEX_COLOR_IN_PROMPT.test(text);
+}
+
+export function extractColorsFromPrompt(text: string): string[] {
+  const paletteMatch =
+    text.match(/multi-color palette\s*\(([^)]+)\)/i) ??
+    text.match(/limited palette\s*\(([^)]+)\)/i) ??
+    text.match(/two-color palette\s*\(([^)]+)\)/i) ??
+    text.match(/client-selected palette\s*\(([^)]+)\)/i);
+  if (paletteMatch?.[1]) {
+    return paletteMatch[1].split(',').map((c) => c.trim()).filter(Boolean);
+  }
+  return [...text.matchAll(/#[0-9A-Fa-f]{3,8}\b/g)].map((m) => m[0]!);
+}
+
+export function usesMultipleLogoColors(input?: StylePreferenceInput, promptText?: string): boolean {
+  if (stylePreferenceOverrides(input).allowMultipleColors) return true;
+  return Boolean(promptText && promptImpliesColorPalette(promptText));
+}
+
+export function buildImageColorDirective(input?: StylePreferenceInput, promptText?: string): string {
+  if (!usesMultipleLogoColors(input, promptText)) {
+    return 'black on white';
+  }
+
+  const selected = input?.colorSelections?.map((c) => c.trim()).filter(Boolean) ?? [];
+  const fromPrompt = promptText ? extractColorsFromPrompt(promptText) : [];
+  const colors = selected.length > 0 ? selected : fromPrompt;
+
+  if (colors.length > 0) {
+    return `flat solid logo colors: ${colors.join(', ')}, no gradients`;
+  }
+
+  return 'use the specified brand colors from the prompt, flat solid color fills, no gradients';
+}

@@ -229,8 +229,11 @@ export const ru: Record<MessageKey, string> = {
   'brief.tab.reviewDescription': 'Редактирование и генерация',
   'brief.readinessLabel': 'Бриф: {label}',
   'brief.readyToGenerate': 'Бриф готов — можно генерировать промпты',
-  'brief.composeLowReadinessConfirm':
-    'Готовность брифа ниже 50%. Всё равно сгенерировать? Заполненные секции обычно улучшают качество промпта.',
+  'brief.lowReadiness.title': 'Низкая готовность брифа',
+  'brief.lowReadiness.description':
+    'Готовность ниже 50%. Заполненные секции обычно улучшают качество промпта.',
+  'brief.lowReadiness.confirm': 'Всё равно сгенерировать',
+  'brief.lowReadiness.cancel': 'Заполнить бриф',
   'brief.backToProject': 'Проект',
   'brief.composePrompts': 'Собрать промпты',
 
@@ -296,8 +299,32 @@ export const ru: Record<MessageKey, string> = {
   'brief.typography.wordmark': 'Wordmark',
   'brief.typography.lettermark': 'Lettermark',
   'brief.typography.combination': 'Combination',
+  'brief.typography.markTypeHint.wordmark':
+    'Полное имя бренда как знак — типографика главный носитель.',
+  'brief.typography.markTypeHint.lettermark':
+    'Инициалы или одна буква — компактная монограмма как знак.',
+  'brief.typography.markTypeHint.combination':
+    'Символ и слово вместе — единый lockup в одной геометрической системе.',
   'brief.typography.standard': 'Standard',
   'brief.typography.constructed': 'Constructed',
+  'brief.typography.modifiedGlyph': 'Modified glyph',
+  'brief.typography.rebus': 'Rebus',
+  'brief.typography.monogramLigature': 'Monogram ligature',
+  'brief.typography.styleHint.standard':
+    'Читаемая типографика без трюков — чистый wordmark.',
+  'brief.typography.styleHint.constructed':
+    'Буквы из геометрии на сетке — конструктивная модульная типографика.',
+  'brief.typography.styleHint.modifiedGlyph':
+    'Одна буква с характером — модифицированный глиф несёт идею.',
+  'brief.typography.styleHint.rebus':
+    'Образ внутри буквы через negative space — имя остаётся полностью читаемым.',
+  'brief.typography.styleHint.monogramLigature':
+    'Сцепленные инициалы в одну компактную монограмму.',
+  'brief.typography.rebusLabel': 'Rebus wordmark',
+  'brief.typography.rebusHint':
+    'Буква объединяется с образом через negative space (например, кот внутри «c»). При генерации — typography-led territory.',
+  'brief.typography.rebusNeedsName': 'Для rebus нужно имя бренда на шаге Project.',
+  'brief.typography.rebusActive': 'Режим Rebus — при compose используется typography-led territory',
   'brief.typography.analyze': 'Анализировать типографику',
   'brief.typography.applied': 'Применено к брифу',
   'brief.typography.setIndustryFirst': 'Сначала укажите индустрию на шаге Проект.',
@@ -351,6 +378,8 @@ export const ru: Record<MessageKey, string> = {
   'brief.references.continueToClient': 'К клиентскому брифу',
   'brief.references.clearAll': 'Очистить всё',
   'brief.references.empty': 'Референсов пока нет — опционально, но улучшает fit',
+  'brief.references.autoCatalog':
+    'Автоподбор референсов из каталога, если ничего не выбрано (Brain рекомендует по индустрии и типу знака)',
 
   'brief.client.label': 'Предпочтения / детали клиента',
   'brief.client.placeholder':

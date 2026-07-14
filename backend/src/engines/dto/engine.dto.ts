@@ -25,8 +25,8 @@ export class BrandDNARequestDto {
   markType?: 'wordmark' | 'lettermark' | 'combination';
 
   @IsOptional()
-  @IsIn(['standard', 'constructed'])
-  typographyStyle?: 'standard' | 'constructed';
+  @IsIn(['standard', 'constructed', 'modified_glyph', 'rebus', 'monogram_ligature'])
+  typographyStyle?: 'standard' | 'constructed' | 'modified_glyph' | 'rebus' | 'monogram_ligature';
 }
 
 export class LetterDNARequestDto {

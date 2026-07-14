@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { CompileRequest, CompileResult, CompiledPrompt, PromptExperience } from './types';
 import { buildCanonicalBrief } from './ingress';
+import { buildKnowledgeEnrichment, mergeKnowledgeIntoBrief } from './knowledge-enrichment';
 import { resolveConflicts } from './resolver';
 import { planVariants } from './variant-planner';
 import { buildPromptSchema } from './schema';
@@ -24,11 +25,13 @@ function briefHash(resolved: CompileResult['resolved'], variantIndex: number): s
 export function compileBrief(request: CompileRequest): CompileResult {
   const canonical = buildCanonicalBrief(request);
   const resolved = resolveConflicts(canonical);
+  const enrichment = buildKnowledgeEnrichment(request.compileKnowledge);
+  const enriched = mergeKnowledgeIntoBrief(resolved, enrichment);
   const variantCount = Math.min(request.variationCount ?? 1, 5);
   const plans = planVariants(variantCount, request.preferredTerritoryId);
 
   const prompts: CompiledPrompt[] = plans.map((plan) => {
-    const schema = buildPromptSchema(resolved, plan);
+    const schema = buildPromptSchema(enriched, plan, enrichment);
     return {
       positive: renderPositive(schema),
       negative: renderNegative(schema),
@@ -37,10 +40,10 @@ export function compileBrief(request: CompileRequest): CompileResult {
     };
   });
 
-  const validation = validateCompiled(resolved, prompts);
-  const readiness = computeReadiness(resolved);
+  const validation = validateCompiled(enriched, prompts);
+  const readiness = computeReadiness(enriched);
 
-  return { resolved, prompts, validation, readiness };
+  return { resolved: enriched, prompts, validation, readiness };
 }
 
 export function createPromptExperience(

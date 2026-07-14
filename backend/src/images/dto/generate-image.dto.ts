@@ -45,12 +45,26 @@ export class GenerateFromComposedPromptDto {
   markType?: 'wordmark' | 'lettermark' | 'combination';
 
   @IsOptional()
-  @IsIn(['standard', 'constructed'])
-  typographyStyle?: 'standard' | 'constructed';
+  @IsIn(['standard', 'constructed', 'modified_glyph', 'rebus', 'monogram_ligature'])
+  typographyStyle?: 'standard' | 'constructed' | 'modified_glyph' | 'rebus' | 'monogram_ligature';
 
   @IsOptional()
   @IsIn(['1024x1024', '1024x1792', '1792x1024'])
   size?: ImageSize;
+
+  @IsOptional()
+  @IsIn([
+    'auto',
+    'black_white',
+    'monochrome',
+    'two_color',
+    'multi_color',
+    'corporate_blue',
+    'red_accent',
+    'limited',
+    'custom',
+  ])
+  colorPalette?: string;
 
   @IsOptional()
   @IsArray()

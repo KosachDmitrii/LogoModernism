@@ -1,5 +1,11 @@
 import { buildIndustryLineForBrief } from './industry-direction';
+import type { KnowledgeEnrichment } from './knowledge-enrichment';
 import type { VariantPlan } from './variant-planner';
+import type { TypographicIntegration } from './typographic-integration';
+import {
+  detectTypographicIntegration,
+  typographicAvoidExtras,
+} from './typographic-integration';
 import type { PromptSchema, PromptSchemaSection, ResolvedBrief } from './types';
 import { SCHEMA_VERSION } from './types';
 import {
@@ -9,14 +15,29 @@ import {
   isMonochromePalette,
 } from './normalizers';
 
-function typographyLine(style: ResolvedBrief['typographyStyle']): string {
+function typographyLine(
+  style: ResolvedBrief['typographyStyle'],
+  integration?: TypographicIntegration,
+): string {
+  if (integration) {
+    return (
+      'Constructed rebus letterforms — one distinctive glyph integrates image and letter via negative space'
+    );
+  }
+  if (style === 'modified_glyph') {
+    return 'Constructed geometric letterforms with one modified distinctive glyph carrying brand character';
+  }
+  if (style === 'monogram_ligature') {
+    return 'Interlocked monogram ligature — initials fused into one compact unified letterform';
+  }
   if (style === 'constructed') {
     return 'Constructed geometric letterforms with one modified distinctive glyph';
   }
   return 'Custom neo-grotesque wordmark with one modified distinctive glyph';
 }
 
-function markTypeLine(brief: ResolvedBrief): string {
+function markTypeLine(brief: ResolvedBrief, integration?: TypographicIntegration): string {
+  if (integration) return 'Wordmark rebus';
   switch (brief.markType) {
     case 'wordmark':
       return 'Wordmark';
@@ -25,6 +46,20 @@ function markTypeLine(brief: ResolvedBrief): string {
     default:
       return 'Combination mark';
   }
+}
+
+function creativeDirectionLine(
+  plan: VariantPlan,
+  integration?: TypographicIntegration,
+  rebusWordmark?: boolean,
+): string {
+  if (integration && (plan.axis === 'typography_led' || rebusWordmark)) {
+    return `Typography-led rebus wordmark — ${integration.promptLine}`;
+  }
+  if (integration && plan.axis === 'balanced') {
+    return `Balanced rebus wordmark — ${integration.promptLine}`;
+  }
+  return plan.creativeDirection;
 }
 
 function inspiredByLine(brief: ResolvedBrief): string | undefined {
@@ -60,8 +95,10 @@ function industryLine(brief: ResolvedBrief): string | undefined {
 export function buildPromptSchema(
   brief: ResolvedBrief,
   plan: VariantPlan,
+  enrichment?: KnowledgeEnrichment,
 ): PromptSchema {
   const sections: PromptSchemaSection[] = [];
+  const integration = detectTypographicIntegration(brief);
 
   const push = (key: string, text: string, source: PromptSchemaSection['provenance']['source']) => {
     if (!text?.trim()) return;
@@ -78,16 +115,24 @@ export function buildPromptSchema(
     );
   }
 
-  push('mark_type', markTypeLine(brief), brief.reference ? 'reference' : 'client');
+  push('mark_type', markTypeLine(brief, integration), brief.reference ? 'reference' : 'client');
 
   const inspired = inspiredByLine(brief);
   if (inspired) push('inspired_by', inspired, 'reference');
 
   push('geometry', `Geometry vocabulary: ${geometryVocabulary(brief.shapes)}`, 'client');
   push('construction', `Construction: ${brief.construction}`, brief.reference ? 'reference' : 'client');
-  push('composition', `Composition: ${brief.composition}`, brief.reference ? 'reference' : 'client');
+  push(
+    'composition',
+    `Composition: ${integration ? 'negative space figure-ground letterform integration' : brief.composition}`,
+    integration ? 'client' : brief.reference ? 'reference' : 'client',
+  );
 
-  push('typography', `Typography: ${typographyLine(brief.typographyStyle)}`, 'client');
+  push('typography', `Typography: ${typographyLine(brief.typographyStyle, integration)}`, 'client');
+
+  if (integration) {
+    push('typographic_integration', `Typographic integration: ${integration.promptLine}`, 'client');
+  }
 
   const industry = industryLine(brief);
   if (industry) push('industry', industry, 'system');
@@ -109,13 +154,30 @@ export function buildPromptSchema(
   ].join(', ');
   push('rendering', `Rendering: ${rendering}`, 'system');
 
-  push('creative_direction', `Creative direction: ${plan.creativeDirection}`, 'system');
+  push(
+    'creative_direction',
+    `Creative direction: ${creativeDirectionLine(plan, integration, brief.rebusWordmark)}`,
+    'system',
+  );
+
+  if (enrichment?.priorDirection) {
+    push('prior_direction', `Prior direction: ${enrichment.priorDirection}`, 'system');
+  }
+
+  if (enrichment?.principleFragments.length) {
+    push(
+      'design_principles',
+      `Design principles: ${enrichment.principleFragments.join(', ')}`,
+      'system',
+    );
+  }
 
   const avoidBase = [
     'generic circular bracket templates',
     'disconnected floating symbols',
     'stock Helvetica wordmarks',
     'literal clipart',
+    ...(integration ? typographicAvoidExtras() : []),
     ...brief.forbiddenMotifs,
   ];
   push('avoid', `Avoid: ${[...new Set(avoidBase)].join(', ')}`, 'client');

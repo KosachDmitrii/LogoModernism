@@ -6,6 +6,7 @@ import { evaluateRequestPromptCompliance } from '@logo-platform/design-brain';
 import { runPromptPipeline, critiqueDesign, evolvePrompt } from '@logo-platform/prompt-engine';
 import { ImagesService } from '../images/images.service';
 import { PromptRecordsService } from './prompt-records.service';
+import type { GeneratePromptLogoDto } from './dto/generate-prompt-logo.dto';
 
 @Injectable()
 export class PromptsService {
@@ -31,11 +32,13 @@ export class PromptsService {
           typographyStyle: request.typographyStyle,
           analysisPrincipleIds: request.analysisPrincipleIds,
           catalogReferenceIds: request.catalogReferenceIds,
-      catalogNarrative: request.catalogNarrative,
-      briefContext: request.briefContext,
-      useBrain: true,
-      preferredTerritoryId: request.preferredTerritoryId,
-    });
+          autoCatalogReferences: request.autoCatalogReferences,
+          rebusWordmark: request.rebusWordmark,
+          catalogNarrative: request.catalogNarrative,
+          briefContext: request.briefContext,
+          useBrain: true,
+          preferredTerritoryId: request.preferredTerritoryId,
+        });
       } catch (error) {
         if (request.useBrain === true) throw error;
         console.warn('Brain prompt pipeline failed, falling back to rules:', error);
@@ -334,15 +337,7 @@ export class PromptsService {
     };
   }
 
-  async generateLogoForPrompt(
-    promptId: string,
-    body: {
-      companyName?: string;
-      markType?: 'wordmark' | 'lettermark' | 'combination';
-      typographyStyle?: 'standard' | 'constructed';
-      provider?: 'openai' | 'mock';
-    },
-  ) {
+  async generateLogoForPrompt(promptId: string, body: GeneratePromptLogoDto) {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store prompt logos');
     }
@@ -354,6 +349,7 @@ export class PromptsService {
       'stylePreferences' in record.metadata
         ? (record.metadata as {
             stylePreferences?: {
+              colorPalette?: string;
               colorSelections?: string[];
               allowShadows?: boolean;
               allowPhotoreal?: boolean;
@@ -371,6 +367,7 @@ export class PromptsService {
       markType: body.markType,
       typographyStyle: body.typographyStyle,
       provider: body.provider,
+      colorPalette: stylePreferences?.colorPalette,
       colorSelections: stylePreferences?.colorSelections,
       allowShadows: stylePreferences?.allowShadows,
       allowPhotoreal: stylePreferences?.allowPhotoreal,

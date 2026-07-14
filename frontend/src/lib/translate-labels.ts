@@ -23,6 +23,9 @@ const MARK_TYPE_KEYS: Record<string, MessageKey> = {
 const TYPOGRAPHY_STYLE_KEYS: Record<string, MessageKey> = {
   standard: 'brief.typography.standard',
   constructed: 'brief.typography.constructed',
+  modified_glyph: 'brief.typography.modifiedGlyph',
+  rebus: 'brief.typography.rebus',
+  monogram_ligature: 'brief.typography.monogramLigature',
 };
 
 function hasKey(key: string): key is MessageKey {

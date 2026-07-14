@@ -1,5 +1,6 @@
 import type { CompileResult } from '@logo-platform/brief-compiler';
-import type { BrainGenerateRequest, LogoDNA, PromptScores } from '@logo-platform/shared';
+import type { BrainGenerateRequest, LogoDNA, PromptScores, TypographyStyle } from '@logo-platform/shared';
+import { isConstructedTypographyStyle } from '@logo-platform/shared';
 import { scorePrompt } from '@logo-platform/prompt-engine';
 
 function mapEra(era: string): LogoDNA['era'] {
@@ -38,8 +39,13 @@ export function dnaFromCompile(compile: CompileResult, request: BrainGenerateReq
   };
 }
 
-function typographyFocusLabel(style: 'standard' | 'constructed'): string {
-  return style === 'constructed' ? 'constructed geometric letterforms' : 'custom neo-grotesque';
+function typographyFocusLabel(style: TypographyStyle): string {
+  if (style === 'rebus') return 'rebus wordmark letterforms';
+  if (style === 'monogram_ligature') return 'monogram ligature letterforms';
+  if (style === 'modified_glyph') return 'modified glyph letterforms';
+  return isConstructedTypographyStyle(style)
+    ? 'constructed geometric letterforms'
+    : 'custom neo-grotesque';
 }
 
 export function scoreCompiledPrompt(

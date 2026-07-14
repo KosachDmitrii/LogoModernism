@@ -1,6 +1,6 @@
-import type { BrainGenerateRequest, CreativeTerritory } from '@logo-platform/shared';
+import type { BrainGenerateRequest, CreativeTerritory, TypographyStyle } from '@logo-platform/shared';
 import type { CompileResult } from '@logo-platform/brief-compiler';
-import { buildIndustryDirection } from '@logo-platform/shared';
+import { buildIndustryDirection, typographyStyleLabelFragment } from '@logo-platform/shared';
 
 function colorApproachFromPalette(palette: string, selections: string[]): string {
   if (palette === 'black_white' || palette === 'monochrome') {
@@ -16,10 +16,8 @@ function colorApproachFromPalette(palette: string, selections: string[]): string
   return 'Controlled brand palette';
 }
 
-function typographyFocus(style: 'standard' | 'constructed'): string {
-  return style === 'constructed'
-    ? 'Constructed geometric letterforms with one modified distinctive glyph'
-    : 'Custom neo-grotesque wordmark with one modified distinctive glyph';
+function typographyFocus(style: TypographyStyle): string {
+  return typographyStyleLabelFragment(style);
 }
 
 function markArchitecture(markType: string): string {

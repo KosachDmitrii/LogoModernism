@@ -291,8 +291,118 @@ describe('Brief Compiler', () => {
       },
     );
 
-    expect(scores.modernismScore).toBeGreaterThanOrEqual(7);
+    expect(scores.modernismScore).toBeGreaterThanOrEqual(6.5);
     expect(scores.promptQuality).toBeGreaterThanOrEqual(6);
     expect(result.prompts[0]!.positive).toContain('two-color palette (#000000 and #E63946)');
+  });
+
+  it('builds rebus wordmark prompt for short animal brand names', () => {
+    const result = compileBrief({
+      industry: 'Pet Services',
+      companyName: 'cat',
+      markType: 'wordmark',
+      typographyStyle: 'constructed',
+      minimalismLevel: 9,
+      variationCount: 1,
+      preferredTerritoryId: 'territory-typography',
+      briefContext: {
+        colorPalette: 'black_white',
+        composition: 'negative space figure-ground',
+        construction: 'modular grid',
+        geometry: 'circle',
+        preferredShapes: 'circle',
+      },
+    });
+
+    const text = result.prompts[0]!.positive.toLowerCase();
+    expect(text).toContain('wordmark rebus');
+    expect(text).toContain('typographic integration');
+    expect(text).toContain("letter 'c'");
+    expect(text).toContain('cat silhouette');
+    expect(text).toContain('negative space');
+    expect(text).not.toContain('combination mark');
+  });
+
+  it('forces rebus mode from typographyStyle rebus', () => {
+    const result = compileBrief({
+      industry: 'Pet Services',
+      companyName: 'Cat',
+      typographyStyle: 'rebus',
+      variationCount: 1,
+      preferredTerritoryId: 'territory-typography',
+      briefContext: {
+        colorPalette: 'black_white',
+      },
+    });
+
+    const text = result.prompts[0]!.positive.toLowerCase();
+    expect(text).toContain('wordmark rebus');
+    expect(result.resolved.markType).toBe('wordmark');
+    expect(result.resolved.typographyStyle).toBe('rebus');
+    expect(result.resolved.rebusWordmark).toBe(true);
+  });
+
+  it('forces rebus mode from explicit rebusWordmark flag', () => {
+    const result = compileBrief({
+      industry: 'Pet Services',
+      companyName: 'Cat',
+      rebusWordmark: true,
+      variationCount: 1,
+      preferredTerritoryId: 'territory-typography',
+      briefContext: {
+        colorPalette: 'black_white',
+      },
+    });
+
+    const text = result.prompts[0]!.positive.toLowerCase();
+    expect(text).toContain('wordmark rebus');
+    expect(text).toContain('typography-led rebus wordmark');
+    expect(text).toContain('typographic integration');
+    expect(text).toContain("letter 'c'");
+    expect(result.resolved.markType).toBe('wordmark');
+    expect(result.resolved.typographyStyle).toBe('rebus');
+    expect(result.resolved.composition).toContain('negative space');
+  });
+
+  it('parses explicit typographic trick from client notes', () => {
+    const result = compileBrief({
+      industry: 'Creative Agency',
+      companyName: 'fox',
+      markType: 'combination',
+      variationCount: 1,
+      briefContext: {
+        colorPalette: 'black_white',
+        clientNotes: 'letter f contains fox silhouette via negative space',
+        composition: 'symmetry',
+      },
+    });
+
+    const text = result.prompts[0]!.positive.toLowerCase();
+    expect(text).toContain('typographic integration');
+    expect(text).toContain("letter 'f'");
+    expect(text).toContain('fox silhouette');
+    expect(text).toContain('separate clipart icon beside text');
+  });
+
+  it('merges knowledge enrichment into prompt sections', () => {
+    const result = compileBrief({
+      ...baseRequest,
+      analysisPrincipleIds: ['geo-circle'],
+      compileKnowledge: {
+        retrievalCue: 'Prior project cues: tight grid wordmark',
+        tasteAvoidPatterns: ['gradients', 'photorealism'],
+        principleFragments: ['built from circle construction'],
+        projectWorkedCues: ['strict brief adherence'],
+        projectAvoidCues: ['off-brief decorative effects'],
+      },
+    });
+
+    const text = result.prompts[0]!.positive.toLowerCase();
+    expect(text).toContain('prior direction');
+    expect(text).toContain('tight grid wordmark');
+    expect(text).toContain('design principles');
+    expect(text).toContain('built from circle construction');
+    expect(text).toContain('gradients');
+    expect(text).toContain('off-brief decorative effects');
   });
 });

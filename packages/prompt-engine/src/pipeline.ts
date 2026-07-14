@@ -1,6 +1,6 @@
 import type { CompileResult } from '@logo-platform/brief-compiler';
 import type { ComposedPrompt, LogoDNA, PromptGenerationRequest } from '@logo-platform/shared';
-import { normalizeBrandName } from '@logo-platform/shared';
+import { normalizeBrandName, isConstructedTypographyStyle } from '@logo-platform/shared';
 import { compileBrief } from '@logo-platform/brief-compiler';
 import { randomUUID } from 'node:crypto';
 import { evolvePrompt, critiqueDesign } from './prompt-evolution';
@@ -41,7 +41,7 @@ function dnaFromCompile(compile: CompileResult, request: PromptGenerationRequest
           : 'minimal',
     era: mapEra(resolved.era),
     typography: [
-      resolved.typographyStyle === 'constructed'
+      isConstructedTypographyStyle(resolved.typographyStyle)
         ? 'constructed geometric letterforms'
         : 'custom neo-grotesque',
     ],

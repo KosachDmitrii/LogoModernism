@@ -5,6 +5,7 @@ export function resolveCatalogIntelligence(
   request: BrainGenerateRequest,
 ): { request: BrainGenerateRequest; intelligence: CatalogIntelligenceResult } {
   const hasManualRefs = Boolean(request.catalogReferenceIds?.length);
+  const autoSelect = request.autoCatalogReferences === true && !hasManualRefs;
   const recommendations = getCatalogRecommendations({
     industry: request.industry,
     markType: request.markType,
@@ -14,7 +15,9 @@ export function resolveCatalogIntelligence(
 
   const referenceIds = hasManualRefs
     ? request.catalogReferenceIds!
-    : recommendations.slice(0, 4).map((r) => r.id);
+    : autoSelect
+      ? recommendations.slice(0, 4).map((r) => r.id)
+      : [];
 
   const catalogContext = buildCatalogPromptContext(referenceIds, {
     narrative: request.catalogNarrative,
@@ -45,7 +48,7 @@ export function resolveCatalogIntelligence(
         industryScore: r.industryScore,
       })),
       narrative: narrative ?? catalogContext?.inspirationFragments.slice(0, 2).join('; ') ?? '',
-      autoSelected: !hasManualRefs,
+      autoSelected: autoSelect,
     },
   };
 }

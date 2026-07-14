@@ -3,6 +3,7 @@ import type {
   BrainArchitecture,
   BrainExperienceRecord,
   BrainGenerateRequest,
+  BriefContext,
   CatalogIntelligenceResult,
   ComposedPrompt,
   ConstraintReport,
@@ -14,12 +15,15 @@ import type {
 } from '@logo-platform/shared';
 import type { PrismaClient } from '@logo-platform/database';
 import { compileBrief, createPromptExperience } from '@logo-platform/brief-compiler';
+import { getPrincipleById } from '@logo-platform/knowledge-base';
+import { buildCompileKnowledgeContext } from '../knowledge/build-compile-knowledge';
 import { buildTerritoriesFromCompile } from './compiler-territories';
 import { dnaFromCompile, scoreCompiledPrompt } from './compiler-scoring';
 import { selectCreativeTerritory } from './creative-strategy';
 import { buildBrainArchitecture } from './brain-architecture';
 import { computeTasteProfile } from '../learning/taste-profile';
 import { semanticSearch } from '../retrieval/semantic-search';
+import { searchProjectMemory } from '../retrieval/project-memory';
 import { resolveCatalogIntelligence } from '../retrieval/catalog-intelligence';
 import { ingestFeedback } from '../ingest/ingest-feedback';
 
@@ -51,19 +55,30 @@ function toComposedPrompt(
 ): ComposedPrompt {
   const scores = scoreCompiledPrompt(positive, compile, request);
   const dna = dnaFromCompile(compile, request);
+  const selectedPrinciples = (request.analysisPrincipleIds ?? [])
+    .map((id) => getPrincipleById(id))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    .slice(0, 6);
 
   return {
     id: randomUUID(),
     text: positive,
     industry: request.industry,
-    selectedPrinciples: [],
+    selectedPrinciples,
     scores,
     dna,
     metadata: {
       era: dna.era,
       variationIndex: index,
-      markType: request.markType,
-      typographyStyle: request.typographyStyle,
+      markType: request.markType ?? compile.resolved.markType,
+      typographyStyle: request.typographyStyle ?? compile.resolved.typographyStyle,
+      stylePreferences: {
+        colorPalette: compile.resolved.colorPalette as BriefContext['colorPalette'],
+        colorSelections: compile.resolved.colorSelections,
+        allowShadows: compile.resolved.allowShadows,
+        allowPhotoreal: compile.resolved.allowPhotoreal,
+        clientNotes: request.briefContext?.clientNotes,
+      },
       brainPowered: true,
       constraintReport,
       reasoning: 'Brief compiler v1',
@@ -117,29 +132,50 @@ export async function runBriefCompilerPipeline(
   prisma: PrismaClient,
   request: BrainGenerateRequest,
 ): Promise<BrainPipelineResult> {
-  const { request: catalogRequest, intelligence } = resolveCatalogIntelligence(request);
+  const retrievalQuery = [
+    request.industry,
+    request.companyName,
+    request.markType,
+    request.briefContext?.geometry,
+    request.briefContext?.colorPalette,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const [searchResult, tasteProfile, projectMemory, architecture, catalogResolved] =
+    await Promise.all([
+      semanticSearch(prisma, { query: retrievalQuery, limit: 4 }),
+      computeTasteProfile(prisma),
+      searchProjectMemory(prisma, {
+        companyName: request.companyName,
+        industry: request.industry,
+      }),
+      buildBrainArchitecture(prisma, request, []),
+      Promise.resolve(resolveCatalogIntelligence(request)),
+    ]);
+
+  const compileKnowledge = buildCompileKnowledgeContext({
+    tasteProfile,
+    retrievedExperiences: searchResult.results,
+    projectMemory,
+    analysisPrincipleIds: catalogResolved.request.analysisPrincipleIds,
+  });
+
+  const catalogRequest = {
+    ...catalogResolved.request,
+    compileKnowledge,
+    preferredTerritoryId:
+      catalogResolved.request.preferredTerritoryId ??
+      (catalogResolved.request.rebusWordmark ? 'territory-typography' : undefined),
+  };
+
   const compile = compileBrief(catalogRequest);
+  const intelligence = catalogResolved.intelligence;
   const constraintReport = buildConstraintReport(compile);
 
   if (!compile.validation.passed) {
     throw new Error(`Brief compiler validation failed: ${compile.validation.violations.join('; ')}`);
   }
-
-  const retrievalQuery = [
-    catalogRequest.industry,
-    catalogRequest.companyName,
-    catalogRequest.markType,
-    catalogRequest.briefContext?.geometry,
-    catalogRequest.briefContext?.colorPalette,
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  const [searchResult, tasteProfile, architecture] = await Promise.all([
-    semanticSearch(prisma, { query: retrievalQuery, limit: 4 }),
-    computeTasteProfile(prisma),
-    buildBrainArchitecture(prisma, catalogRequest, []),
-  ]);
 
   const territories = buildTerritoriesFromCompile(compile, catalogRequest);
   const selectedTerritory = selectCreativeTerritory(territories, catalogRequest);
@@ -165,6 +201,8 @@ export async function runBriefCompilerPipeline(
         variantAxis: experience.variantAxis,
         overrides: compile.resolved.overrides,
         readiness: compile.readiness,
+        companyName: catalogRequest.companyName,
+        industry: catalogRequest.industry,
       },
     }).catch(() => undefined);
   }
@@ -181,7 +219,10 @@ export async function runBriefCompilerPipeline(
       composition: [compile.resolved.composition],
       typography: [],
       era: compile.resolved.era,
-      principles: [],
+      principles: (catalogRequest.analysisPrincipleIds ?? [])
+        .map((id) => getPrincipleById(id))
+        .filter((p): p is NonNullable<typeof p> => Boolean(p))
+        .slice(0, 6),
       antiPatterns: [],
       catalogReferences: compile.resolved.reference ? [compile.resolved.reference.catalogId] : [],
       reasoning: 'Compiled deterministically from canonical brief',

@@ -31,6 +31,7 @@ export class ImagesService {
       count: 1,
       markType: dto.markType,
       typographyStyle: dto.typographyStyle,
+      colorPalette: dto.colorPalette,
       colorSelections: dto.colorSelections,
       allowShadows: dto.allowShadows,
       allowPhotoreal: dto.allowPhotoreal,

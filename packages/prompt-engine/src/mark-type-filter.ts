@@ -1,5 +1,5 @@
 import type { DesignRule, LogoMarkType, TypographyStyle } from '@logo-platform/shared';
-import { hasExplicitBrandName } from '@logo-platform/shared';
+import { hasExplicitBrandName, isConstructedTypographyStyle } from '@logo-platform/shared';
 
 export interface MarkTypeFilterOptions {
   typographyStyle?: TypographyStyle;
@@ -76,7 +76,7 @@ const LETTERMARK_SYMBOL_FRAGMENT =
   /\b(standalone symbol|iconic symbol|abstract symbol|pictogram|emblem|badge|ribbon|banner|shield|heraldic|crest|seal|symbol and wordmark|wordmark)\b/i;
 
 function isConstructed(options?: MarkTypeFilterOptions): boolean {
-  return options?.typographyStyle === 'constructed';
+  return isConstructedTypographyStyle(options?.typographyStyle);
 }
 
 function isSymbolOnlyMode(markType?: LogoMarkType, options?: MarkTypeFilterOptions): boolean {

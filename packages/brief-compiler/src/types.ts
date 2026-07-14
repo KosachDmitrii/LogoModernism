@@ -1,4 +1,4 @@
-import type { BrainGenerateRequest, LogoMarkType } from '@logo-platform/shared';
+import type { BrainGenerateRequest, LogoMarkType, TypographyStyle } from '@logo-platform/shared';
 
 export const SCHEMA_VERSION = 'brief-compiler-v1';
 
@@ -29,7 +29,7 @@ export interface CanonicalBrief {
   inspiration: string;
   minimalism: MinimalismLevel;
   markType: LogoMarkType;
-  typographyStyle: 'standard' | 'constructed';
+  typographyStyle: TypographyStyle;
   shapes: string[];
   construction: string;
   composition: string;
@@ -39,6 +39,7 @@ export interface CanonicalBrief {
   forbiddenMotifs: string[];
   allowShadows: boolean;
   allowPhotoreal: boolean;
+  rebusWordmark: boolean;
   reference?: ReferenceProfile;
 }
 

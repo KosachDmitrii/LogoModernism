@@ -1,5 +1,6 @@
 import type { LogoMarkType, TypographyStyle } from './types';
 import { isMultiWordCompanyName, lettermarkTextFromName } from './lettermark-text';
+import { isConstructedTypographyStyle, typographyStyleNeedsBrandName } from './typography-styles';
 
 export function normalizeBrandName(companyName?: string | null): string | undefined {
   const trimmed = companyName?.trim();
@@ -19,7 +20,7 @@ export function resolveMarkTypeForBrand(
   typographyStyle?: TypographyStyle,
 ): LogoMarkType | undefined {
   if (hasExplicitBrandName(companyName)) return markType;
-  if (typographyStyle === 'constructed') return undefined;
+  if (isConstructedTypographyStyle(typographyStyle)) return undefined;
   if (markType && TEXTUAL_MARK_TYPES.has(markType)) return undefined;
   if (markType === 'combination') return undefined;
   return markType;
@@ -29,7 +30,7 @@ export function resolveTypographyStyleForBrand(
   typographyStyle: TypographyStyle | undefined,
   companyName?: string | null,
 ): TypographyStyle | undefined {
-  if (!hasExplicitBrandName(companyName) && typographyStyle === 'constructed') {
+  if (!hasExplicitBrandName(companyName) && typographyStyleNeedsBrandName(typographyStyle)) {
     return undefined;
   }
   return typographyStyle;

@@ -225,8 +225,11 @@ export const en = {
   'brief.tab.reviewDescription': 'Edit & generate prompts',
   'brief.readinessLabel': 'Brief: {label}',
   'brief.readyToGenerate': 'Brief is ready — you can generate prompts',
-  'brief.composeLowReadinessConfirm':
-    'Brief readiness is below 50%. Generate anyway? Filling more sections usually improves prompt quality.',
+  'brief.lowReadiness.title': 'Brief readiness is low',
+  'brief.lowReadiness.description':
+    'Readiness is below 50%. Filling more sections usually improves prompt quality.',
+  'brief.lowReadiness.confirm': 'Generate anyway',
+  'brief.lowReadiness.cancel': 'Fill brief first',
   'brief.backToProject': 'Project',
   'brief.composePrompts': 'Compose Prompts',
 
@@ -292,8 +295,32 @@ export const en = {
   'brief.typography.wordmark': 'Wordmark',
   'brief.typography.lettermark': 'Lettermark',
   'brief.typography.combination': 'Combination',
+  'brief.typography.markTypeHint.wordmark':
+    'Full brand name as the logo — typography is the primary mark.',
+  'brief.typography.markTypeHint.lettermark':
+    'Initials or a single letter — compact monogram as the mark.',
+  'brief.typography.markTypeHint.combination':
+    'Symbol and wordmark together — unified lockup sharing one system.',
   'brief.typography.standard': 'Standard',
   'brief.typography.constructed': 'Constructed',
+  'brief.typography.modifiedGlyph': 'Modified glyph',
+  'brief.typography.rebus': 'Rebus',
+  'brief.typography.monogramLigature': 'Monogram ligature',
+  'brief.typography.styleHint.standard':
+    'Readable type-led forms — clean wordmark without typographic tricks.',
+  'brief.typography.styleHint.constructed':
+    'Letters built from geometry on a grid — modular constructive typography.',
+  'brief.typography.styleHint.modifiedGlyph':
+    'One letter with distinctive character — a single modified glyph carries the idea.',
+  'brief.typography.styleHint.rebus':
+    'Image inside a letter via negative space — name must stay fully readable.',
+  'brief.typography.styleHint.monogramLigature':
+    'Interlocked initials fused into one compact letterform unit.',
+  'brief.typography.rebusLabel': 'Rebus wordmark',
+  'brief.typography.rebusHint':
+    'Letter integrates an image via negative space (e.g. cat inside “c”). Uses typography-led territory on generate.',
+  'brief.typography.rebusNeedsName': 'Rebus wordmark needs a company name on the Project step.',
+  'brief.typography.rebusActive': 'Rebus mode — typography-led territory on compose',
   'brief.typography.analyze': 'Analyze Typography',
   'brief.typography.applied': 'Applied to brief',
   'brief.typography.setIndustryFirst': 'Set industry on the Project step first.',
@@ -347,6 +374,8 @@ export const en = {
   'brief.references.continueToClient': 'Continue to client brief',
   'brief.references.clearAll': 'Clear all',
   'brief.references.empty': 'No references yet — optional, but improves sector fit',
+  'brief.references.autoCatalog':
+    'Auto-pick catalog references when none are selected (Brain recommends by industry and mark type)',
 
   'brief.client.label': 'Client preferences / details',
   'brief.client.placeholder':

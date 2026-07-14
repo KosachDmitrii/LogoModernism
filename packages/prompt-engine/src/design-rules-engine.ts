@@ -6,6 +6,7 @@ import {
   resolvePromptSpec,
   filterCatalogInspirationFragments,
   filterCatalogPrincipleIds,
+  isConstructedTypographyStyle,
 } from '@logo-platform/shared';
 import {
   designPrinciples,
@@ -321,7 +322,7 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
     addRule(getPrincipleById('typ-wordmark'));
   }
 
-  if (typographyStyle === 'constructed') {
+  if (isConstructedTypographyStyle(typographyStyle)) {
     for (const id of ['con-modular-grid', 'con-grid-based', 'typ-custom-letterform', 'comp-stacked']) {
       addRule(getPrincipleById(id));
     }
@@ -353,7 +354,7 @@ function buildLogoDNA(
   const complexityRule = principles.find((p) => p.category === 'complexity');
   const eraRule = principles.find((p) => p.category === 'era');
 
-  const constructed = typographyStyle === 'constructed';
+  const constructed = isConstructedTypographyStyle(typographyStyle);
   const typographicOnly = markType === 'wordmark' || markType === 'lettermark';
 
   return {

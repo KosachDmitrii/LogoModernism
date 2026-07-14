@@ -311,7 +311,7 @@ export interface DesignBrief {
   primaryEmotion: string;
   narrative: string;
   markType: '' | 'wordmark' | 'lettermark' | 'combination';
-  typographyStyle: '' | 'standard' | 'constructed';
+  typographyStyle: '' | 'standard' | 'constructed' | 'modified_glyph' | 'rebus' | 'monogram_ligature';
   colorPalette: '' | 'auto' | 'black_white' | 'monochrome' | 'two_color' | 'multi_color' | 'corporate_blue' | 'red_accent' | 'limited' | 'custom';
   colorSelections: string[];
   allowShadows: boolean;
@@ -330,6 +330,10 @@ export interface DesignBrief {
   principleIds: string[];
   /** Logo catalog reference IDs selected as inspiration */
   catalogReferenceIds: string[];
+  /** Auto-pick catalog references when none are manually selected */
+  autoCatalogReferences: boolean;
+  /** Explicit rebus wordmark — letter integrates image via negative space */
+  rebusWordmark: boolean;
   sources: string[];
 }
 
@@ -374,6 +378,8 @@ export const EMPTY_DESIGN_BRIEF: DesignBrief = {
   critiqueNote: '',
   principleIds: [],
   catalogReferenceIds: [],
+  autoCatalogReferences: false,
+  rebusWordmark: false,
   sources: [],
 };
 
