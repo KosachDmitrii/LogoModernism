@@ -11,7 +11,7 @@ export interface IndustryFormNode {
 
 const INDUSTRY_NODES: IndustryFormNode[] = [
   {
-    industryTags: ['food', 'restaurant', 'pizza', 'cafe', 'bakery', 'beverage', 'culinary'],
+    industryTags: ['food', 'restaurant', 'pizza', 'cafe', 'bakery', 'beverage', 'culinary', 'coffee', 'bar', 'brewery'],
     abstractMotifs: ['round focal geometry', 'warm radial construction', 'communal circular weave', 'craft silhouette'],
     stylizedMotifs: ['round focal arc geometry', 'communal circular weave', 'quarter-circle negative space'],
     recognizableMotifs: ['brick oven arch silhouette', 'flame teardrop', 'pizza peel crossbar'],
@@ -27,7 +27,7 @@ const INDUSTRY_NODES: IndustryFormNode[] = [
     constructionBias: ['diagonal construction', 'modular grid', 'optical balance'],
   },
   {
-    industryTags: ['tech', 'software', 'saas', 'digital', 'ai', 'data'],
+    industryTags: ['tech', 'software', 'saas', 'digital', 'ai', 'data', 'cybersecurity', 'developer', 'fintech'],
     abstractMotifs: ['modular node network', 'circuit path geometry', 'binary grid rhythm', 'connected vertex system'],
     stylizedMotifs: ['pixel cluster mark', 'data stream curves', 'chip grid silhouette'],
     recognizableMotifs: ['bracket code symbol', 'server rack icon', 'cloud contour'],
@@ -43,7 +43,7 @@ const INDUSTRY_NODES: IndustryFormNode[] = [
     constructionBias: ['symmetry', 'baseline grid', 'optical balance'],
   },
   {
-    industryTags: ['health', 'medical', 'wellness', 'pharma', 'clinic'],
+    industryTags: ['health', 'medical', 'wellness', 'pharma', 'clinic', 'dental', 'beauty', 'hospital', 'biotech'],
     abstractMotifs: ['crossing care geometry', 'pulse arc rhythm', 'protective circle enclosure', 'healing spiral'],
     stylizedMotifs: ['medical cross abstraction', 'leaf-heart hybrid', 'caduceus line reduction'],
     recognizableMotifs: ['medical cross', 'heart symbol', 'caduceus'],

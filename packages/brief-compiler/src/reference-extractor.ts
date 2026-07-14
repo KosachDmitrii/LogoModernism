@@ -34,7 +34,16 @@ function attributionLabel(entry: LogoReference, likenessRisk: 'low' | 'high'): s
   const designer = entry.designer?.trim();
   const year = entry.year ? ` (${entry.year})` : '';
   if (likenessRisk === 'high') {
-    return designer ? `${designer}${year}` : 'modernist lineage';
+    if (designer) return `${designer}${year}`;
+    const eraMap: Record<string, string> = {
+      swiss: 'International Typographic Style',
+      bauhaus: 'Bauhaus geometric tradition',
+      corporate_identity: 'corporate identity modernism',
+      '1960s': '1960s corporate identity',
+      '1970s': '1970s systematic identity',
+      mid_century: 'mid-century modernist identity',
+    };
+    return entry.era ? (eraMap[entry.era] ?? 'modernist corporate identity') : 'modernist corporate identity';
   }
   const name = softenTrademarkLikenessLanguage(entry.name);
   if (designer) return `${name} by ${designer}${year}`;

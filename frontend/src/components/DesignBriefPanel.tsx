@@ -39,9 +39,13 @@ const EDITABLE_BRIEF_FIELDS: Array<{ key: TextBriefField; labelKey: MessageKey; 
 const READONLY_BRIEF_FIELDS: Array<{ key: TextBriefField; labelKey: MessageKey }> = [
   { key: 'primaryEmotion', labelKey: 'brief.panel.field.primaryEmotion' },
   { key: 'typography', labelKey: 'brief.panel.field.typography' },
-  { key: 'clientNotes', labelKey: 'brief.panel.field.clientNotes' },
   { key: 'bestPromptHint', labelKey: 'brief.panel.field.bestPromptHint' },
   { key: 'critiqueNote', labelKey: 'brief.panel.field.critique' },
+];
+
+/** Client-authored context that is compiled into the image prompt. */
+const PROMPT_CONTEXT_FIELDS: Array<{ key: TextBriefField; labelKey: MessageKey }> = [
+  { key: 'clientNotes', labelKey: 'brief.panel.field.clientNotes' },
 ];
 
 const TEXTAREA_CLASS =
@@ -130,6 +134,7 @@ export function DesignBriefPanel() {
   }
 
   const filledEditableFields = EDITABLE_BRIEF_FIELDS.filter(({ key }) => designBrief[key].trim());
+  const filledPromptContextFields = PROMPT_CONTEXT_FIELDS.filter(({ key }) => designBrief[key].trim());
   const filledReadonlyFields = READONLY_BRIEF_FIELDS.filter(({ key }) => designBrief[key].trim());
   const hasColorPalette = Boolean(designBrief.colorPalette);
   const hasStyleExtras =
@@ -143,10 +148,14 @@ export function DesignBriefPanel() {
     hasStyleExtras ||
     hasCatalogRefs;
   const hasFieldContent =
-    hasReadonlyMeta || filledEditableFields.length > 0 || filledReadonlyFields.length > 0;
+    hasReadonlyMeta ||
+    filledEditableFields.length > 0 ||
+    filledPromptContextFields.length > 0 ||
+    filledReadonlyFields.length > 0;
 
   const buildHint = t('brief.panel.readOnlyBuild');
   const noPromptHint = t('brief.panel.readOnlyNoPrompt');
+  const usedInPromptHint = t('brief.panel.usedInPrompt');
 
   return (
     <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
@@ -269,6 +278,19 @@ export function DesignBriefPanel() {
                 />
               )}
             </div>
+          ))}
+        </div>
+      )}
+
+      {filledPromptContextFields.length > 0 && (
+        <div className="space-y-3 pt-1 border-t border-zinc-800/80">
+          {filledPromptContextFields.map(({ key, labelKey }) => (
+            <ReadonlyField
+              key={key}
+              label={t(labelKey)}
+              value={designBrief[key]}
+              hint={usedInPromptHint}
+            />
           ))}
         </div>
       )}

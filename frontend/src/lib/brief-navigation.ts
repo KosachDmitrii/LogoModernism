@@ -11,13 +11,16 @@ export const BUILD_SECTIONS: BuildSection[] = [
 
 export const BRIEF_BUILD_SECTION_KEY = 'brief-build-section';
 export const BRIEF_BUILD_ADVANCE_KEY = 'brief-build-advance';
+/** One-shot step when returning from Logo Catalog → Brief build. */
+export const PROMPTS_WIZARD_RETURN_STEP_KEY = 'prompts-wizard-return-step';
+/** Persisted wizard step across sidebar navigation. */
 export const PROMPTS_WIZARD_STEP_KEY = 'prompts-wizard-step';
 
 export function returnToBriefBuildSection(section: BuildSection, industry = '') {
   sessionStorage.removeItem(BRIEF_BUILD_ADVANCE_KEY);
   sessionStorage.setItem(BRIEF_BUILD_SECTION_KEY, section);
   sessionStorage.setItem(
-    PROMPTS_WIZARD_STEP_KEY,
+    PROMPTS_WIZARD_RETURN_STEP_KEY,
     String(resolveInitialPromptsWizardStep(industry)),
   );
 }
@@ -26,9 +29,26 @@ export function resolveInitialPromptsWizardStep(industry: string): 1 | 2 {
   return industry.trim() ? 2 : 1;
 }
 
-export function readPromptsWizardReturnStep(): 1 | 2 | 3 | null {
+export function rememberPromptsWizardStep(step: 1 | 2 | 3) {
+  sessionStorage.setItem(PROMPTS_WIZARD_STEP_KEY, String(step));
+}
+
+export function readPersistedPromptsWizardStep(): 1 | 2 | 3 | null {
   const step = sessionStorage.getItem(PROMPTS_WIZARD_STEP_KEY);
+  if (step === '1' || step === '2' || step === '3') {
+    return Number(step) as 1 | 2 | 3;
+  }
+  return null;
+}
+
+export function clearPersistedPromptsWizardStep() {
   sessionStorage.removeItem(PROMPTS_WIZARD_STEP_KEY);
+  sessionStorage.removeItem(PROMPTS_WIZARD_RETURN_STEP_KEY);
+}
+
+export function readPromptsWizardReturnStep(): 1 | 2 | 3 | null {
+  const step = sessionStorage.getItem(PROMPTS_WIZARD_RETURN_STEP_KEY);
+  sessionStorage.removeItem(PROMPTS_WIZARD_RETURN_STEP_KEY);
   if (step === '1' || step === '2' || step === '3') {
     return Number(step) as 1 | 2 | 3;
   }

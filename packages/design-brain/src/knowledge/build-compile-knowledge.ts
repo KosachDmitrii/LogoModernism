@@ -1,9 +1,5 @@
-import { getPrincipleById } from '@logo-platform/knowledge-base';
-import type {
-  BrainExperienceRecord,
-  CompileKnowledgeContext,
-  TasteProfile,
-} from '@logo-platform/shared';
+import { getPrincipleById, filterStructurePrincipleIds } from '@logo-platform/knowledge-base';
+import type { BrainExperienceRecord, CompileKnowledgeContext, LogoMarkType, TasteProfile } from '@logo-platform/shared';
 
 const TAG_TO_AVOID: Record<string, string> = {
   geometry: 'off-brief geometry',
@@ -99,10 +95,11 @@ export function tasteAvoidFromProfile(profile: TasteProfile): string[] {
   return [...new Set(mapped)];
 }
 
-export function principlesFromIds(ids?: string[]): string[] {
+export function principlesFromIds(ids?: string[], markType?: LogoMarkType): string[] {
   if (!ids?.length) return [];
+  const filtered = filterStructurePrincipleIds(ids, markType);
   const fragments: string[] = [];
-  for (const id of ids.slice(0, 6)) {
+  for (const id of filtered.slice(0, 6)) {
     const principle = getPrincipleById(id);
     if (principle?.promptFragment) fragments.push(principle.promptFragment);
   }
@@ -138,10 +135,11 @@ export function buildCompileKnowledgeContext(input: {
   retrievedExperiences: BrainExperienceRecord[];
   projectMemory: BrainExperienceRecord[];
   analysisPrincipleIds?: string[];
+  markType?: LogoMarkType;
 }): CompileKnowledgeContext | undefined {
   const tasteAvoid = tasteAvoidFromProfile(input.tasteProfile);
   const retrievalCue = retrievalCueFromExperiences(input.retrievedExperiences);
-  const principleFragments = principlesFromIds(input.analysisPrincipleIds);
+  const principleFragments = principlesFromIds(input.analysisPrincipleIds, input.markType);
   const { worked, avoid } = projectMemoryFromExperiences(input.projectMemory);
 
   if (

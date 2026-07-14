@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Loader2, Palette } from 'lucide-react';
 import { defaultPaletteColors, paletteNeedsColorSelections, resolveColorSelections } from '@logo-platform/shared';
@@ -11,6 +11,7 @@ import { useT, type MessageKey } from '../../i18n';
 import { formatError } from '../../lib/api-error';
 import { BriefColorSelections } from './BriefColorSelections';
 import { BriefRadioOption } from './BriefRadioOption';
+import { CustomSelect } from '../CustomSelect';
 
 type RenderEffectMode = 'flat' | 'shadow' | '3d' | 'shadow_3d';
 
@@ -103,29 +104,28 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
   const canApply = Boolean(industry.trim()) && Boolean(designBrief.colorPalette) && colorSlotsReady;
   const renderEffect = renderEffectMode(designBrief.allowShadows, designBrief.allowPhotoreal);
 
+  const colorPaletteOptions = useMemo(
+    () => COLOR_OPTIONS.map((option) => ({ value: option.value, label: t(option.labelKey) })),
+    [t],
+  );
+
   return (
     <div className="space-y-3">
       <div>
         <label className="block text-xs font-medium text-zinc-500 mb-1">{t('brief.style.colorPalette')}</label>
-        <select
+        <CustomSelect
           value={designBrief.colorPalette}
-          onChange={(e) => {
-            const colorPalette = e.target.value as DesignBrief['colorPalette'];
+          onChange={(colorPalette) => {
             updateDesignBrief({
-              colorPalette,
-              colorSelections: paletteNeedsColorSelections(colorPalette)
-                ? defaultColorSelections(colorPalette)
+              colorPalette: colorPalette as DesignBrief['colorPalette'],
+              colorSelections: paletteNeedsColorSelections(colorPalette as DesignBrief['colorPalette'])
+                ? defaultColorSelections(colorPalette as DesignBrief['colorPalette'])
                 : [],
             });
           }}
-          className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
-        >
-          {COLOR_OPTIONS.map((option) => (
-            <option key={option.value || 'empty'} value={option.value}>
-              {t(option.labelKey)}
-            </option>
-          ))}
-        </select>
+          options={colorPaletteOptions}
+          size="sm"
+        />
       </div>
 
       <BriefColorSelections

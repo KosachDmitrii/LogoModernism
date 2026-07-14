@@ -22,6 +22,8 @@ import {
   sanitizeCatalogNarrativeForPrompt,
   isHighRiskCatalogEntry,
   softenTrademarkLikenessLanguage,
+  describeCatalogStructureTransfer,
+  filterStructurePrincipleIds,
   HIGH_RISK_TRADEMARK_NAMES,
 } from './catalog';
 
@@ -50,6 +52,8 @@ export {
   sanitizeCatalogNarrativeForPrompt,
   isHighRiskCatalogEntry,
   softenTrademarkLikenessLanguage,
+  filterStructurePrincipleIds,
+  describeCatalogStructureTransfer,
   HIGH_RISK_TRADEMARK_NAMES,
 };
 

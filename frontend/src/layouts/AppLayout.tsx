@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { APP_NAV } from '../lib/navigation';
 import { useT } from '../i18n';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { ThemeSwitcher } from '../components/ThemeSwitcher';
 
 export function AppLayout() {
   const t = useT();
@@ -34,8 +35,9 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="px-4 py-3 border-t border-zinc-800/80 space-y-2">
+        <div className="px-4 py-3 border-t border-zinc-800/80 space-y-2.5">
           <LanguageSwitcher />
+          <ThemeSwitcher />
           <p className="text-[10px] font-mono text-zinc-700 tracking-wider">{t('layout.version')}</p>
         </div>
       </aside>

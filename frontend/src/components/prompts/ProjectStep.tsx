@@ -1,6 +1,8 @@
 import { ArrowRight } from 'lucide-react';
+import { useMemo } from 'react';
 import { useAppStore } from '../../store';
 import { IndustrySelect } from '../IndustrySelect';
+import { CustomSelect } from '../CustomSelect';
 import { eraToInspiration } from '../../lib/brief-mappers';
 import { PromptCountPicker } from './PromptCountPicker';
 import { useT, type MessageKey } from '../../i18n';
@@ -64,6 +66,16 @@ export function ProjectStep({ onContinue }: ProjectStepProps) {
     ? INSPIRATION_MODES.find((m) => m.value === inspirationFromEra)?.labelKey
     : undefined;
 
+  const eraSelectOptions = useMemo(
+    () => ERA_OPTIONS.map((option) => ({ value: option.value, label: t(option.labelKey) })),
+    [t],
+  );
+
+  const inspirationSelectOptions = useMemo(
+    () => INSPIRATION_MODES.map((option) => ({ value: option.value, label: t(option.labelKey) })),
+    [t],
+  );
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-xs text-zinc-500">{t('prompts.project.intro')}</p>
@@ -94,33 +106,21 @@ export function ProjectStep({ onContinue }: ProjectStepProps) {
             <label className="block text-xs font-medium text-zinc-400 mb-1.5">
               {t('prompts.project.eraLabel')}
             </label>
-            <select
+            <CustomSelect
               value={preferredEra}
-              onChange={(e) => setPreferredEra(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:border-zinc-600"
-            >
-              {ERA_OPTIONS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {t(m.labelKey)}
-                </option>
-              ))}
-            </select>
+              onChange={setPreferredEra}
+              options={eraSelectOptions}
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1.5">
               {t('prompts.project.inspirationLabel')}
             </label>
-            <select
+            <CustomSelect
               value={inspirationMode}
-              onChange={(e) => setInspirationMode(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:border-zinc-600"
-            >
-              {INSPIRATION_MODES.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {t(m.labelKey)}
-                </option>
-              ))}
-            </select>
+              onChange={setInspirationMode}
+              options={inspirationSelectOptions}
+            />
           </div>
         </div>
       )}

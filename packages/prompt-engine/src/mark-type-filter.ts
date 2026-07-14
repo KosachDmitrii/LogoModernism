@@ -66,7 +66,7 @@ const BLOCKED_IDS: Record<LogoMarkType, Set<string>> = {
     'mark-pictogram',
     'typ-wordmark',
   ]),
-  combination: new Set(),
+  combination: new Set(['mark-emblem', 'mark-heraldic']),
 };
 
 const SYMBOL_FRAGMENT =

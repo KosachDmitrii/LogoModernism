@@ -13,7 +13,12 @@ export async function computeTasteProfile(prisma: PrismaClient): Promise<TastePr
   const signals = await prisma.brainTasteSignal.findMany({
     orderBy: { createdAt: 'desc' },
     take: 500,
-    include: { experience: true },
+    select: {
+      signalType: true,
+      score: true,
+      context: true,
+      metadata: true,
+    },
   });
 
   if (!signals.length) {

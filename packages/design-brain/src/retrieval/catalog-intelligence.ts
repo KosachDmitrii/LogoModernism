@@ -22,6 +22,7 @@ export function resolveCatalogIntelligence(
   const catalogContext = buildCatalogPromptContext(referenceIds, {
     narrative: request.catalogNarrative,
     typographyStyle: request.typographyStyle,
+    briefMarkType: request.markType,
   });
 
   // Never invent significance/score dumps into catalogNarrative — that becomes Design brief note.

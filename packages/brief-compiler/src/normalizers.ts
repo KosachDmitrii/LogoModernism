@@ -1,5 +1,22 @@
+import { getPrincipleById } from '@logo-platform/knowledge-base';
 import type { MinimalismLevel } from './types';
 import { resolveColorSelections, sanitizeCompositionField } from '@logo-platform/shared';
+
+const ERA_INSPIRATION_MOODS: Record<string, string> = {
+  swiss: 'Swiss International Typographic Style discipline',
+  bauhaus: 'Bauhaus geometric tradition',
+};
+
+const INSPIRATION_MODE_TO_PRINCIPLE: Record<string, string> = {
+  ibm: 'insp-ibm',
+  nasa: 'insp-nasa',
+  lufthansa: 'insp-lufthansa',
+  braun: 'insp-braun',
+  cbs: 'insp-cbs',
+  abc: 'insp-abc',
+  olivetti: 'insp-olivetti',
+  westinghouse: 'insp-westinghouse',
+};
 
 const ERA_ALIASES: Record<string, string> = {
   swiss: 'International Typographic Style',
@@ -88,7 +105,24 @@ export function normalizeComposition(raw?: string): string {
 }
 
 export function parseInspirationMood(inspiration?: string, inspirationMode?: string): string {
-  return sanitizeIngressText(inspiration ?? inspirationMode ?? '');
+  if (inspiration?.trim()) {
+    return sanitizeIngressText(inspiration);
+  }
+
+  const mode = inspirationMode?.trim().toLowerCase();
+  if (!mode) return '';
+
+  if (ERA_INSPIRATION_MOODS[mode]) {
+    return ERA_INSPIRATION_MOODS[mode];
+  }
+
+  const principleId = INSPIRATION_MODE_TO_PRINCIPLE[mode];
+  if (principleId) {
+    const fragment = getPrincipleById(principleId)?.promptFragment;
+    if (fragment) return sanitizeIngressText(fragment);
+  }
+
+  return sanitizeIngressText(mode);
 }
 
 const FORBIDDEN_PATTERNS = [

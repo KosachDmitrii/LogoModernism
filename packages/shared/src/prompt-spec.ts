@@ -418,7 +418,14 @@ export function filterCatalogPrincipleIds(
     'typ-extra-slab-serif',
     'mark-emblem',
   ]);
-  const blockedForWordmark = new Set(['mark-iconic-symbol', 'mark-abstract-symbol', 'mark-symbol-only']);
+  const blockedForWordmark = new Set([
+    'mark-iconic-symbol',
+    'mark-abstract-symbol',
+    'mark-symbol-only',
+    'mark-emblem',
+    'mark-heraldic',
+  ]);
+  const blockedForCombination = new Set(['mark-emblem', 'mark-heraldic', 'mark-pictogram']);
   const blockedForSymbolOnly = new Set(['typ-wordmark', 'mark-combination-mark']);
 
   return principleIds.filter((id) => {
@@ -426,6 +433,7 @@ export function filterCatalogPrincipleIds(
     if (spec.markMode === 'wordmark' && blockedForWordmark.has(id)) return false;
     if (spec.markMode === 'lettermark' && id === 'mark-iconic-symbol') return false;
     if (spec.markMode === 'symbol_only' && blockedForSymbolOnly.has(id)) return false;
+    if (spec.markMode === 'combination' && blockedForCombination.has(id)) return false;
     return true;
   });
 }

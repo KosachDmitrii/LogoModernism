@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Loader2, Type } from 'lucide-react';
 import { analyzeBrandDNA } from '../../api';
@@ -7,6 +7,7 @@ import type { DesignBrief } from '../../types';
 import { useT, type MessageKey } from '../../i18n';
 import { formatError } from '../../lib/api-error';
 import { markTypeLabel } from '../../lib/translate-labels';
+import { CustomSelect } from '../CustomSelect';
 import {
   deriveRebusWordmark,
   isRebusTypographyStyle,
@@ -162,44 +163,49 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
 
   const markTypeHint = MARK_TYPES.find((option) => option.value === markType)?.hintKey;
 
+  const markTypeOptions = useMemo(
+    () => MARK_TYPES.map((option) => ({ value: option.value, label: t(option.labelKey) })),
+    [t],
+  );
+
+  const typographyStyleOptions = useMemo(
+    () =>
+      availableStyles.map((value) => ({
+        value,
+        label: t(TYPOGRAPHY_STYLE_LABELS[value]),
+      })),
+    [availableStyles, t],
+  );
+
   return (
     <div className="space-y-3 relative z-10" onClick={(e) => e.stopPropagation()}>
       <div className="grid grid-cols-2 gap-3 items-start">
         <div>
           <label className="block text-xs text-zinc-500 mb-1">{t('brief.typography.markType')}</label>
-          <select
+          <CustomSelect
             value={markType}
-            onChange={(e) => handleMarkTypeChange(e.target.value as MarkType)}
-            className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs focus:outline-none focus:border-zinc-600"
-          >
-            {MARK_TYPES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {t(option.labelKey)}
-              </option>
-            ))}
-          </select>
+            onChange={(next) => handleMarkTypeChange(next as MarkType)}
+            options={markTypeOptions}
+            size="sm"
+            searchable={false}
+          />
           {markTypeHint && (
             <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">{t(markTypeHint)}</p>
           )}
         </div>
         <div>
           <label className="block text-xs text-zinc-500 mb-1">{t('brief.typography.typographyStyle')}</label>
-          <select
+          <CustomSelect
             value={typographyStyle}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (isTypographyStyle(value)) {
-                handleTypographyStyleChange(value);
+            onChange={(next) => {
+              if (isTypographyStyle(next)) {
+                handleTypographyStyleChange(next);
               }
             }}
-            className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs focus:outline-none focus:border-zinc-600"
-          >
-            {availableStyles.map((value) => (
-              <option key={value} value={value}>
-                {t(TYPOGRAPHY_STYLE_LABELS[value])}
-              </option>
-            ))}
-          </select>
+            options={typographyStyleOptions}
+            size="sm"
+            searchable={false}
+          />
           <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
             {t(TYPOGRAPHY_STYLE_HINTS[typographyStyle])}
           </p>

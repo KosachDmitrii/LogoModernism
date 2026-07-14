@@ -1,10 +1,17 @@
-import type { LogoMarkType } from '@logo-platform/shared';
-import type { CanonicalBrief, ConflictBlock, ConflictOverride, ReferenceProfile, ResolvedBrief } from './types';
-import { canonicalizeEra } from './normalizers';
+import type { CanonicalBrief, ConflictBlock, ConflictOverride, ResolvedBrief } from './types';
 
-function mapRefMarkToClient(mark: ReferenceProfile['markTypeHint']): LogoMarkType {
-  if (mark === 'symbol') return 'combination';
-  return mark as LogoMarkType;
+const DEFAULT_COMPOSITIONS = new Set(['symmetry']);
+const DEFAULT_CONSTRUCTIONS = new Set([
+  'baseline grid for optical balance',
+  'baseline grid for modular alignment',
+]);
+
+function isDefaultComposition(value: string): boolean {
+  return DEFAULT_COMPOSITIONS.has(value.trim().toLowerCase());
+}
+
+function isDefaultConstruction(value: string): boolean {
+  return DEFAULT_CONSTRUCTIONS.has(value.trim().toLowerCase());
 }
 
 export function resolveConflicts(brief: CanonicalBrief): ResolvedBrief {
@@ -25,31 +32,6 @@ export function resolveConflicts(brief: CanonicalBrief): ResolvedBrief {
     });
   }
 
-  const refMark = mapRefMarkToClient(ref.markTypeHint);
-  if (brief.markType !== refMark) {
-    if (brief.companyName && ref.markTypeHint === 'symbol') {
-      overrides.push({
-        field: 'markType',
-        from: brief.markType,
-        to: 'combination',
-        severity: 'override',
-        winner: 'brand_lock',
-        summary: 'Branded brief requires combination mark; reference symbol structure applied as subordinate symbol',
-      });
-      resolved.markType = 'combination';
-    } else {
-      overrides.push({
-        field: 'markType',
-        from: brief.markType,
-        to: refMark,
-        severity: 'override',
-        winner: 'reference',
-        summary: 'Reference mark architecture overrides client mark type',
-      });
-      resolved.markType = refMark;
-    }
-  }
-
   const mergeShapes = [...new Set([...ref.geometry, ...brief.shapes])];
   if (mergeShapes.join(',') !== brief.shapes.join(',')) {
     overrides.push({
@@ -63,41 +45,28 @@ export function resolveConflicts(brief: CanonicalBrief): ResolvedBrief {
     resolved.shapes = mergeShapes;
   }
 
-  if (brief.construction !== ref.construction) {
+  if (isDefaultConstruction(brief.construction) && brief.construction !== ref.construction) {
     overrides.push({
       field: 'construction',
       from: brief.construction,
       to: ref.construction,
-      severity: 'override',
+      severity: 'merge',
       winner: 'reference',
-      summary: 'Reference construction system overrides client choice',
+      summary: 'Reference construction merged into brief',
     });
     resolved.construction = ref.construction;
   }
 
-  if (brief.composition !== ref.composition) {
+  if (isDefaultComposition(brief.composition) && brief.composition !== ref.composition) {
     overrides.push({
       field: 'composition',
       from: brief.composition,
       to: ref.composition,
-      severity: 'override',
+      severity: 'merge',
       winner: 'reference',
-      summary: 'Reference composition overrides client choice',
+      summary: 'Reference composition merged into brief',
     });
     resolved.composition = ref.composition;
-  }
-
-  const clientEra = canonicalizeEra(brief.era);
-  if (clientEra !== ref.eraHint) {
-    overrides.push({
-      field: 'era',
-      from: clientEra,
-      to: ref.eraHint,
-      severity: 'override',
-      winner: 'reference',
-      summary: 'Reference era hint overrides client era',
-    });
-    resolved.era = ref.eraHint;
   }
 
   if (brief.colorPalette === 'auto' && ref.likenessRisk === 'low') {

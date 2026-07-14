@@ -6,6 +6,8 @@ export interface PromptScores {
   readabilityScore: number;
   scalabilityScore: number;
   brandRecognitionScore: number;
+  cohesionScore: number;
+  identityScore: number;
   promptQuality: number;
 }
 

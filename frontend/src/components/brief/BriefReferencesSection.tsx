@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BookOpen, ExternalLink, X } from 'lucide-react';
 import { getCatalogEntry } from '../../api';
 import { rememberBriefBuildSection } from '../../lib/brief-navigation';
+import { catalogStructureLabels } from '../../lib/catalog-structure-preview';
 import { useAppStore } from '../../store';
 import { useT } from '../../i18n';
 import { BriefRadioOption } from './BriefRadioOption';
@@ -41,6 +42,7 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
   return (
     <div className="space-y-3">
       <p className="text-[13px] text-zinc-500 leading-relaxed">{t('brief.references.intro')}</p>
+      <p className="text-xs text-zinc-600 leading-relaxed">{t('brief.references.structureOnly')}</p>
 
       <div className="space-y-2">
         <p className="text-xs font-medium text-zinc-500">{t('brief.references.catalogMode')}</p>
@@ -91,22 +93,39 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
             </button>
           </div>
           <ul className="space-y-1">
-            {(appliedEntries ?? appliedIds.map((id) => ({ id, name: id }))).map((entry) => (
+            {(appliedEntries ?? appliedIds.map((id) => ({ id, name: id }))).map((entry) => {
+              const structure = catalogStructureLabels(entry);
+              return (
               <li
                 key={entry.id}
-                className="flex items-center justify-between gap-2 px-2 py-1 rounded-md bg-emerald-950/30 border border-emerald-800/20"
+                className="px-2 py-1.5 rounded-md bg-emerald-950/30 border border-emerald-800/20 space-y-1"
               >
-                <span className="text-[13px] text-emerald-100/90 truncate">{entry.name}</span>
-                <button
-                  type="button"
-                  onClick={() => removeReference(entry.id)}
-                  className="shrink-0 p-0.5 rounded hover:bg-emerald-900/60 text-emerald-400 hover:text-red-300 transition-colors"
-                  aria-label={`${t('common.remove')} ${entry.name}`}
-                >
-                  <X size={14} />
-                </button>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[13px] text-emerald-100/90 truncate">{entry.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeReference(entry.id)}
+                    className="shrink-0 p-0.5 rounded hover:bg-emerald-900/60 text-emerald-400 hover:text-red-300 transition-colors"
+                    aria-label={`${t('common.remove')} ${entry.name}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                {structure.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {structure.map((label) => (
+                      <span
+                        key={`${entry.id}-${label}`}
+                        className="text-[10px] px-1.5 py-0.5 rounded-full border border-violet-800/40 bg-violet-950/30 text-violet-300"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </li>
-            ))}
+            );
+            })}
           </ul>
           <button
             type="button"

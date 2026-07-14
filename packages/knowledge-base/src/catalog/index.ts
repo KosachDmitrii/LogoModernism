@@ -169,6 +169,11 @@ export {
   scoreCatalogIndustryMatch,
 } from './catalog-industry';
 export type { CatalogRecommendation } from './catalog-industry';
+export {
+  describeCatalogStructureTransfer,
+  filterStructurePrincipleIds,
+  refMarkTypeMatchesBrief,
+} from './catalog-structure';
 
 /** Backward-compatible alias */
 export const logoReferences = CURATED_CATALOG;

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { compileBrief, extractReferenceProfile } from '@logo-platform/brief-compiler';
+import { buildCatalogPromptContext } from '@logo-platform/knowledge-base';
+import { principlesFromIds } from '../../src/knowledge/build-compile-knowledge';
 import { scoreCompiledPrompt } from '../../src/reasoning/compiler-scoring';
 
 const baseRequest = {
@@ -46,7 +48,7 @@ describe('Brief Compiler', () => {
     expect(text).toContain('#f5c518');
   });
 
-  it('reference overrides client mark type (IKEA wordmark ref)', () => {
+  it('keeps client mark type when catalog ref differs (IKEA wordmark ref, combination brief)', () => {
     const result = compileBrief({
       ...baseRequest,
       companyName: 'Corso',
@@ -61,10 +63,63 @@ describe('Brief Compiler', () => {
     expect(result.validation.passed).toBe(true);
     const text = result.prompts[0]!.positive.toLowerCase();
     expect(text).toContain('corso');
-    expect(text).toContain('wordmark');
+    expect(text).toContain('combination mark');
+    expect(result.resolved.markType).toBe('combination');
     expect(text).not.toContain('ikea');
-    expect(text).not.toContain('standalone symbol');
+    expect(text).not.toContain('heraldic');
+    expect(text).not.toContain('emblem badge');
     expect((text.match(/\bera:/g) ?? []).length).toBe(1);
+  });
+
+  it('maps inspirationMode presets to trademark-safe mood text (IBM Principles)', () => {
+    const result = compileBrief({
+      ...baseRequest,
+      companyName: 'Cofix',
+      industry: 'Coffee Shop',
+      inspirationMode: 'ibm',
+      preferredEra: '1970s',
+      briefContext: {
+        colorPalette: 'black_white',
+        composition: 'symmetry',
+      },
+    });
+    expect(result.validation.passed).toBe(true);
+    const text = result.prompts[0]!.positive.toLowerCase();
+    expect(text).toContain('systematic grid corporate design');
+    expect(text).not.toContain('ibm');
+  });
+
+  it('applies structure-only principles from emblem ref without likeness DNA (Starbucks + combination)', () => {
+    const catalogContext = buildCatalogPromptContext(['ref-starbucks'], { briefMarkType: 'combination' });
+    const result = compileBrief({
+      ...baseRequest,
+      companyName: 'Cofix',
+      industry: 'Coffee Shop',
+      markType: 'combination',
+      preferredEra: 'international_style',
+      catalogReferenceIds: ['ref-starbucks'],
+      briefContext: {
+        ...baseRequest.briefContext,
+        personality: 'abstract coffee cup or bean silhouette, not literal',
+        colorPalette: 'black_white',
+      },
+      compileKnowledge: {
+        principleFragments: principlesFromIds(catalogContext?.principleIds, 'combination'),
+        tasteAvoidPatterns: [],
+        projectWorkedCues: [],
+        projectAvoidCues: [],
+      },
+    });
+    expect(result.validation.passed).toBe(true);
+    const text = result.prompts[0]!.positive.toLowerCase();
+    expect(text).toContain('combination mark');
+    expect(text).toContain('cofix');
+    expect(result.resolved.markType).toBe('combination');
+    expect(text).not.toContain('starbucks');
+    expect(text).not.toContain('emblem badge');
+    expect(text).not.toContain('heraldic shield');
+    expect(text).not.toContain('modernist lineage associated with modernist lineage');
+    expect(text).toContain('structure');
   });
 
   it('symbol reference yields combination for branded brief (brand lock)', () => {
@@ -433,6 +488,20 @@ describe('Brief Compiler', () => {
     expect(text).toContain('built from circle construction');
     expect(text).toContain('gradients');
     expect(text).toContain('off-brief decorative effects');
+  });
+
+  it('appends client preferences from clientNotes to the compiled prompt', () => {
+    const result = compileBrief({
+      ...baseRequest,
+      briefContext: {
+        ...baseRequest.briefContext,
+        clientNotes: 'Abstract figure reminiscent of fitness',
+      },
+    });
+
+    const text = result.prompts[0]!.positive;
+    expect(text).toContain('Client preferences: Abstract figure reminiscent of fitness');
+    expect(result.resolved.clientNotes).toBe('Abstract figure reminiscent of fitness');
   });
 
   it('allows shadows and 3D rendering when enabled in brief', () => {

@@ -1,4 +1,4 @@
-import type { CatalogMarkType, Era, LogoReference, TypographyStyle } from '@logo-platform/shared';
+import type { CatalogMarkType, Era, LogoMarkType, LogoReference, TypographyStyle } from '@logo-platform/shared';
 import {
   sanitizeBriefNarrativeForPrompt,
   sanitizeCatalogTagList,
@@ -10,17 +10,19 @@ import {
   isHighRiskCatalogEntry,
   sanitizeCatalogNarrativeForPrompt,
   scrubCatalogSignificanceLeaks,
-  softCompositionLabels,
-  softGeometryLabels,
   softenTrademarkLikenessLanguage,
 } from './catalog-likeness';
 import { getCatalogEntry } from './index';
+import {
+  filterStructurePrincipleIds,
+  refMarkTypeMatchesBrief,
+} from './catalog-structure';
 
 const GEOMETRY_TAG_TO_PRINCIPLE: Record<string, string[]> = {
   circle: ['geo-circle', 'comp-negative-space'],
   square: ['geo-square'],
   triangle: ['geo-triangle', 'geo-angular'],
-  shield: ['mark-emblem', 'geo-angular'],
+  shield: ['geo-angular'],
   bow: ['comp-negative-space', 'geo-angular'],
   hexagon: ['geo-angular'],
   cross: ['geo-angular'],
@@ -46,6 +48,16 @@ const SECTION_TO_PRINCIPLE: Record<string, string[]> = {
   words: ['typ-wordmark'],
 };
 
+const ERA_TRADITION_LABEL: Record<string, string> = {
+  swiss: 'International Typographic Style',
+  bauhaus: 'Bauhaus geometric tradition',
+  corporate_identity: 'corporate identity modernism',
+  '1960s': '1960s corporate identity',
+  '1970s': '1970s systematic identity',
+  mid_century: 'mid-century modernist identity',
+  international_style: 'International Typographic Style',
+};
+
 export interface CatalogPromptContext {
   referenceIds: string[];
   references: LogoReference[];
@@ -63,11 +75,10 @@ function unique<T>(items: T[]): T[] {
   return [...new Set(items)];
 }
 
-function principlesFromReference(ref: LogoReference): string[] {
-  const ids = [...ref.principleIds];
+function principlesFromReference(ref: LogoReference, briefMarkType?: LogoMarkType): string[] {
+  const ids = [...(ref.principleIds ?? [])];
 
-  for (const g of ref.geometry) {
-    // Prefer explicit principle id tokens; also map human shape names.
+  for (const g of ref.geometry ?? []) {
     if (/^geo-|^comp-|^con-|^mark-|^typ-/i.test(g)) {
       ids.push(g);
       continue;
@@ -75,17 +86,15 @@ function principlesFromReference(ref: LogoReference): string[] {
     for (const pid of GEOMETRY_TAG_TO_PRINCIPLE[g] ?? []) ids.push(pid);
   }
 
-  if (ref.markType) {
+  if (ref.markType && refMarkTypeMatchesBrief(ref.markType, briefMarkType)) {
     for (const pid of MARK_TYPE_TO_PRINCIPLE[ref.markType] ?? []) ids.push(pid);
   }
 
-  if (ref.catalogSection) {
+  if (ref.catalogSection && refMarkTypeMatchesBrief(ref.markType, briefMarkType)) {
     for (const pid of SECTION_TO_PRINCIPLE[ref.catalogSection] ?? []) ids.push(pid);
   }
 
-  if (ref.era) ids.push(`era-${ref.era.replace(/_/g, '-')}`);
-
-  return unique(ids);
+  return filterStructurePrincipleIds(unique(ids), briefMarkType);
 }
 
 function referenceHeader(ref: LogoReference): string {
@@ -141,27 +150,20 @@ function sanitizeSignificance(significance: string): string {
 function inspirationSentence(ref: LogoReference): string {
   const highRisk = isHighRiskCatalogEntry(ref);
   const designer = sanitizeDesignerName(ref.designer);
-  const header = highRisk
-    ? [
-        ref.name
-          .replace(/\bgolden arches\b/gi, '')
-          .replace(/\bswoosh\b/gi, '')
-          .replace(/\s{2,}/g, ' ')
-          .trim() || ref.name,
-        designer ? `by ${designer}` : '',
-        ref.year ? `(${ref.year})` : '',
-      ]
-        .filter(Boolean)
-        .join(' ')
-    : referenceHeader(ref);
+  const structureCue = abstractGeometryCue(ref);
 
   if (highRisk) {
+    const tradition = designer
+      ? `${designer}${ref.year ? ` (${ref.year})` : ''}`
+      : ref.era
+        ? (ERA_TRADITION_LABEL[ref.era] ?? 'modernist corporate identity')
+        : 'modernist corporate identity';
     return (
-      `Inspired by ${abstractGeometryCue(ref)} in the modernist lineage associated with ${header}, ` +
-      'while remaining fully original — structure and principles only, not a visual copy of the reference.'
+      `Inspired by ${structureCue} from ${tradition} — structure and construction principles only, not a visual copy`
     );
   }
 
+  const header = referenceHeader(ref);
   const significance = ref.significance ? sanitizeSignificance(ref.significance) : '';
   if (significance && /geometric|construction|modular|silhouette|grid|form|letterform|approach/i.test(significance)) {
     const cleaned = significance
@@ -171,50 +173,27 @@ function inspirationSentence(ref: LogoReference): string {
       .replace(/\.$/, '');
     return (
       `Inspired by ${cleaned} associated with ${header}, ` +
-      'while remaining fully original and not a copy.'
+      'structure and principles only, not a visual copy'
     );
   }
 
   return (
-    `Inspired by ${abstractGeometryCue(ref)} associated with ${header}, ` +
-    'while remaining fully original and not a copy.'
+    `Inspired by ${structureCue} associated with ${header}, ` +
+    'structure and principles only, not a visual copy'
   );
 }
 
 function referenceToFragments(ref: LogoReference): string[] {
-  const parts: string[] = [inspirationSentence(ref)];
-  const highRisk = isHighRiskCatalogEntry(ref);
-
-  const geometry = sanitizeCatalogTagList(
-    highRisk ? softGeometryLabels(ref.geometry) : ref.geometry,
-  );
-  if (geometry.length) {
-    parts.push(`Geometry vocabulary: ${unique(geometry).join(', ')}`);
-  }
-
-  const construction = sanitizeCatalogTagList(ref.construction);
-  if (construction.length) {
-    parts.push(`Construction: ${construction.join(', ')}`);
-  }
-
-  const composition = sanitizeCatalogTagList(
-    highRisk ? softCompositionLabels(ref.composition) : ref.composition,
-  );
-  if (composition.length) {
-    parts.push(`Composition: ${unique(composition).join(', ')}`);
-  }
-
-  const typography = sanitizeCatalogTagList(ref.typography);
-  if (typography.length) {
-    parts.push(`Typography: ${typography.join(', ')}`);
-  }
-
-  return parts;
+  return [inspirationSentence(ref)];
 }
 
 export function buildCatalogPromptContext(
   referenceIds: string[],
-  options?: { narrative?: string; typographyStyle?: TypographyStyle },
+  options?: {
+    narrative?: string;
+    typographyStyle?: TypographyStyle;
+    briefMarkType?: LogoMarkType;
+  },
 ): CatalogPromptContext | null {
   if (!referenceIds.length) return null;
 
@@ -254,7 +233,7 @@ export function buildCatalogPromptContext(
   return {
     referenceIds,
     references,
-    principleIds: unique(references.flatMap(principlesFromReference)),
+    principleIds: unique(references.flatMap((r) => principlesFromReference(r, options?.briefMarkType))),
     inspirationFragments,
     geometry: unique(references.flatMap((r) => r.geometry)),
     construction: unique(references.flatMap((r) => r.construction)),

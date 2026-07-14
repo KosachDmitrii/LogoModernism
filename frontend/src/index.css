@@ -1,14 +1,9 @@
 @import "tailwindcss";
+@import "./theme/theme.css";
 
 @theme {
   --font-sans: "DM Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
-  --color-surface: #0a0a0b;
-  --color-surface-elevated: #141416;
-  --color-border: #27272a;
-  --color-accent: #e4e4e7;
-  --color-muted: #71717a;
-  --color-highlight: #fafafa;
 }
 
 * {
@@ -19,6 +14,7 @@
 
 html {
   font-size: 106.25%; /* 17px — slightly larger UI type & rem-based Tailwind */
+  background: var(--color-surface);
 }
 
 body {
@@ -37,6 +33,11 @@ body {
 ::selection {
   background: #3f3f46;
   color: white;
+}
+
+[data-theme='light'] ::selection {
+  background: #ddd6fe;
+  color: #18181b;
 }
 
 *::-webkit-scrollbar {

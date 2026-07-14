@@ -5,6 +5,7 @@ import { toVectorLiteral } from '../embedding/cosine';
 import { getRepoRoot } from './paths';
 
 let schemaReady = false;
+let schemaReadyPromise: Promise<void> | null = null;
 
 function sqlPath(): string {
   return resolve(getRepoRoot(), 'packages/database/prisma/sql/brain-setup.sql');
@@ -12,18 +13,25 @@ function sqlPath(): string {
 
 export async function ensureBrainSchema(prisma: PrismaClient): Promise<void> {
   if (schemaReady) return;
+  if (!schemaReadyPromise) {
+    schemaReadyPromise = (async () => {
+      const sql = readFileSync(sqlPath(), 'utf8');
+      const statements = sql
+        .split(';')
+        .map((statement) => statement.trim())
+        .filter(Boolean);
 
-  const sql = readFileSync(sqlPath(), 'utf8');
-  const statements = sql
-    .split(';')
-    .map((statement) => statement.trim())
-    .filter(Boolean);
+      for (const statement of statements) {
+        await prisma.$executeRawUnsafe(statement);
+      }
 
-  for (const statement of statements) {
-    await prisma.$executeRawUnsafe(statement);
+      schemaReady = true;
+    })().finally(() => {
+      schemaReadyPromise = null;
+    });
   }
 
-  schemaReady = true;
+  await schemaReadyPromise;
 }
 
 export async function isPgvectorEnabled(prisma: PrismaClient): Promise<boolean> {

@@ -3,7 +3,8 @@ import { Copy, Check, ImageIcon, Loader2, Download, Heart } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
-import type { ComposedPrompt, GeneratedImage, LogoFeedback } from '../types';
+import type { ComposedPrompt, GeneratedImage, LogoFeedback, PromptScores } from '../types';
+import type { MessageKey } from '../i18n/en';
 import { ScoreBar } from './ScoreBar';
 import { BriefCoverageMap } from './brief/BriefCoverageMap';
 import { BrainExplainability } from './prompts/BrainExplainability';
@@ -17,6 +18,19 @@ import { formatError } from '../lib/api-error';
 import { imageProviderLabel } from '../lib/translate-labels';
 
 const MAX_LOGOS = 3;
+
+const PROMPT_SCORE_FIELDS: Array<{ key: keyof PromptScores; labelKey: MessageKey }> = [
+  { key: 'promptQuality', labelKey: 'prompts.card.scoreOverall' },
+  { key: 'modernismScore', labelKey: 'prompts.card.scoreModernism' },
+  { key: 'swissScore', labelKey: 'prompts.card.scoreSwiss' },
+  { key: 'minimalismScore', labelKey: 'prompts.card.scoreMinimalism' },
+  { key: 'geometryScore', labelKey: 'prompts.card.scoreGeometry' },
+  { key: 'cohesionScore', labelKey: 'prompts.card.scoreCohesion' },
+  { key: 'identityScore', labelKey: 'prompts.card.scoreIdentity' },
+  { key: 'brandRecognitionScore', labelKey: 'prompts.card.scoreBrandRecognition' },
+  { key: 'readabilityScore', labelKey: 'prompts.card.scoreReadability' },
+  { key: 'scalabilityScore', labelKey: 'prompts.card.scoreScalability' },
+];
 
 interface PromptCardProps {
   prompt: ComposedPrompt;
@@ -216,10 +230,16 @@ export function PromptCard({
           animate={{ opacity: 1, height: 'auto' }}
           className="space-y-2 pt-3 border-t border-zinc-800"
         >
-          <ScoreBar label={t('prompts.card.scoreModernism')} value={prompt.scores?.modernismScore ?? 0} />
-          <ScoreBar label={t('prompts.card.scoreSwiss')} value={prompt.scores?.swissScore ?? 0} />
-          <ScoreBar label={t('prompts.card.scoreMinimalism')} value={prompt.scores?.minimalismScore ?? 0} />
-          <ScoreBar label={t('prompts.card.scoreGeometry')} value={prompt.scores?.geometryScore ?? 0} />
+          <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+            {t('prompts.card.scoresTitle')}
+          </p>
+          {PROMPT_SCORE_FIELDS.map(({ key, labelKey }) => (
+            <ScoreBar
+              key={key}
+              label={t(labelKey)}
+              value={prompt.scores?.[key] ?? 0}
+            />
+          ))}
           {prompt.metadata.briefCoverage && prompt.metadata.briefCoverage.length > 0 && (
             <BriefCoverageMap
               designBrief={designBrief}

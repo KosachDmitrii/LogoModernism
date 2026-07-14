@@ -159,6 +159,7 @@ export async function runBriefCompilerPipeline(
     retrievedExperiences: searchResult.results,
     projectMemory,
     analysisPrincipleIds: catalogResolved.request.analysisPrincipleIds,
+    markType: catalogResolved.request.markType,
   });
 
   const catalogRequest = {

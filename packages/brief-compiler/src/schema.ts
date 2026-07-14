@@ -8,7 +8,7 @@ import {
 } from './typographic-integration';
 import type { PromptSchema, PromptSchemaSection, ResolvedBrief } from './types';
 import { SCHEMA_VERSION } from './types';
-import { deriveRebusWordmark } from '@logo-platform/shared';
+import { buildClientNotesFragment, deriveRebusWordmark } from '@logo-platform/shared';
 import {
   colorLine,
   eraLabel,
@@ -80,8 +80,7 @@ function inspiredByLine(brief: ResolvedBrief): string | undefined {
   const ref = brief.reference;
   if (ref.likenessRisk === 'high') {
     return (
-      `Inspired by ${ref.structureCue} in the modernist lineage associated with ${ref.attributionLabel}, ` +
-      'while remaining fully original — structure and principles only, not a visual copy of the reference'
+      `Inspired by ${ref.structureCue} from ${ref.attributionLabel} — structure and construction principles only, not a visual copy`
     );
   }
   return (
@@ -191,6 +190,11 @@ export function buildPromptSchema(
     { allowShadows: brief.allowShadows, allowPhotoreal: brief.allowPhotoreal },
   );
   push('avoid', `Avoid: ${[...new Set(avoidBase)].join(', ')}`, 'client');
+
+  const clientPreferences = buildClientNotesFragment(brief.clientNotes);
+  if (clientPreferences) {
+    push('client_preferences', clientPreferences, 'client');
+  }
 
   return {
     version: SCHEMA_VERSION,

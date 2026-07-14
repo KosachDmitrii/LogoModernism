@@ -1,6 +1,8 @@
 import type { LearnedPrincipleCategoryCount, LearnedPrinciplesSort } from '../../types';
+import { useMemo } from 'react';
 import { useT, type MessageKey } from '../../i18n';
 import { formatBrainLabel } from '../../lib/brain-labels';
+import { CustomSelect } from '../CustomSelect';
 
 const SORT_LABEL_KEYS: Record<LearnedPrinciplesSort, MessageKey> = {
   influence_desc: 'brain.principles.sort.influenceDesc',
@@ -25,41 +27,51 @@ export function BrainPrinciplesFilters({
 }: BrainPrinciplesFiltersProps) {
   const t = useT();
 
+  const categoryOptions = useMemo(
+    () => [
+      { value: '', label: t('brain.principles.filter.all') },
+      ...categories.map((item) => ({
+        value: item.category,
+        label: `${formatBrainLabel(item.category)} (${item.count})`,
+      })),
+    ],
+    [categories, t],
+  );
+
+  const sortOptions = useMemo(
+    () =>
+      (Object.keys(SORT_LABEL_KEYS) as LearnedPrinciplesSort[]).map((value) => ({
+        value,
+        label: t(SORT_LABEL_KEYS[value]),
+      })),
+    [t],
+  );
+
   return (
     <div className="flex flex-wrap gap-3 p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
       <label className="flex flex-col gap-1.5 min-w-[180px] flex-1">
         <span className="text-[11px] uppercase tracking-wide text-zinc-500">
           {t('brain.principles.filter.label')}
         </span>
-        <select
+        <CustomSelect
           value={category}
-          onChange={(e) => onCategoryChange(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-sm text-zinc-200"
-        >
-          <option value="">{t('brain.principles.filter.all')}</option>
-          {categories.map((item) => (
-            <option key={item.category} value={item.category}>
-              {formatBrainLabel(item.category)} ({item.count})
-            </option>
-          ))}
-        </select>
+          onChange={onCategoryChange}
+          options={categoryOptions}
+          size="sm"
+        />
       </label>
 
       <label className="flex flex-col gap-1.5 min-w-[180px] flex-1">
         <span className="text-[11px] uppercase tracking-wide text-zinc-500">
           {t('brain.principles.sort.label')}
         </span>
-        <select
+        <CustomSelect
           value={sort}
-          onChange={(e) => onSortChange(e.target.value as LearnedPrinciplesSort)}
-          className="px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-sm text-zinc-200"
-        >
-          {(Object.keys(SORT_LABEL_KEYS) as LearnedPrinciplesSort[]).map((value) => (
-            <option key={value} value={value}>
-              {t(SORT_LABEL_KEYS[value])}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => onSortChange(value as LearnedPrinciplesSort)}
+          options={sortOptions}
+          size="sm"
+          searchable={false}
+        />
       </label>
     </div>
   );

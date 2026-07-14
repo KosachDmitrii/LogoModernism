@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { PromptCard } from '../components/PromptCard';
 import { BriefWorkflowPanel } from '../components/brief/BriefWorkflowPanel';
@@ -19,7 +19,13 @@ import { applyConstraintResolutions } from '../lib/apply-constraint-resolution';
 import type { ConstraintResolution } from '../types';
 import { useT, type MessageKey } from '../i18n';
 import { formatError } from '../lib/api-error';
-import { readPromptsWizardReturnStep, resolveInitialPromptsWizardStep } from '../lib/brief-navigation';
+import {
+  clearPersistedPromptsWizardStep,
+  readPersistedPromptsWizardStep,
+  readPromptsWizardReturnStep,
+  rememberPromptsWizardStep,
+  resolveInitialPromptsWizardStep,
+} from '../lib/brief-navigation';
 import { getBriefReadiness } from '../lib/brief-readiness';
 import { toPromptGenerateIntent } from '../lib/prompt-generate-intent';
 
@@ -40,14 +46,33 @@ export function PromptsPage() {
   const resetWizard = useAppStore((s) => s.resetWizard);
 
   const [activeStep, setActiveStep] = useState<PromptWizardStep>(() => {
-    const industryValue = useAppStore.getState().industry;
+    const { industry: industryValue, prompts: storedPrompts } = useAppStore.getState();
+
     const returnStep = readPromptsWizardReturnStep();
     if (returnStep != null) {
       if (returnStep === 2 && !industryValue.trim()) return 1;
+      if (returnStep === 3 && storedPrompts.length === 0) {
+        return industryValue.trim() ? 2 : 1;
+      }
       return returnStep;
     }
+
+    const persisted = readPersistedPromptsWizardStep();
+    if (persisted != null) {
+      if (persisted === 2 && !industryValue.trim()) return 1;
+      if (persisted === 3 && storedPrompts.length === 0) {
+        return industryValue.trim() ? 2 : 1;
+      }
+      return persisted;
+    }
+
+    if (storedPrompts.length > 0) return 3;
     return resolveInitialPromptsWizardStep(industryValue);
   });
+
+  useEffect(() => {
+    rememberPromptsWizardStep(activeStep);
+  }, [activeStep]);
   const [startOverOpen, setStartOverOpen] = useState(false);
   const [lowReadinessOpen, setLowReadinessOpen] = useState(false);
   const [pendingCompose, setPendingCompose] = useState<{
@@ -111,6 +136,7 @@ export function PromptsPage() {
 
   const confirmStartOver = () => {
     resetWizard();
+    clearPersistedPromptsWizardStep();
     setActiveStep(1);
     setStartOverOpen(false);
   };

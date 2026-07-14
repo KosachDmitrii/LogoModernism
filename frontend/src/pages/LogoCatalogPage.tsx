@@ -12,6 +12,7 @@ import {
 import { useAppStore } from '../store';
 import { returnToBriefBuildSection } from '../lib/brief-navigation';
 import { ApplyToPromptsButton } from '../components/ApplyToPromptsButton';
+import { CustomSelect } from '../components/CustomSelect';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
 import { useT, type MessageKey } from '../i18n';
@@ -71,6 +72,14 @@ export function LogoCatalogPage() {
   const [era, setEra] = useState('');
   const [entryKind, setEntryKind] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const eraFilterOptions = useMemo(
+    () => [
+      { value: '', label: t('catalog.allEras') },
+      ...ERA_OPTIONS.map((option) => ({ value: option, label: t(ERA_LABEL_KEYS[option]) })),
+    ],
+    [t],
+  );
 
   const { data: stats } = useQuery({ queryKey: ['catalog-stats'], queryFn: getCatalogStats });
   const { data: taxonomy } = useQuery({ queryKey: ['catalog-taxonomy'], queryFn: getCatalogTaxonomy });
@@ -340,18 +349,12 @@ export function LogoCatalogPage() {
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:border-zinc-600"
               />
             </div>
-            <select
+            <CustomSelect
               value={era}
-              onChange={(e) => setEra(e.target.value)}
-              className="px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm focus:outline-none"
-            >
-              <option value="">{t('catalog.allEras')}</option>
-              {ERA_OPTIONS.map((e) => (
-                <option key={e} value={e}>
-                  {t(ERA_LABEL_KEYS[e])}
-                </option>
-              ))}
-            </select>
+              onChange={setEra}
+              options={eraFilterOptions}
+              className="w-[200px] shrink-0"
+            />
           </div>
 
           {activeChapter && (

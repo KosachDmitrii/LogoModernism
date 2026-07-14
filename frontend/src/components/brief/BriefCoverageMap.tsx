@@ -116,13 +116,13 @@ export function BriefCoverageMap({ designBrief, promptCoverage, compact }: Brief
 
   return (
     <div className={clsx('space-y-2', compact ? '' : 'p-3 rounded-xl bg-zinc-950/50 border border-zinc-800')}>
-      <p className="text-[13px] font-medium text-zinc-400">{t('brief.coverage.willSend')}</p>
+      <p className="text-[13px] font-medium text-zinc-500">{t('brief.coverage.willSend')}</p>
       <div className="flex flex-wrap gap-1.5">
         {allPending.map((item) => (
           <span
             key={item.field}
             title={item.snippet}
-            className="text-xs px-2 py-0.5 rounded-full border border-blue-900/40 bg-blue-950/30 text-blue-300"
+            className="text-xs px-2 py-0.5 rounded-full border border-violet-800/40 bg-violet-950/30 text-violet-300"
           >
             {item.label}
           </span>

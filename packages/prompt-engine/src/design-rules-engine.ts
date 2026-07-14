@@ -210,6 +210,7 @@ export function selectDesignRules(input: RuleSelectionInput): RuleSelectionResul
   const catalogContext = buildCatalogPromptContext(input.catalogReferenceIds ?? [], {
     narrative: input.catalogNarrative,
     typographyStyle,
+    briefMarkType: markType,
   });
   const promptSpec = resolvePromptSpec({
     companyName: brandName,

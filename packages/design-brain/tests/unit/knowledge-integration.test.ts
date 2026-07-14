@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { buildCatalogPromptContext } from '@logo-platform/knowledge-base';
 import { resolveCatalogIntelligence } from '../../src/retrieval/catalog-intelligence';
 import {
   buildCompileKnowledgeContext,
+  principlesFromIds,
   projectMemoryFromExperiences,
 } from '../../src/knowledge/build-compile-knowledge';
 
@@ -40,6 +42,43 @@ describe('Catalog intelligence', () => {
 });
 
 describe('Compile knowledge context', () => {
+  it('filters emblem likeness principles for combination briefs', () => {
+    const context = buildCatalogPromptContext(['ref-starbucks'], { briefMarkType: 'combination' });
+    expect(context?.principleIds).toContain('geo-circle');
+    expect(context?.principleIds).not.toContain('mark-emblem');
+    expect(context?.principleIds).not.toContain('mark-heraldic');
+    expect(context?.inspirationFragments[0]).toContain('structure');
+    expect(context?.inspirationFragments[0]).not.toContain('Starbucks');
+  });
+
+  it('merges structure-only catalog principles into compile knowledge', () => {
+    const { request } = resolveCatalogIntelligence({
+      industry: 'Coffee Shop',
+      markType: 'combination',
+      catalogReferenceIds: ['ref-starbucks'],
+    });
+    const knowledge = buildCompileKnowledgeContext({
+      tasteProfile: {
+        preferredMarkTypes: ['combination'],
+        preferredGeometry: ['circle'],
+        avoidedPatterns: [],
+        averageScore: 7,
+        signalCount: 0,
+        summary: 'test',
+      },
+      retrievedExperiences: [],
+      projectMemory: [],
+      analysisPrincipleIds: request.analysisPrincipleIds,
+      markType: 'combination',
+    });
+    const fragments = knowledge?.principleFragments ?? [];
+    expect(fragments.some((f) => /circle/i.test(f))).toBe(true);
+    expect(fragments.some((f) => /emblem|heraldic|shield/i.test(f))).toBe(false);
+    expect(principlesFromIds(request.analysisPrincipleIds, 'combination').some((f) => /emblem/i.test(f))).toBe(
+      false,
+    );
+  });
+
   it('builds avoid and cue lines from taste and project memory', () => {
     const context = buildCompileKnowledgeContext({
       tasteProfile: {

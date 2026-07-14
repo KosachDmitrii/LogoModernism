@@ -227,7 +227,7 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
         <button
           type="button"
           onClick={onGoToReview}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-zinc-100 text-zinc-900 font-medium text-sm hover:bg-white transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-zinc-100 text-zinc-900 font-medium text-sm border border-zinc-700/50 hover:bg-zinc-200 transition-colors"
         >
           {t('brief.build.reviewBrief')}
           <ArrowRight size={16} />
