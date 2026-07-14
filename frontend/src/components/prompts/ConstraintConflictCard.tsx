@@ -157,7 +157,7 @@ export function ConstraintConflictCard({
                     value={resolution.id}
                     checked={selectedResolutionId === resolution.id}
                     onChange={() => onSelectResolution(resolution.id)}
-                    className="mt-0.5 accent-violet-500"
+                    className="brief-radio mt-0.5"
                   />
                   <span className="text-zinc-300 leading-relaxed">
                     {resolutionLabel(resolution.id, t)}

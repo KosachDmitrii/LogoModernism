@@ -203,8 +203,6 @@ export function applyStyleToBrief(
         ? sanitizeCompositionField(joinTags([current.composition, patch.composition]))
         : current.composition,
       colorSelections: current.colorSelections,
-      allowShadows: false,
-      allowPhotoreal: false,
     },
     'Style',
   );

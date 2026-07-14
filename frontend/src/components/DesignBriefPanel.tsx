@@ -1,3 +1,4 @@
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { isRebusTypographyStyle } from '@logo-platform/shared';
 import type { DesignBrief } from '../types';
@@ -22,21 +23,89 @@ type TextBriefField = {
   [K in keyof DesignBrief]: DesignBrief[K] extends string ? K : never;
 }[keyof DesignBrief];
 
-const BRIEF_FIELD_KEYS: Array<{ key: TextBriefField; labelKey: MessageKey; rows?: number }> = [
-  { key: 'personality', labelKey: 'brief.panel.field.personality' },
-  { key: 'complexity', labelKey: 'brief.panel.field.complexity' },
-  { key: 'primaryEmotion', labelKey: 'brief.panel.field.primaryEmotion' },
-  { key: 'narrative', labelKey: 'brief.panel.field.narrative', rows: 3 },
+/** Fields that flow into the compiler prompt (mood, geometry, composition, avoid, era, complexity). */
+const EDITABLE_BRIEF_FIELDS: Array<{ key: TextBriefField; labelKey: MessageKey; multiline?: boolean }> = [
+  { key: 'personality', labelKey: 'brief.panel.field.personality', multiline: true },
+  { key: 'composition', labelKey: 'brief.panel.field.composition', multiline: true },
+  { key: 'preferredShapes', labelKey: 'brief.panel.field.preferredShapes' },
   { key: 'geometry', labelKey: 'brief.panel.field.geometry' },
   { key: 'construction', labelKey: 'brief.panel.field.construction' },
-  { key: 'preferredShapes', labelKey: 'brief.panel.field.preferredShapes' },
-  { key: 'composition', labelKey: 'brief.panel.field.composition' },
+  { key: 'constraints', labelKey: 'brief.panel.field.constraints', multiline: true },
+  { key: 'complexity', labelKey: 'brief.panel.field.complexity' },
+  { key: 'narrative', labelKey: 'brief.panel.field.narrative', multiline: true },
+];
+
+/** Diagnostic / Brand DNA dumps — visible for context, not compiled into prompt text. */
+const READONLY_BRIEF_FIELDS: Array<{ key: TextBriefField; labelKey: MessageKey }> = [
+  { key: 'primaryEmotion', labelKey: 'brief.panel.field.primaryEmotion' },
   { key: 'typography', labelKey: 'brief.panel.field.typography' },
-  { key: 'constraints', labelKey: 'brief.panel.field.constraints' },
-  { key: 'clientNotes', labelKey: 'brief.panel.field.clientNotes', rows: 3 },
-  { key: 'bestPromptHint', labelKey: 'brief.panel.field.bestPromptHint', rows: 3 },
+  { key: 'clientNotes', labelKey: 'brief.panel.field.clientNotes' },
+  { key: 'bestPromptHint', labelKey: 'brief.panel.field.bestPromptHint' },
   { key: 'critiqueNote', labelKey: 'brief.panel.field.critique' },
 ];
+
+const TEXTAREA_CLASS =
+  'w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 resize-none overflow-hidden min-h-[2.5rem]';
+const INPUT_CLASS =
+  'w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600';
+const READONLY_VALUE_CLASS =
+  'px-3 py-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 text-xs text-zinc-400 whitespace-pre-wrap';
+
+function AutoResizeTextarea({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  className: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const resize = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    resize();
+  }, [value, resize]);
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(event) => {
+        onChange(event);
+        requestAnimationFrame(resize);
+      }}
+      rows={1}
+      className={className}
+    />
+  );
+}
+
+function ReadonlyField({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2 mb-1">
+        <label className="text-xs font-medium text-zinc-500">{label}</label>
+        <span className="text-[10px] text-zinc-600 shrink-0">{hint}</span>
+      </div>
+      <p className={READONLY_VALUE_CLASS}>{value}</p>
+    </div>
+  );
+}
 
 function colorPaletteLabel(
   value: DesignBrief['colorPalette'],
@@ -60,26 +129,33 @@ export function DesignBriefPanel() {
     );
   }
 
-  const filledTextFields = BRIEF_FIELD_KEYS.filter(({ key }) => designBrief[key].trim());
+  const filledEditableFields = EDITABLE_BRIEF_FIELDS.filter(({ key }) => designBrief[key].trim());
+  const filledReadonlyFields = READONLY_BRIEF_FIELDS.filter(({ key }) => designBrief[key].trim());
   const hasColorPalette = Boolean(designBrief.colorPalette);
   const hasStyleExtras =
     designBrief.colorSelections.length > 0 || designBrief.allowShadows || designBrief.allowPhotoreal;
   const hasCatalogRefs = (designBrief.catalogReferenceIds?.length ?? 0) > 0;
-  const hasFieldContent =
+  const hasReadonlyMeta =
     Boolean(designBrief.era.trim()) ||
     Boolean(designBrief.markType) ||
     Boolean(designBrief.typographyStyle) ||
     hasColorPalette ||
     hasStyleExtras ||
-    hasCatalogRefs ||
-    filledTextFields.length > 0;
+    hasCatalogRefs;
+  const hasFieldContent =
+    hasReadonlyMeta || filledEditableFields.length > 0 || filledReadonlyFields.length > 0;
+
+  const buildHint = t('brief.panel.readOnlyBuild');
+  const noPromptHint = t('brief.panel.readOnlyNoPrompt');
 
   return (
     <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xs font-medium text-zinc-400">{t('brief.panel.summary')}</p>
-          <p className="text-xs text-zinc-600 mt-0.5">{t('brief.panel.editable')}</p>
+          {filledEditableFields.length > 0 && (
+            <p className="text-xs text-zinc-600 mt-0.5">{t('brief.panel.editable')}</p>
+          )}
           <div className="flex flex-wrap gap-1 mt-1.5">
             {designBrief.sources.map((source) => (
               <span
@@ -104,93 +180,108 @@ export function DesignBriefPanel() {
         <p className="text-xs text-zinc-500">{t('brief.panel.noFieldsYet')}</p>
       )}
 
-      {designBrief.era.trim() && (
-        <p className="text-xs text-zinc-300">
-          <span className="text-zinc-500">{t('brief.panel.era')}</span>{' '}
-          {designBrief.era}
-          <span className="text-zinc-500"> ({t(getEraSourceKey(designBrief))})</span>
-        </p>
-      )}
+      {hasReadonlyMeta && (
+        <div className="space-y-3">
+          <p className="text-[10px] uppercase tracking-wide text-zinc-600">{t('brief.panel.readOnlySection')}</p>
 
-      {designBrief.markType && (
-        <p className="text-xs text-zinc-300">
-          <span className="text-zinc-500">{t('brief.panel.markType')}</span> {markTypeLabel(designBrief.markType, t)}
-        </p>
-      )}
+          {designBrief.era.trim() && (
+            <ReadonlyField
+              label={t('brief.panel.era').replace(/:$/, '')}
+              value={`${designBrief.era} (${t(getEraSourceKey(designBrief))})`}
+              hint={buildHint}
+            />
+          )}
 
-      {designBrief.typographyStyle && (
-        <p className="text-xs text-zinc-300">
-          <span className="text-zinc-500">{t('brief.panel.typographyStyle')}</span>{' '}
-          {typographyStyleLabel(designBrief.typographyStyle, t)}
-        </p>
-      )}
+          {designBrief.markType && (
+            <ReadonlyField
+              label={t('brief.panel.markType').replace(/:$/, '')}
+              value={markTypeLabel(designBrief.markType, t)}
+              hint={buildHint}
+            />
+          )}
 
-      {(isRebusTypographyStyle(
-        designBrief.typographyStyle === 'rebus' ? 'rebus' : undefined,
-      ) || designBrief.rebusWordmark) && (
-        <p className="text-xs text-violet-300/90 px-2 py-1.5 rounded-lg bg-violet-950/30 border border-violet-800/40">
-          {t('brief.typography.rebusActive')}
-        </p>
-      )}
+          {designBrief.typographyStyle && (
+            <ReadonlyField
+              label={t('brief.panel.typographyStyle').replace(/:$/, '')}
+              value={typographyStyleLabel(designBrief.typographyStyle, t)}
+              hint={buildHint}
+            />
+          )}
 
-      {hasColorPalette && (
-        <div>
-          <p className="text-xs font-medium text-zinc-500 mb-1">{t('brief.panel.colorPalette')}</p>
-          <p className="px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300">
-            {colorPaletteLabel(designBrief.colorPalette, t)}
-          </p>
-        </div>
-      )}
-
-      {hasStyleExtras && (
-        <div className="space-y-1">
-          {designBrief.colorSelections.length > 0 && (
-            <p className="text-xs text-zinc-300">
-              <span className="text-zinc-500">{t('brief.panel.selectedColors')}</span>{' '}
-              {designBrief.colorSelections.join(', ')}
+          {(isRebusTypographyStyle(
+            designBrief.typographyStyle === 'rebus' ? 'rebus' : undefined,
+          ) || designBrief.rebusWordmark) && (
+            <p className="text-xs text-violet-300/90 px-2 py-1.5 rounded-lg bg-violet-950/30 border border-violet-800/40">
+              {t('brief.typography.rebusActive')}
             </p>
           )}
-          {(designBrief.allowShadows || designBrief.allowPhotoreal) && (
-            <p className="text-xs text-zinc-300">
-              <span className="text-zinc-500">{t('brief.panel.effectsAllowed')}</span>{' '}
-              {[
+
+          {hasColorPalette && (
+            <ReadonlyField
+              label={t('brief.panel.colorPalette')}
+              value={colorPaletteLabel(designBrief.colorPalette, t)}
+              hint={buildHint}
+            />
+          )}
+
+          {hasStyleExtras && (
+            <ReadonlyField
+              label={t('brief.panel.effectsAllowed').replace(/:$/, '')}
+              value={[
+                designBrief.colorSelections.length > 0
+                  ? `${t('brief.panel.selectedColors')} ${designBrief.colorSelections.join(', ')}`
+                  : '',
                 designBrief.allowShadows ? t('brief.panel.shadows') : '',
                 designBrief.allowPhotoreal ? t('brief.panel.photoreal') : '',
               ]
                 .filter(Boolean)
-                .join(', ')}
-            </p>
+                .join(' · ')}
+              hint={buildHint}
+            />
+          )}
+
+          {hasCatalogRefs && (
+            <ReadonlyField
+              label={t('brief.panel.catalogRefs').replace(/:$/, '')}
+              value={String(designBrief.catalogReferenceIds.length)}
+              hint={buildHint}
+            />
           )}
         </div>
       )}
 
-      {hasCatalogRefs && (
-        <p className="text-xs text-zinc-300">
-          <span className="text-zinc-500">{t('brief.panel.catalogRefs')}</span>{' '}
-          {designBrief.catalogReferenceIds.length}
-        </p>
-      )}
-
-      {filledTextFields.length > 0 && (
-        <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-          {filledTextFields.map(({ key, labelKey, rows }) => (
+      {filledEditableFields.length > 0 && (
+        <div className="space-y-3">
+          {filledEditableFields.map(({ key, labelKey, multiline }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-zinc-500 mb-1">{t(labelKey)}</label>
-              {rows ? (
-                <textarea
+              {multiline ? (
+                <AutoResizeTextarea
                   value={designBrief[key]}
                   onChange={(e) => updateDesignBrief({ [key]: e.target.value })}
-                  rows={rows}
-                  className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600 resize-none"
+                  className={TEXTAREA_CLASS}
                 />
               ) : (
                 <input
                   value={designBrief[key]}
                   onChange={(e) => updateDesignBrief({ [key]: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
+                  className={INPUT_CLASS}
                 />
               )}
             </div>
+          ))}
+        </div>
+      )}
+
+      {filledReadonlyFields.length > 0 && (
+        <div className="space-y-3 pt-1 border-t border-zinc-800/80">
+          {filledReadonlyFields.map(({ key, labelKey }) => (
+            <ReadonlyField
+              key={key}
+              label={t(labelKey)}
+              value={designBrief[key]}
+              hint={noPromptHint}
+            />
           ))}
         </div>
       )}

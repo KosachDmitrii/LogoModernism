@@ -107,7 +107,12 @@ function TerritoryCard({
           </span>
         )}
       </div>
-      <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">{territory.thesis}</p>
+      <p
+        className="text-xs text-zinc-500 line-clamp-2 leading-relaxed cursor-help"
+        title={territory.thesis}
+      >
+        {territory.thesis}
+      </p>
       <p className="text-[11px] text-zinc-600 mt-2">
         {t('prompts.partner.fitScore', { percent: (territory.confidence * 100).toFixed(0) })}
       </p>

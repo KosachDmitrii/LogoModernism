@@ -28,13 +28,23 @@ const COMPACT_RENDER_SUFFIX =
   ' Flat vector illustration, clean white background, ' +
   'no gradients, no shadows, no photorealism, centered composition.';
 
-function constructedSuffix(colorDirective: string): string {
+function depthRenderTail(request: ImageGenerationRequest): string {
+  const parts: string[] = [];
+  if (request.allowShadows) parts.push('include subtle controlled shadows');
+  if (request.allowPhotoreal) parts.push('include controlled 3D dimensional depth');
+  if (parts.length === 0) return 'no gradients, no shadows, no photorealism';
+  const tail = [...parts];
+  if (!request.allowPhotoreal) tail.push('no gradients', 'no photorealism');
+  return tail.join(', ');
+}
+
+function constructedSuffix(colorDirective: string, request: ImageGenerationRequest): string {
   return (
     ' Professional constructed typography logo, letters built from geometric primitives — ' +
     'triangles, semicircles, and rectangles on a modular grid, dense stacked typographic block, ' +
     `bold letterforms on light background (${colorDirective}), letters are the entire logo, ` +
     'not an off-the-shelf font, no separate icon, no roundel, no emblem, no pictorial symbol, ' +
-    'flat vector, clean white background, no gradients, no shadows, no photorealism, centered composition.'
+    `vector letterforms, clean white background, ${depthRenderTail(request)}, centered composition.`
   );
 }
 
@@ -46,16 +56,16 @@ const SYMBOL_ONLY_SUFFIX =
   'flat vector style, clean white background, strong geometric silhouette, ' +
   'no gradients, no shadows, no photorealism, centered composition.';
 
-function wordmarkSuffix(colorDirective: string): string {
+function wordmarkSuffix(colorDirective: string, request: ImageGenerationRequest): string {
   return (
     ' Professional typographic wordmark logo, letters spelling the brand name are the entire logo, ' +
     'typography only, no icon, no symbol, no emblem, no pictorial mark above or beside the text, ' +
-    `flat vector letterforms, clean white background (${colorDirective}), ` +
-    'no gradients, no shadows, no photorealism, centered horizontal wordmark.'
+    `vector letterforms, clean white background (${colorDirective}), ` +
+    `${depthRenderTail(request)}, centered horizontal wordmark.`
   );
 }
 
-function lettermarkSuffix(companyName: string, colorDirective: string): string {
+function lettermarkSuffix(companyName: string, colorDirective: string, request: ImageGenerationRequest): string {
   const text = lettermarkTextFromName(companyName);
   const usesInitials = isMultiWordCompanyName(companyName);
 
@@ -64,8 +74,8 @@ function lettermarkSuffix(companyName: string, colorDirective: string): string {
       ` Professional lettermark monogram logo built only from the initials "${text}", ` +
       'the letterforms themselves are the entire logo, do not spell the full brand name, ' +
       'no icon, no pictorial symbol, no emblem, no badge, no industry imagery, ' +
-      `flat vector letterforms, clean white background (${colorDirective}), ` +
-      'no gradients, no shadows, no photorealism, centered composition.'
+      `vector letterforms, clean white background (${colorDirective}), ` +
+      `${depthRenderTail(request)}, centered composition.`
     );
   }
 
@@ -73,8 +83,8 @@ function lettermarkSuffix(companyName: string, colorDirective: string): string {
     ` Professional lettermark logo built from the full word "${text}", ` +
     'the full word is the entire logo, do not abbreviate to initials, ' +
     'no icon, no pictorial symbol, no emblem, no badge, no industry imagery, ' +
-    `flat vector letterforms, clean white background (${colorDirective}), ` +
-    'no gradients, no shadows, no photorealism, centered composition.'
+    `vector letterforms, clean white background (${colorDirective}), ` +
+    `${depthRenderTail(request)}, centered composition.`
   );
 }
 
@@ -125,11 +135,18 @@ function renderSuffixForPrompt(
 ): string {
   const style = stylePreferenceOverrides(request);
   const colorDirective = buildImageColorDirective(request, base);
+  const depthParts: string[] = [];
+  if (request.allowShadows) depthParts.push('include subtle controlled shadows');
+  if (request.allowPhotoreal) depthParts.push('include controlled 3D dimensional depth');
+  const depthHint = depthParts.length > 0 ? depthParts.join(', ') : 'no shadows';
+  const renderLead = request.allowPhotoreal
+    ? 'Vector logo with controlled 3D dimensional depth'
+    : 'Flat vector illustration';
   const renderBase = [
-    'Flat vector illustration',
+    renderLead,
     'clean white background',
     usesMultipleLogoColors(request, base) ? colorDirective : 'monochrome',
-    !style.allowShadows ? 'no shadows' : '',
+    depthHint,
     !style.allowPhotoreal ? 'no photorealism' : '',
     'centered composition',
   ]
@@ -181,6 +198,32 @@ function applyImageStyleOverrides(text: string, request: ImageGenerationRequest)
       .replace(/\bblack letterforms on light background\b/gi, 'colored letterforms on light background');
   }
 
+  const allowDepth = request.allowShadows || request.allowPhotoreal;
+  if (allowDepth) {
+    result = result
+      .replace(/\bno shadows?\b/gi, '')
+      .replace(/\bno depth effects?\b/gi, '')
+      .replace(/\bno gradients\b/gi, request.allowPhotoreal ? '' : 'no gradients')
+      .replace(
+        /\bsubtle controlled shadows and 3d dimensional depth allowed\b/gi,
+        'include subtle controlled shadows and controlled 3D dimensional depth',
+      )
+      .replace(/\bsubtle controlled shadows allowed\b/gi, 'include subtle controlled shadows')
+      .replace(/\bcontrolled 3d dimensional depth allowed\b/gi, 'include controlled 3D dimensional depth');
+    if (request.allowPhotoreal) {
+      result = result
+        .replace(/\bflat vector illustration\b/gi, 'vector logo with controlled 3D dimensional depth')
+        .replace(/\bflat vector letterforms\b/gi, 'vector letterforms with controlled 3D dimensional depth')
+        .replace(/\bflat vector style\b/gi, 'vector style with controlled 3D dimensional depth');
+    }
+    if (request.allowShadows && !/\binclude subtle controlled shadows\b/i.test(result)) {
+      result += ' Include subtle controlled shadows on the letterforms.';
+    }
+    if (request.allowPhotoreal && !/\binclude controlled 3d dimensional depth\b/i.test(result)) {
+      result += ' Include controlled 3D dimensional depth on the letterforms.';
+    }
+  }
+
   return result.replace(/\s+,/g, ',').replace(/,\s*,+/g, ', ').replace(/\s+/g, ' ').trim();
 }
 
@@ -217,7 +260,9 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
   }
 
   if (markType === 'lettermark' && brandName) {
-    const suffix = lettermarkSuffix(brandName, colorDirective);
+    const suffix = detailed
+      ? renderSuffixForPrompt(base, markType, detailed, request, brandName)
+      : lettermarkSuffix(brandName, colorDirective, request);
     const text = base.toLowerCase().includes('lettermark')
       ? `${base}${company}. ${suffix}`
       : `Lettermark logo${company}: ${base}. ${suffix}`;
@@ -225,7 +270,7 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
   }
 
   if (isGeometricConstructed) {
-    const constructed = constructedSuffix(colorDirective);
+    const constructed = constructedSuffix(colorDirective, request);
     const suffix = detailed ? renderSuffixForPrompt(base, markType, detailed, request, brandName) : constructed;
     const text = base.toLowerCase().includes('constructed')
       ? `${base}${company}. ${suffix}`
@@ -236,7 +281,7 @@ export function enhanceLogoPrompt(request: ImageGenerationRequest): string {
   if (markType === 'wordmark') {
     const suffix = detailed
       ? `${renderSuffixForPrompt(base, markType, detailed, request, brandName)}${buildImageArtDirectionSuffix({ markType: 'wordmark', companyName: brandName })}`
-      : wordmarkSuffix(colorDirective);
+      : wordmarkSuffix(colorDirective, request);
     const text = base.toLowerCase().includes('wordmark')
       ? `${base}${company}. ${suffix}`
       : `Typographic wordmark logo${company}: ${base}. ${suffix}`;

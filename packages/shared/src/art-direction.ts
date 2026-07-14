@@ -259,7 +259,7 @@ export function buildStylePreferenceFragments(input?: StylePreferenceInput): str
   }
 
   if (input.allowPhotoreal) {
-    fragments.push('Client explicitly allows photoreal presentation or realistic mockup rendering');
+    fragments.push('Client explicitly allows controlled 3D dimensional depth on letterforms');
   }
 
   return fragments;

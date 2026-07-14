@@ -13,9 +13,6 @@ export interface TypographicIntegration {
   promptLine: string;
 }
 
-const INTEGRATION_SIGNAL =
-  /negative\s*space|figure[- ]ground|rebus|silhouette|letterform\s+integration|typographic\s+trick|letter\s+as\s+(?:image|form)|inside\s+(?:the\s+)?letter|glyph\s+integration/i;
-
 const SUBJECT_WORD = /\b(cat|dog|fox|bee|owl|fish|bear|bird|rabbit|mouse|lion|tiger|whale|shark|frog|snake|horse|pig|cow|sheep|duck|penguin)\b/i;
 
 const EXPLICIT_IN_LETTER =
@@ -127,24 +124,18 @@ export function detectTypographicIntegration(
   const companyName = brief.companyName?.trim();
   if (!companyName) return undefined;
 
+  const rebusEnabled = deriveRebusWordmark(brief.typographyStyle, brief.rebusWordmark);
+  if (!rebusEnabled) return undefined;
+
   const haystack = briefHaystack(brief).toLowerCase();
   const explicit = parseExplicitIntegration(haystack);
-  const hasSignal =
-    INTEGRATION_SIGNAL.test(haystack) || deriveRebusWordmark(brief.typographyStyle, brief.rebusWordmark);
   const subjectFromName = inferSubjectFromName(companyName);
-  const shortName = companyName.length <= 8;
-
-  if (!deriveRebusWordmark(brief.typographyStyle, brief.rebusWordmark) && !explicit && !hasSignal && !(shortName && subjectFromName)) {
-    return undefined;
-  }
 
   const subject =
     explicit?.subject ??
     (SUBJECT_WORD.exec(haystack)?.[1]?.toLowerCase()) ??
     subjectFromName ??
-    (deriveRebusWordmark(brief.typographyStyle, brief.rebusWordmark) ? 'brand motif' : undefined);
-
-  if (!subject) return undefined;
+    'brand motif';
 
   const targetLetter = explicit?.letter ?? pickTargetLetter(companyName, subject);
   const technique = inferTechnique(haystack);

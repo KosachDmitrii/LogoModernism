@@ -49,7 +49,7 @@ const TASTE_AVOID_MAP: Record<string, string> = {
 };
 
 const RETRIEVAL_NOISE =
-  /successful generation|brief compiler generated|taste signal|score\s*\d|ingest|feedback:/i;
+  /successful generation|brief compiler generated|taste signal|score\s*\d|ingest|feedback:|prompt saved to favorites|prompt quality|company:\s*\w/i;
 
 function normalizeAvoidKey(pattern: string): string {
   return pattern.toLowerCase().replace(/[\s-]+/g, '_').trim();
@@ -73,7 +73,10 @@ function isUsefulRetrievalFragment(text: string): boolean {
 export function retrievalCueFromExperiences(
   experiences: BrainExperienceRecord[],
 ): string | undefined {
-  const top = experiences.filter((e) => (e.similarity ?? 0) >= 0.45).slice(0, 3);
+  const top = experiences
+    .filter((e) => (e.similarity ?? 0) >= 0.45)
+    .filter((e) => (e.metadata as { kind?: string } | undefined)?.kind !== 'prompt_saved')
+    .slice(0, 3);
   if (!top.length) return undefined;
 
   const fragments = top

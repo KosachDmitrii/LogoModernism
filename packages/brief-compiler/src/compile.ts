@@ -34,7 +34,10 @@ export function compileBrief(request: CompileRequest): CompileResult {
     const schema = buildPromptSchema(enriched, plan, enrichment);
     return {
       positive: renderPositive(schema),
-      negative: renderNegative(schema),
+      negative: renderNegative(schema, {
+        allowShadows: enriched.allowShadows,
+        allowPhotoreal: enriched.allowPhotoreal,
+      }),
       schema,
       briefHash: briefHash(resolved, plan.index),
     };

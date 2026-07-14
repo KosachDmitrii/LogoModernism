@@ -16,7 +16,8 @@ import { extractReferenceProfile } from './reference-extractor';
 
 function resolveMarkType(request: BrainGenerateRequest, rebusWordmark: boolean): LogoMarkType {
   if (rebusWordmark) return 'wordmark';
-  return request.markType ?? (request.companyName?.trim() ? 'combination' : 'wordmark');
+  if (request.markType) return request.markType;
+  return request.companyName?.trim() ? 'combination' : 'wordmark';
 }
 
 function resolveTypographyStyle(request: BrainGenerateRequest, rebusWordmark: boolean) {

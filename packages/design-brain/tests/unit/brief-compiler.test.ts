@@ -301,7 +301,7 @@ describe('Brief Compiler', () => {
       industry: 'Pet Services',
       companyName: 'cat',
       markType: 'wordmark',
-      typographyStyle: 'constructed',
+      typographyStyle: 'rebus',
       minimalismLevel: 9,
       variationCount: 1,
       preferredTerritoryId: 'territory-typography',
@@ -364,11 +364,12 @@ describe('Brief Compiler', () => {
     expect(result.resolved.composition).toContain('negative space');
   });
 
-  it('parses explicit typographic trick from client notes', () => {
+  it('parses explicit typographic trick from client notes when rebus is enabled', () => {
     const result = compileBrief({
       industry: 'Creative Agency',
       companyName: 'fox',
-      markType: 'combination',
+      markType: 'wordmark',
+      typographyStyle: 'rebus',
       variationCount: 1,
       briefContext: {
         colorPalette: 'black_white',
@@ -382,6 +383,34 @@ describe('Brief Compiler', () => {
     expect(text).toContain("letter 'f'");
     expect(text).toContain('fox silhouette');
     expect(text).toContain('separate clipart icon beside text');
+  });
+
+  it('respects lettermark and monogram ligature without auto rebus for animal names', () => {
+    const result = compileBrief({
+      industry: 'Food & Beverage',
+      companyName: 'Cow',
+      markType: 'lettermark',
+      typographyStyle: 'monogram_ligature',
+      minimalismLevel: 9,
+      variationCount: 1,
+      preferredTerritoryId: 'territory-typography',
+      briefContext: {
+        colorPalette: 'black_white',
+        composition: 'negative space figure-ground',
+        construction: 'baseline grid for optical balance',
+        geometry: 'modular geometric forms',
+      },
+    });
+
+    const text = result.prompts[0]!.positive.toLowerCase();
+    expect(text).toContain('lettermark');
+    expect(text).toContain('monogram ligature');
+    expect(text).not.toContain('wordmark rebus');
+    expect(text).not.toContain('typographic integration');
+    expect(text).not.toContain('cow silhouette');
+    expect(result.resolved.markType).toBe('lettermark');
+    expect(result.resolved.typographyStyle).toBe('monogram_ligature');
+    expect(result.resolved.rebusWordmark).toBe(false);
   });
 
   it('merges knowledge enrichment into prompt sections', () => {
@@ -398,11 +427,37 @@ describe('Brief Compiler', () => {
     });
 
     const text = result.prompts[0]!.positive.toLowerCase();
-    expect(text).toContain('prior direction');
-    expect(text).toContain('tight grid wordmark');
+    expect(text).not.toContain('prior direction');
+    expect(text).not.toContain('tight grid wordmark');
     expect(text).toContain('design principles');
     expect(text).toContain('built from circle construction');
     expect(text).toContain('gradients');
     expect(text).toContain('off-brief decorative effects');
+  });
+
+  it('allows shadows and 3D rendering when enabled in brief', () => {
+    const result = compileBrief({
+      ...baseRequest,
+      briefContext: {
+        ...baseRequest.briefContext,
+        allowShadows: true,
+        allowPhotoreal: true,
+      },
+      compileKnowledge: {
+        tasteAvoidPatterns: ['shadows and depth effects', '3d effects', 'gradients'],
+        principleFragments: [],
+        projectWorkedCues: [],
+        projectAvoidCues: [],
+      },
+    });
+
+    const positive = result.prompts[0]!.positive.toLowerCase();
+    const negative = result.prompts[0]!.negative.toLowerCase();
+
+    expect(positive).toContain('include subtle controlled shadows and controlled 3d dimensional depth');
+    expect(positive).not.toContain('no shadows no depth effects');
+    expect(negative).not.toContain('3d render');
+    expect(negative).not.toContain('shadows and depth effects');
+    expect(negative).not.toContain('3d effects');
   });
 });

@@ -10,6 +10,30 @@ import { parseMarkTypeFromBrief } from '../../lib/brief-mappers';
 import { useT, type MessageKey } from '../../i18n';
 import { formatError } from '../../lib/api-error';
 import { BriefColorSelections } from './BriefColorSelections';
+import { BriefRadioOption } from './BriefRadioOption';
+
+type RenderEffectMode = 'flat' | 'shadow' | '3d' | 'shadow_3d';
+
+function renderEffectMode(allowShadows: boolean, allowPhotoreal: boolean): RenderEffectMode {
+  if (allowShadows && allowPhotoreal) return 'shadow_3d';
+  if (allowShadows) return 'shadow';
+  if (allowPhotoreal) return '3d';
+  return 'flat';
+}
+
+function renderEffectFlags(mode: RenderEffectMode): Pick<DesignBrief, 'allowShadows' | 'allowPhotoreal'> {
+  return {
+    allowShadows: mode === 'shadow' || mode === 'shadow_3d',
+    allowPhotoreal: mode === '3d' || mode === 'shadow_3d',
+  };
+}
+
+const RENDER_EFFECT_OPTIONS: Array<{ value: RenderEffectMode; labelKey: MessageKey; hintKey: MessageKey }> = [
+  { value: 'flat', labelKey: 'brief.style.renderFlat', hintKey: 'brief.style.renderFlatHint' },
+  { value: 'shadow', labelKey: 'brief.style.allowShadows', hintKey: 'brief.style.allowShadowsHint' },
+  { value: '3d', labelKey: 'brief.style.allow3d', hintKey: 'brief.style.allow3dHint' },
+  { value: 'shadow_3d', labelKey: 'brief.style.renderShadow3d', hintKey: 'brief.style.renderShadow3dHint' },
+];
 
 const COLOR_OPTIONS: Array<{ value: DesignBrief['colorPalette']; labelKey: MessageKey }> = [
   { value: '', labelKey: 'brief.style.autoFromRules' },
@@ -77,6 +101,7 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
           : 1);
 
   const canApply = Boolean(industry.trim()) && Boolean(designBrief.colorPalette) && colorSlotsReady;
+  const renderEffect = renderEffectMode(designBrief.allowShadows, designBrief.allowPhotoreal);
 
   return (
     <div className="space-y-3">
@@ -91,8 +116,6 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
               colorSelections: paletteNeedsColorSelections(colorPalette)
                 ? defaultColorSelections(colorPalette)
                 : [],
-              allowShadows: false,
-              allowPhotoreal: false,
             });
           }}
           className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
@@ -110,6 +133,22 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
         selections={colorSelections}
         onChange={(next) => updateDesignBrief({ colorSelections: next })}
       />
+
+      <div className="space-y-2 pt-1">
+        <p className="text-xs font-medium text-zinc-500">{t('brief.style.renderEffects')}</p>
+        {RENDER_EFFECT_OPTIONS.map((option) => (
+          <BriefRadioOption
+            key={option.value}
+            name="brief-render-effect"
+            value={option.value}
+            checked={renderEffect === option.value}
+            onChange={() => updateDesignBrief(renderEffectFlags(option.value))}
+          >
+            <span className="font-medium text-zinc-200">{t(option.labelKey)}</span>
+            <span className="block mt-0.5 text-zinc-500">{t(option.hintKey)}</span>
+          </BriefRadioOption>
+        ))}
+      </div>
 
       <button
         type="button"

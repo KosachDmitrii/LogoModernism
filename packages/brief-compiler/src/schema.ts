@@ -8,12 +8,14 @@ import {
 } from './typographic-integration';
 import type { PromptSchema, PromptSchemaSection, ResolvedBrief } from './types';
 import { SCHEMA_VERSION } from './types';
+import { deriveRebusWordmark } from '@logo-platform/shared';
 import {
   colorLine,
   eraLabel,
   geometryVocabulary,
   isMonochromePalette,
 } from './normalizers';
+import { filterAvoidForRenderEffects, renderingLine } from './render-effects';
 
 function typographyLine(
   style: ResolvedBrief['typographyStyle'],
@@ -50,14 +52,25 @@ function markTypeLine(brief: ResolvedBrief, integration?: TypographicIntegration
 
 function creativeDirectionLine(
   plan: VariantPlan,
+  brief: ResolvedBrief,
   integration?: TypographicIntegration,
-  rebusWordmark?: boolean,
 ): string {
-  if (integration && (plan.axis === 'typography_led' || rebusWordmark)) {
+  const rebusEnabled = deriveRebusWordmark(brief.typographyStyle, brief.rebusWordmark);
+  if (integration && rebusEnabled && (plan.axis === 'typography_led' || brief.rebusWordmark)) {
     return `Typography-led rebus wordmark — ${integration.promptLine}`;
   }
-  if (integration && plan.axis === 'balanced') {
+  if (integration && rebusEnabled && plan.axis === 'balanced') {
     return `Balanced rebus wordmark — ${integration.promptLine}`;
+  }
+  if (brief.markType === 'lettermark') {
+    return plan.axis === 'typography_led'
+      ? 'Typography-led lettermark — interlocked monogram ligature as primary anchor'
+      : plan.axis === 'construction_led'
+        ? 'Construction-led lettermark — modular grid drives monogram structure'
+        : 'Balanced lettermark — compact initials with unified geometric stroke weight';
+  }
+  if (brief.markType === 'wordmark' && brief.typographyStyle === 'monogram_ligature') {
+    return 'Typography-led wordmark — custom letterforms as primary anchor';
   }
   return plan.creativeDirection;
 }
@@ -146,23 +159,17 @@ export function buildPromptSchema(
   push('era', `Era: ${eraLabel(brief.era)}`, brief.reference ? 'reference' : 'client');
   push('color', `Color: ${colorLine(brief.colorPalette, brief.colorSelections)}`, 'client');
 
-  const rendering = [
-    'flat vector illustration',
-    'scalable silhouette readable at small sizes',
-    brief.allowShadows ? 'subtle depth allowed' : 'no shadows no depth effects',
-    brief.allowPhotoreal ? 'controlled photoreal finish' : 'no gradients',
-  ].join(', ');
+  const rendering = renderingLine({
+    allowShadows: brief.allowShadows,
+    allowPhotoreal: brief.allowPhotoreal,
+  });
   push('rendering', `Rendering: ${rendering}`, 'system');
 
   push(
     'creative_direction',
-    `Creative direction: ${creativeDirectionLine(plan, integration, brief.rebusWordmark)}`,
+    `Creative direction: ${creativeDirectionLine(plan, brief, integration)}`,
     'system',
   );
-
-  if (enrichment?.priorDirection) {
-    push('prior_direction', `Prior direction: ${enrichment.priorDirection}`, 'system');
-  }
 
   if (enrichment?.principleFragments.length) {
     push(
@@ -172,14 +179,17 @@ export function buildPromptSchema(
     );
   }
 
-  const avoidBase = [
-    'generic circular bracket templates',
-    'disconnected floating symbols',
-    'stock Helvetica wordmarks',
-    'literal clipart',
-    ...(integration ? typographicAvoidExtras() : []),
-    ...brief.forbiddenMotifs,
-  ];
+  const avoidBase = filterAvoidForRenderEffects(
+    [
+      'generic circular bracket templates',
+      'disconnected floating symbols',
+      'stock Helvetica wordmarks',
+      'literal clipart',
+      ...(integration ? typographicAvoidExtras() : []),
+      ...brief.forbiddenMotifs,
+    ],
+    { allowShadows: brief.allowShadows, allowPhotoreal: brief.allowPhotoreal },
+  );
   push('avoid', `Avoid: ${[...new Set(avoidBase)].join(', ')}`, 'client');
 
   return {

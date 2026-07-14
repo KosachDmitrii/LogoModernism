@@ -88,10 +88,7 @@ export function normalizeComposition(raw?: string): string {
 }
 
 export function parseInspirationMood(inspiration?: string, inspirationMode?: string): string {
-  const raw = sanitizeIngressText(inspiration ?? inspirationMode ?? '');
-  if (!raw) return '';
-  if (raw.length > 80) return raw.slice(0, 77) + '…';
-  return raw;
+  return sanitizeIngressText(inspiration ?? inspirationMode ?? '');
 }
 
 const FORBIDDEN_PATTERNS = [

@@ -5,6 +5,7 @@ import { getCatalogEntry } from '../../api';
 import { rememberBriefBuildSection } from '../../lib/brief-navigation';
 import { useAppStore } from '../../store';
 import { useT } from '../../i18n';
+import { BriefRadioOption } from './BriefRadioOption';
 
 export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: () => void }) {
   const t = useT();
@@ -41,17 +42,25 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
     <div className="space-y-3">
       <p className="text-[13px] text-zinc-500 leading-relaxed">{t('brief.references.intro')}</p>
 
-      <label className="flex items-start gap-2.5 p-3 rounded-lg border border-zinc-800 bg-zinc-900/40 cursor-pointer">
-        <input
-          type="checkbox"
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-zinc-500">{t('brief.references.catalogMode')}</p>
+        <BriefRadioOption
+          name="catalog-reference-mode"
+          value="manual"
+          checked={!designBrief.autoCatalogReferences}
+          onChange={() => updateDesignBrief({ autoCatalogReferences: false })}
+        >
+          {t('brief.references.catalogModeManual')}
+        </BriefRadioOption>
+        <BriefRadioOption
+          name="catalog-reference-mode"
+          value="auto"
           checked={designBrief.autoCatalogReferences}
-          onChange={(e) => updateDesignBrief({ autoCatalogReferences: e.target.checked })}
-          className="mt-0.5 rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500/40"
-        />
-        <span className="text-xs text-zinc-300 leading-relaxed">
+          onChange={() => updateDesignBrief({ autoCatalogReferences: true })}
+        >
           {t('brief.references.autoCatalog')}
-        </span>
-      </label>
+        </BriefRadioOption>
+      </div>
 
       <Link
         to="/logo-catalog"
