@@ -10,8 +10,8 @@ import {
   REQUIRED_ROLES,
 } from '../../src/auth/roles.decorator';
 import {
-  PLATFORM_ADMINS,
-  REQUIRED_PLATFORM_ROLES,
+  ADMINS,
+  REQUIRED_ACCESS_ROLES,
 } from '../../src/auth/platform-roles.decorator';
 
 function rolesFor(controller: object, method: string): string[] | undefined {
@@ -22,12 +22,12 @@ function rolesFor(controller: object, method: string): string[] | undefined {
   return handler ? Reflect.getMetadata(REQUIRED_ROLES, handler) : undefined;
 }
 
-function platformRolesFor(controller: object, method: string): string[] | undefined {
+function accessRolesFor(controller: object, method: string): string[] | undefined {
   const handler = Object.getOwnPropertyDescriptor(
     Object.getPrototypeOf(controller),
     method,
   )?.value as object | undefined;
-  return handler ? Reflect.getMetadata(REQUIRED_PLATFORM_ROLES, handler) : undefined;
+  return handler ? Reflect.getMetadata(REQUIRED_ACCESS_ROLES, handler) : undefined;
 }
 
 describe('RBAC endpoint metadata', () => {
@@ -54,7 +54,7 @@ describe('RBAC endpoint metadata', () => {
     'ingestImage',
   ])('keeps Brain admin operation %s admin-only', (method) => {
     expect(rolesFor(brain, method)).toEqual(BRAIN_ADMINS);
-    expect(platformRolesFor(brain, method)).toEqual(PLATFORM_ADMINS);
+    expect(accessRolesFor(brain, method)).toEqual(ADMINS);
   });
 
   it.each(['stats', 'tasteProfile', 'principleCategories', 'principles'])(

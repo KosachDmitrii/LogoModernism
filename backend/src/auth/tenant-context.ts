@@ -1,17 +1,18 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import type { PlatformRole } from '@logo-platform/shared';
+import type { AccessRole } from '@logo-platform/shared';
 import type { Request } from 'express';
 
 export type TenantScope = {
   userId: string;
   organizationId: string;
   projectId?: string;
+  accessRole: AccessRole;
 };
 
 export type AuthIdentity = {
   userId: string;
   email?: string;
-  platformRole?: PlatformRole;
+  accessRole?: AccessRole;
 };
 
 export type AuthenticatedRequest = Request & {

@@ -83,6 +83,7 @@ export function RegisterPage() {
                 value={organizationName}
                 onChange={setOrganizationName}
                 autoComplete="organization"
+                required={false}
               />
             </div>
             <AuthField
@@ -142,6 +143,7 @@ function AuthField({
   type = 'text',
   autoComplete,
   minLength,
+  required = true,
 }: {
   label: string;
   value: string;
@@ -149,12 +151,13 @@ function AuthField({
   type?: string;
   autoComplete?: string;
   minLength?: number;
+  required?: boolean;
 }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm text-zinc-300">{label}</span>
       <input
-        required
+        required={required}
         type={type}
         value={value}
         minLength={minLength}

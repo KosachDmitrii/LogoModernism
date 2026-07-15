@@ -148,7 +148,7 @@ export async function getBillingOverview(): Promise<BillingOverview> {
   return res.json();
 }
 
-export async function createBillingCheckout(plan: 'PRO'): Promise<{ url: string }> {
+export async function createBillingCheckout(plan: 'PLUS' | 'PRO'): Promise<{ url: string }> {
   const res = await fetch(`${API_BASE}/billing/checkout`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

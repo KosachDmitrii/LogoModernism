@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isPostgreSqlPoolTimeout } from '../../src/common/postgresql-pool-timeout.filter';
 import { TenantAuthGuard } from '../../src/auth/tenant-auth.guard';
 import { AUTHENTICATED_ONLY_ROUTE } from '../../src/auth/authenticated.decorator';
-import { REQUIRED_ROLES } from '../../src/auth/roles.decorator';
+import { REQUIRED_ACCESS_ROLES } from '../../src/auth/platform-roles.decorator';
 import type { ExecutionContext } from '@nestjs/common';
 import type { Reflector } from '@nestjs/core';
 import { NightlyBrainSchedulerService } from '../../src/design-brain/nightly-brain-scheduler.service';
@@ -74,7 +74,7 @@ describe('scalability guardrails', () => {
     }
   });
 
-  it('denies Viewer access to contributor operations in development', async () => {
+  it('denies User access to admin operations in development', async () => {
     const previousNodeEnv = process.env.NODE_ENV;
     const previousJwks = process.env.AUTH_JWKS_URL;
     process.env.NODE_ENV = 'test';
@@ -82,13 +82,13 @@ describe('scalability guardrails', () => {
     try {
       const reflector = {
         getAllAndOverride: (key: string) =>
-          key === REQUIRED_ROLES ? ['OWNER', 'ADMIN', 'MEMBER'] : false,
+          key === REQUIRED_ACCESS_ROLES ? ['ADMIN'] : false,
       } as unknown as Reflector;
       const guard = new TenantAuthGuard(reflector);
       const { context } = authContext({
-        'x-user-id': 'viewer-a',
+        'x-user-id': 'user-a',
         'x-organization-id': 'org-a',
-        'x-role': 'VIEWER',
+        'x-access-role': 'USER',
       });
       await expect(guard.canActivate(context)).rejects.toMatchObject({ status: 403 });
     } finally {
@@ -105,13 +105,13 @@ describe('scalability guardrails', () => {
     try {
       const reflector = {
         getAllAndOverride: (key: string) =>
-          key === REQUIRED_ROLES ? ['OWNER', 'ADMIN'] : false,
+          key === REQUIRED_ACCESS_ROLES ? ['ADMIN'] : false,
       } as unknown as Reflector;
       const guard = new TenantAuthGuard(reflector);
       const { context } = authContext({
         'x-user-id': 'admin-b',
         'x-organization-id': 'org-b',
-        'x-role': 'ADMIN',
+        'x-access-role': 'ADMIN',
       });
       await expect(guard.canActivate(context)).resolves.toBe(true);
     } finally {

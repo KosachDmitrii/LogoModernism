@@ -4,9 +4,11 @@ import { runFullPipeline } from '../../api';
 import { useAppStore } from '../../store';
 import { useT } from '../../i18n';
 import { formatError } from '../../lib/api-error';
+import { useToast } from '../ToastProvider';
 
 export function AutoBriefButton() {
   const t = useT();
+  const toast = useToast();
   const companyName = useAppStore((s) => s.companyName);
   const industry = useAppStore((s) => s.industry);
   const applyPipeline = useAppStore((s) => s.applyPipeline);
@@ -24,6 +26,7 @@ export function AutoBriefButton() {
     onSuccess: (result) => {
       applyPipeline(brandName, industry, result);
     },
+    onError: (error) => toast.error(formatError(error, t)),
   });
 
   const canRun = Boolean(industry.trim());
@@ -53,9 +56,6 @@ export function AutoBriefButton() {
             {t('brief.autoBrief.updated', { score: result.critique.overallScore })}
           </p>
         </div>
-      )}
-      {pipeline.isError && (
-        <p className="text-xs text-red-400">{formatError(pipeline.error, t)}</p>
       )}
     </div>
   );

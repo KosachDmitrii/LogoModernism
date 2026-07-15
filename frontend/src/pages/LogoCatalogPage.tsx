@@ -64,10 +64,8 @@ const ERA_LABEL_KEYS: Record<(typeof ERA_OPTIONS)[number], MessageKey> = {
 
 export function LogoCatalogPage() {
   const t = useT();
-  const { profile, activeMembership } = useAuth();
-  const canApply = Boolean(
-    profile && activeMembership && activeMembership.role !== 'VIEWER',
-  );
+  const { profile } = useAuth();
+  const canApply = Boolean(profile);
   const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
   const designBrief = useAppStore((s) => s.designBrief);
   const projectIndustry = useAppStore((s) => s.industry);

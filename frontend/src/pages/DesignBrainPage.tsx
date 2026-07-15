@@ -45,17 +45,15 @@ import { useT, type MessageKey } from '../i18n';
 import { formatError } from '../lib/api-error';
 import { useAuth } from '../auth/AuthProvider';
 import { hasPermission } from '../auth/permissions';
+import { useToast } from '../components/ToastProvider';
 
 type Tab = 'overview' | 'principles' | 'learn' | 'research';
 
 export function DesignBrainPage() {
   const t = useT();
-  const { activeMembership, profile } = useAuth();
-  const canManageBrain = hasPermission(
-    activeMembership?.role,
-    'brain.manage',
-    profile?.platformRole,
-  );
+  const toast = useToast();
+  const { profile } = useAuth();
+  const canManageBrain = hasPermission(profile?.accessRole, 'brain.manage');
   const [tab, setTab] = useState<Tab>('overview');
   const [principlesPage, setPrinciplesPage] = useState(1);
   const [principlesCategory, setPrinciplesCategory] = useState('');
@@ -97,6 +95,7 @@ export function DesignBrainPage() {
         signal,
       ),
     enabled: tab === 'principles',
+    placeholderData: (previousData) => previousData,
   });
   const { data: principleCategories = [] } = useQuery({
     queryKey: ['brain-principle-categories'],
@@ -112,10 +111,11 @@ export function DesignBrainPage() {
   );
 
   useEffect(() => {
+    if (!principlesPageData) return;
     if (principlesPage > totalPrinciplePages) {
       setPrinciplesPage(totalPrinciplePages);
     }
-  }, [principlesPage, totalPrinciplePages]);
+  }, [principlesPage, principlesPageData, totalPrinciplePages]);
   const { data: pendingResearch, isLoading: pendingResearchLoading } = useQuery({
     queryKey: ['brain-research-pending'],
     queryFn: ({ signal }) => listBrainResearchCandidates('pending', signal),
@@ -131,8 +131,6 @@ export function DesignBrainPage() {
 
   const [researchQuery, setResearchQuery] = useState('');
   const [manualUrl, setManualUrl] = useState('');
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [researchError, setResearchError] = useState<string | null>(null);
   const [candidateActions, setCandidateActions] = useState<
     Record<string, 'approve' | 'reject'>
   >({});
@@ -152,7 +150,6 @@ export function DesignBrainPage() {
 
   const handleApproveCandidate = async (id: string) => {
     setCandidateAction(id, 'approve');
-    setResearchError(null);
     try {
       await approveBrainResearch(id);
       await queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
@@ -160,8 +157,9 @@ export function DesignBrainPage() {
       queryClient.invalidateQueries({ queryKey: ['brain-principles'] });
       queryClient.invalidateQueries({ queryKey: ['brain-principles-all'] });
       queryClient.invalidateQueries({ queryKey: ['brain-principle-categories'] });
+      toast.success(t('toast.researchApproved'));
     } catch (error) {
-      setResearchError(formatError(error, t));
+      toast.error(formatError(error, t));
     } finally {
       setCandidateAction(id, null);
     }
@@ -169,12 +167,12 @@ export function DesignBrainPage() {
 
   const handleRejectCandidate = async (id: string) => {
     setCandidateAction(id, 'reject');
-    setResearchError(null);
     try {
       await rejectBrainResearch(id);
       await queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
+      toast.success(t('toast.researchRejected'));
     } catch (error) {
-      setResearchError(formatError(error, t));
+      toast.error(formatError(error, t));
     } finally {
       setCandidateAction(id, null);
     }
@@ -205,11 +203,10 @@ export function DesignBrainPage() {
   }, [latestFinishedAt, queryClient]);
 
   const handlePdfUpload = async (file: File) => {
-    setPdfError(null);
     try {
       await startPdfIngest(file);
     } catch (error) {
-      setPdfError(formatError(error, t));
+      toast.error(formatError(error, t));
     }
   };
 
@@ -222,27 +219,29 @@ export function DesignBrainPage() {
       queryClient.invalidateQueries({ queryKey: ['brain-principles-all'] });
       queryClient.invalidateQueries({ queryKey: ['brain-principle-categories'] });
       queryClient.invalidateQueries({ queryKey: ['brain-taste'] });
+      toast.success(t('toast.brainConsolidated'));
     },
+    onError: (error) => toast.error(formatError(error, t)),
   });
 
   const researchRun = useMutation({
     mutationFn: () => runBrainResearch({ query: researchQuery.trim(), maxSources: 30 }),
     onSuccess: () => {
-      setResearchError(null);
       queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
+      toast.success(t('toast.researchCompleted'));
     },
-    onError: (error) => setResearchError(formatError(error, t)),
+    onError: (error) => toast.error(formatError(error, t)),
   });
 
   const researchPreview = useMutation({
     mutationFn: () =>
       previewBrainResearch({ query: researchQuery.trim() || 'manual', url: manualUrl.trim() }),
     onSuccess: () => {
-      setResearchError(null);
       setManualUrl('');
       queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
+      toast.success(t('toast.urlPreviewed'));
     },
-    onError: (error) => setResearchError(formatError(error, t)),
+    onError: (error) => toast.error(formatError(error, t)),
   });
 
   const tabs: Array<{ id: Tab; labelKey: MessageKey; icon: typeof Brain }> = [
@@ -483,7 +482,6 @@ export function DesignBrainPage() {
                 })}
               </p>
             )}
-            {pdfError && <p className="text-xs text-red-400 mt-2">{pdfError}</p>}
           </IngestSection>
         </div>
       )}
@@ -570,7 +568,6 @@ export function DesignBrainPage() {
             </button>
           </div>
 
-          {researchError && <p className="text-xs text-red-400">{researchError}</p>}
 
           {researchRun.data && researchRun.data.candidates.length === 0 && (
             <p className="text-xs text-amber-400">

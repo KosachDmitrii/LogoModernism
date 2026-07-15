@@ -12,24 +12,16 @@ export const USAGE_OPERATIONS = {
 
 export type UsageOperationKey = (typeof USAGE_OPERATIONS)[keyof typeof USAGE_OPERATIONS];
 
-export const USAGE_OPERATION_COSTS: Record<UsageOperationKey, number> = {
-  [USAGE_OPERATIONS.promptCompose]: 2,
-  [USAGE_OPERATIONS.promptRecommend]: 1,
-  [USAGE_OPERATIONS.imageGenerate]: 10,
-  [USAGE_OPERATIONS.brainInterview]: 1,
-  [USAGE_OPERATIONS.brainIngestImage]: 5,
-  [USAGE_OPERATIONS.brainIngestPdf]: 25,
-  [USAGE_OPERATIONS.brainResearchPreview]: 5,
-  [USAGE_OPERATIONS.brainResearchStandard]: 25,
-  [USAGE_OPERATIONS.brainResearchDeep]: 45,
+export type QuotaSummary = {
+  limit: number | null;
+  used: number;
+  reserved: number;
+  remaining: number | null;
 };
 
 export type UsageSummary = {
   periodStart: string;
   periodEnd: string;
-  includedCredits: number | null;
-  committedCredits: number;
-  reservedCredits: number;
-  purchasedCredits: number;
-  remainingCredits: number | null;
+  prompts: QuotaSummary;
+  logos: QuotaSummary;
 };

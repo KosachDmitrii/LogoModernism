@@ -9,7 +9,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { USAGE_OPERATION_COSTS, USAGE_OPERATIONS } from '@logo-platform/shared';
+import { USAGE_OPERATIONS } from '@logo-platform/shared';
 import type { Response } from 'express';
 import { ImagesService } from './images.service';
 import { GenerateFromComposedPromptDto, GenerateImageDto } from './dto/generate-image.dto';
@@ -56,7 +56,7 @@ export class ImagesController {
       dto.provider,
       tenant!,
       idempotencyKey,
-      (dto.count ?? 1) * USAGE_OPERATION_COSTS[USAGE_OPERATIONS.imageGenerate],
+      dto.count ?? 1,
       () => this.imagesService.generate(dto),
     );
   }
@@ -72,7 +72,7 @@ export class ImagesController {
       dto.provider,
       tenant!,
       idempotencyKey,
-      USAGE_OPERATION_COSTS[USAGE_OPERATIONS.imageGenerate],
+      1,
       () => this.imagesService.generateFromComposedPrompt(dto),
     );
   }
@@ -81,14 +81,14 @@ export class ImagesController {
     provider: string | undefined,
     tenant: TenantScope,
     idempotencyKey: string | undefined,
-    credits: number,
+    units: number,
     action: () => Promise<T>,
   ): Promise<T> {
     if (provider === 'mock') return action();
     const reservation = await this.usage.reserve({
       tenant,
       operationKey: USAGE_OPERATIONS.imageGenerate,
-      credits,
+      units,
       idempotencyKey:
         idempotencyKey ??
         `image:${tenant.organizationId}:${randomUUID()}`,

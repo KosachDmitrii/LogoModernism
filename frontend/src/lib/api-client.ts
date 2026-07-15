@@ -18,16 +18,12 @@ export async function apiFetch(
     const {
       data: { session },
     } = await getSupabaseClient().auth.getSession();
-    const organizationId =
-      window.localStorage.getItem('logo-platform.organization-id') ??
-      (import.meta.env.DEV ? import.meta.env.VITE_ORGANIZATION_ID : undefined);
     const projectId =
       window.localStorage.getItem('logo-platform.project-id') ??
       (import.meta.env.DEV ? import.meta.env.VITE_PROJECT_ID : undefined);
     if (session?.access_token && !authHeaders.has('Authorization')) {
       authHeaders.set('Authorization', `Bearer ${session.access_token}`);
     }
-    if (organizationId) authHeaders.set('x-organization-id', organizationId);
     if (projectId) authHeaders.set('x-project-id', projectId);
     const response = await fetch(input, { ...init, headers: authHeaders, signal });
     if (response.status === 401) {

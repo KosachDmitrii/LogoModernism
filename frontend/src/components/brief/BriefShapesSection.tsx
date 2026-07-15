@@ -6,6 +6,7 @@ import { analyzeGeometry, getPrimitives } from '../../api';
 import { useAppStore } from '../../store';
 import { useT } from '../../i18n';
 import { formatError } from '../../lib/api-error';
+import { useToast } from '../ToastProvider';
 
 interface GeometryRec {
   primitiveId: string;
@@ -23,6 +24,7 @@ interface Primitive {
 
 export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => void }) {
   const t = useT();
+  const toast = useToast();
   const industry = useAppStore((s) => s.industry);
   const applyGeometry = useAppStore((s) => s.applyGeometry);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -35,6 +37,7 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
 
   const analysis = useMutation({
     mutationFn: () => analyzeGeometry({ industry, complexity: 'minimal' }),
+    onError: (error) => toast.error(formatError(error, t)),
   });
 
   const recommendations = (analysis.data?.recommendations ?? []) as GeometryRec[];
@@ -100,12 +103,6 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
 
       {!canAnalyze && (
         <p className="text-xs text-amber-300/80">{t('brief.typography.setIndustryFirst')}</p>
-      )}
-
-      {analysis.isError && (
-        <p className="text-xs text-red-400">
-          {formatError(analysis.error, t)}
-        </p>
       )}
 
       {analysis.data && recommendations.length > 0 && (

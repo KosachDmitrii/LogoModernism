@@ -1,9 +1,9 @@
 import { SetMetadata } from '@nestjs/common';
-import type { PlatformRole } from '@logo-platform/shared';
+import type { AccessRole } from '@logo-platform/shared';
 
-export const REQUIRED_PLATFORM_ROLES = 'requiredPlatformRoles';
+export const REQUIRED_ACCESS_ROLES = 'requiredAccessRoles';
 
-export const PlatformRoles = (...roles: PlatformRole[]) =>
-  SetMetadata(REQUIRED_PLATFORM_ROLES, roles);
+export const AccessRoles = (...roles: AccessRole[]) =>
+  SetMetadata(REQUIRED_ACCESS_ROLES, roles);
 
-export const PLATFORM_ADMINS: PlatformRole[] = ['PLATFORM_ADMIN'];
+export const ADMINS: AccessRole[] = ['ADMIN'];

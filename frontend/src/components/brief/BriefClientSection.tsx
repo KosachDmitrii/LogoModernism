@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Check, MessageCircle } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { useT } from '../../i18n';
+import { useToast } from '../ToastProvider';
 
 export function BriefClientSection({ onStepComplete }: { onStepComplete?: () => void }) {
   const t = useT();
+  const toast = useToast();
   const designBrief = useAppStore((s) => s.designBrief);
   const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
   const [draft, setDraft] = useState(designBrief.clientNotes);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setDraft(designBrief.clientNotes);
@@ -20,8 +21,7 @@ export function BriefClientSection({ onStepComplete }: { onStepComplete?: () => 
       ? designBrief.sources
       : [...designBrief.sources, 'Client brief'];
     updateDesignBrief({ clientNotes: trimmed, sources });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    toast.success(t('toast.clientNotesApplied'));
     onStepComplete?.();
   };
 
@@ -42,12 +42,12 @@ export function BriefClientSection({ onStepComplete }: { onStepComplete?: () => 
 
       <button
         type="button"
-        disabled={!dirty && !saved}
+        disabled={!dirty}
         onClick={applyNotes}
         className="w-full px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {saved ? <Check size={14} className="text-emerald-600" /> : <MessageCircle size={14} />}
-        {saved ? t('brief.client.applied') : t('brief.client.apply')}
+        <MessageCircle size={14} />
+        {t('brief.client.apply')}
       </button>
 
       <p className="text-xs text-zinc-600 leading-relaxed">{t('brief.client.hint')}</p>

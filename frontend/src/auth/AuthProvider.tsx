@@ -13,37 +13,26 @@ import type { Session, User } from '@supabase/supabase-js';
 import { getApiBase } from '../lib/api-base';
 import { getSupabaseClient } from '../lib/supabase';
 
-const ORGANIZATION_KEY = 'logo-platform.organization-id';
 const PENDING_REGISTRATION_KEY = 'logo-platform.pending-registration';
 
 type RegistrationDetails = {
   name: string;
-  organizationName: string;
-};
-
-type Membership = {
-  role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
-  organization: {
-    id: string;
-    name: string;
-    slug: string;
-    plan: 'FREE' | 'PRO' | 'ENTERPRISE';
-  };
+  organizationName?: string;
 };
 
 export type AuthProfile = {
   id: string;
   email: string;
   name: string | null;
-  platformRole: 'USER' | 'PLATFORM_ADMIN';
-  memberships: Membership[];
+  accessRole: 'ADMIN' | 'USER';
+  plan: 'FREE' | 'PLUS' | 'PRO';
+  organizationName: string | null;
 };
 
 type AuthContextValue = {
   session: Session | null;
   user: User | null;
   profile: AuthProfile | null;
-  activeMembership: Membership | null;
   loading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
@@ -96,7 +85,7 @@ function readPendingRegistration(): RegistrationDetails | null {
   if (!raw) return null;
   try {
     const value = JSON.parse(raw) as RegistrationDetails;
-    if (!value.name || !value.organizationName) return null;
+    if (!value.name) return null;
     return value;
   } catch {
     return null;
@@ -135,15 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem(PENDING_REGISTRATION_KEY);
         }
         const nextProfile = await fetchProfile(nextSession);
-        if (!nextProfile.memberships.length) {
-          throw new Error('This account does not belong to an organization');
-        }
-        const storedOrganizationId = localStorage.getItem(ORGANIZATION_KEY);
-        const active =
-          nextProfile.memberships.find(
-            ({ organization }) => organization.id === storedOrganizationId,
-          ) ?? nextProfile.memberships[0];
-        localStorage.setItem(ORGANIZATION_KEY, active.organization.id);
         setProfile(nextProfile);
       } catch (nextError) {
         setProfile(null);
@@ -210,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email,
           password,
           options: {
-            data: { name: details.name, organization_name: details.organizationName },
+            data: { name: details.name, organization_name: details.organizationName ?? null },
             emailRedirectTo: `${window.location.origin}/register`,
           },
         });
@@ -234,7 +214,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await getSupabaseClient().auth.signOut();
-    localStorage.removeItem(ORGANIZATION_KEY);
     localStorage.removeItem('logo-platform.project-id');
     localStorage.removeItem('logo-platform.access-token');
     localStorage.removeItem('logo-platform.user-id');
@@ -249,28 +228,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('logo-platform:unauthorized', handleUnauthorized);
   }, [signOut]);
 
-  const activeMembership = useMemo(() => {
-    const organizationId = localStorage.getItem(ORGANIZATION_KEY);
-    return (
-      profile?.memberships.find(({ organization }) => organization.id === organizationId) ??
-      profile?.memberships[0] ??
-      null
-    );
-  }, [profile]);
-
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       user: session?.user ?? null,
       profile,
-      activeMembership,
       loading,
       error,
       signIn,
       signUp,
       signOut,
     }),
-    [activeMembership, error, loading, profile, session, signIn, signOut, signUp],
+    [error, loading, profile, session, signIn, signOut, signUp],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

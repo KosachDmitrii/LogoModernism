@@ -6,9 +6,9 @@ import { hasPermission } from '../auth/permissions';
 
 export function AppLayout() {
   const t = useT();
-  const { profile, activeMembership } = useAuth();
+  const { profile } = useAuth();
   const authenticated = Boolean(profile);
-  const canUseProduct = hasPermission(activeMembership?.role, 'product.use');
+  const canUseProduct = hasPermission(profile?.accessRole, 'product.use');
   const initials = (profile?.name || profile?.email || 'G')
     .split(/\s+/)
     .slice(0, 2)
@@ -21,7 +21,7 @@ export function AppLayout() {
         <div className="p-5 border-b border-zinc-800">
           <h1 className="text-base font-semibold tracking-tight">{t('layout.appTitle')}</h1>
           <div className="mt-3 flex min-w-0 items-center gap-2.5">
-            <div className="account-avatar grid size-8 shrink-0 place-items-center rounded-full text-[11px] font-semibold">
+            <div className="account-avatar grid size-8 shrink-0 place-items-center rounded-full text-[14px] font-semibold">
               {initials}
             </div>
             <div className="min-w-0 flex-1">
@@ -29,7 +29,7 @@ export function AppLayout() {
                 {profile?.name || profile?.email || t('layout.guest')}
               </p>
               <p className="mt-0.5 truncate text-[10px] font-medium tracking-wider text-violet-400">
-                {activeMembership?.role || t('layout.explore')}
+                {profile?.accessRole || t('layout.explore')}
               </p>
             </div>
           </div>

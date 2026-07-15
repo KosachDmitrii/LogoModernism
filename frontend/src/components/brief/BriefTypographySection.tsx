@@ -8,6 +8,7 @@ import { useT, type MessageKey } from '../../i18n';
 import { formatError } from '../../lib/api-error';
 import { markTypeLabel } from '../../lib/translate-labels';
 import { CustomSelect } from '../CustomSelect';
+import { useToast } from '../ToastProvider';
 import {
   deriveRebusWordmark,
   isRebusTypographyStyle,
@@ -59,6 +60,7 @@ interface BriefTypographySectionProps {
 
 export function BriefTypographySection({ onStepComplete }: BriefTypographySectionProps) {
   const t = useT();
+  const toast = useToast();
   const companyName = useAppStore((s) => s.companyName);
   const industry = useAppStore((s) => s.industry);
   const designBrief = useAppStore((s) => s.designBrief);
@@ -140,6 +142,7 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
       });
       onStepComplete?.();
     },
+    onError: (error) => toast.error(formatError(error, t)),
   });
 
   const result = analysis.data;
@@ -228,12 +231,6 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
 
       {disabledReason && (
         <p className="text-xs text-amber-300/80">{disabledReason}</p>
-      )}
-
-      {analysis.isError && (
-        <p className="text-xs text-red-400">
-          {formatError(analysis.error, t)}
-        </p>
       )}
 
       {result && (

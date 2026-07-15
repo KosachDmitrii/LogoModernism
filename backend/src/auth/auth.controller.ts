@@ -51,13 +51,16 @@ export class AuthController {
         if (sameId && sameId.email.toLowerCase() !== email) {
           throw new ConflictException('Account is linked to another email');
         }
+        const organizationName = body.organizationName?.trim() || null;
         const user = await tx.one<{ id: string }>(
-          `INSERT INTO users (id, email, name, updated_at)
-           VALUES ($1, $2, $3, NOW())
+          `INSERT INTO users (id, email, name, organization_name, updated_at)
+           VALUES ($1, $2, $3, $4, NOW())
            ON CONFLICT (id) DO UPDATE
-             SET name = EXCLUDED.name, updated_at = NOW()
+             SET name = EXCLUDED.name,
+                 organization_name = EXCLUDED.organization_name,
+                 updated_at = NOW()
            RETURNING id`,
-          [identity.userId, email, body.name.trim()],
+          [identity.userId, email, body.name.trim(), organizationName],
         );
         const existingMembership = await tx.maybeOne<{ id: string }>(
           'SELECT id FROM organization_members WHERE user_id = $1 LIMIT 1',
@@ -65,7 +68,8 @@ export class AuthController {
         );
         if (existingMembership) return;
 
-        const baseSlug = slugify(body.organizationName);
+        const scopeName = organizationName || body.name.trim();
+        const baseSlug = slugify(`${scopeName}-${identity.userId.slice(0, 8)}`);
         const slugExists = await tx.maybeOne<{ id: string }>(
           'SELECT id FROM organizations WHERE slug = $1',
           [baseSlug],
@@ -76,7 +80,7 @@ export class AuthController {
            RETURNING id`,
           [
             randomUUID(),
-            body.organizationName.trim(),
+            scopeName,
             slugExists ? `${baseSlug}-${identity.userId.slice(0, 8)}` : baseSlug,
           ],
         );
@@ -101,44 +105,24 @@ export class AuthController {
       id: string;
       email: string;
       name: string | null;
-      platformRole: 'USER' | 'PLATFORM_ADMIN';
+      accessRole: 'ADMIN' | 'USER';
+      plan: 'FREE' | 'PLUS' | 'PRO';
+      organizationName: string | null;
     }>(
-      'SELECT id, email, name, platform_role FROM users WHERE id = $1',
+      `SELECT id, email, name, access_role, plan, organization_name
+       FROM users WHERE id = $1`,
       [identity.userId],
     );
     if (!user) {
       throw new UnauthorizedException('User has not been provisioned');
     }
-    const memberships = await db.query<{
-      role: string;
-      organizationId: string;
-      organizationName: string;
-      organizationSlug: string;
-      organizationPlan: string;
-    }>(
-      `SELECT om.role, o.id AS organization_id, o.name AS organization_name,
-              o.slug AS organization_slug, o.plan AS organization_plan
-       FROM organization_members om
-       JOIN organizations o ON o.id = om.organization_id
-       WHERE om.user_id = $1
-       ORDER BY om.created_at ASC`,
-      [user.id],
-    );
-
     return {
       id: user.id,
       email: user.email,
       name: user.name,
-      platformRole: user.platformRole,
-      memberships: memberships.rows.map((membership) => ({
-        role: membership.role,
-        organization: {
-          id: membership.organizationId,
-          name: membership.organizationName,
-          slug: membership.organizationSlug,
-          plan: membership.organizationPlan,
-        },
-      })),
+      accessRole: user.accessRole,
+      plan: user.plan,
+      organizationName: user.organizationName,
     };
   }
 }

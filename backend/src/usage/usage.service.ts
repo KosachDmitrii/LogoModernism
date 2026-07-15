@@ -9,21 +9,22 @@ import {
 import { db, type DatabaseClient } from '@logo-platform/database';
 import {
   PLAN_ENTITLEMENTS,
+  USAGE_OPERATIONS,
   type Plan,
+  type QuotaKey,
+  type QuotaSummary,
   type UsageOperationKey,
   type UsageSummary,
 } from '@logo-platform/shared';
 import type { TenantScope } from '../auth/tenant-context';
 
 const RESERVATION_TTL_MS = 30 * 60 * 1_000;
-const UNLIMITED_BUCKET_CREDITS = 1_000_000_000;
 const SERIALIZABLE = { isolationLevel: 'SERIALIZABLE' } as const;
 
 type UsageOperation = {
   id: string;
   organizationId: string;
   userId: string | null;
-  projectId: string | null;
   bucketId: string;
   operationKey: string;
   idempotencyKey: string;
@@ -32,11 +33,13 @@ type UsageOperation = {
   includedReservedCredits: number;
   purchasedReservedCredits: number;
   actualCredits: number | null;
-  jobId: string | null;
-  metadata: unknown;
-  expiresAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
+};
+
+type UsageBucket = {
+  id: string;
+  quotaLimit: number | null;
+  committedCredits: number;
+  reservedCredits: number;
 };
 
 function billingPeriod(now = new Date()): { start: Date; end: Date } {
@@ -46,19 +49,29 @@ function billingPeriod(now = new Date()): { start: Date; end: Date } {
   };
 }
 
-function quotaExceeded(resetAt: Date): HttpException {
+function quotaKeyForOperation(operationKey: UsageOperationKey): QuotaKey {
+  if (operationKey === USAGE_OPERATIONS.promptCompose) return 'prompt.compose';
+  if (operationKey === USAGE_OPERATIONS.imageGenerate) return 'image.generate';
+  throw new ConflictException(`Operation ${operationKey} is not metered`);
+}
+
+function quotaExceeded(quotaKey: QuotaKey, resetAt: Date): HttpException {
   return new HttpException(
     {
       code: 'QUOTA_EXCEEDED',
-      message: 'Monthly AI credits are exhausted',
+      quotaKey,
+      message:
+        quotaKey === 'prompt.compose'
+          ? 'Monthly prompt generation limit is exhausted'
+          : 'Monthly logo generation limit is exhausted',
       resetAt: resetAt.toISOString(),
     },
     HttpStatus.TOO_MANY_REQUESTS,
   );
 }
 
-async function lockOrganization(tx: DatabaseClient, organizationId: string) {
-  await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [organizationId]);
+async function lockUser(tx: DatabaseClient, userId: string) {
+  await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`usage:${userId}`]);
 }
 
 @Injectable()
@@ -66,27 +79,28 @@ export class UsageService {
   async reserve(input: {
     tenant: TenantScope;
     operationKey: UsageOperationKey;
-    credits: number;
+    units: number;
     idempotencyKey: string;
     metadata?: unknown;
-  }) {
-    if (!Number.isInteger(input.credits) || input.credits <= 0) {
-      throw new ConflictException('Reservation credits must be a positive integer');
+  }): Promise<UsageOperation> {
+    if (!Number.isInteger(input.units) || input.units <= 0) {
+      throw new ConflictException('Reservation units must be a positive integer');
     }
     const idempotencyKey = input.idempotencyKey.trim();
     if (!idempotencyKey) throw new ConflictException('Idempotency key is required');
+    const quotaKey = quotaKeyForOperation(input.operationKey);
 
     return db.transaction(async (tx) => {
-      await lockOrganization(tx, input.tenant.organizationId);
+      await lockUser(tx, input.tenant.userId);
       const existing = await tx.maybeOne<UsageOperation>(
         `SELECT * FROM usage_operations
-         WHERE organization_id = $1 AND idempotency_key = $2`,
-        [input.tenant.organizationId, idempotencyKey],
+         WHERE user_id = $1 AND idempotency_key = $2`,
+        [input.tenant.userId, idempotencyKey],
       );
       if (existing) {
         if (
           existing.operationKey !== input.operationKey ||
-          existing.reservedCredits !== input.credits
+          existing.reservedCredits !== input.units
         ) {
           throw new ConflictException({
             code: 'IDEMPOTENCY_CONFLICT',
@@ -100,80 +114,65 @@ export class UsageService {
         });
       }
 
-      const organization = await tx.maybeOne<{ plan: Plan }>(
-        'SELECT plan FROM organizations WHERE id = $1',
-        [input.tenant.organizationId],
+      const account = await tx.maybeOne<{ plan: Plan; accessRole: 'ADMIN' | 'USER' }>(
+        'SELECT plan, access_role FROM users WHERE id = $1',
+        [input.tenant.userId],
       );
-      if (!organization) throw new NotFoundException('Organization not found');
+      if (!account) throw new NotFoundException('User account not found');
 
-      const plan = organization.plan;
-      const includedCredits =
-        PLAN_ENTITLEMENTS[plan].monthlyCredits ?? UNLIMITED_BUCKET_CREDITS;
+      const quotaExempt = account.accessRole === 'ADMIN';
+      const limit = quotaExempt
+        ? null
+        : PLAN_ENTITLEMENTS[account.plan].monthlyQuotas[quotaKey];
       const period = billingPeriod();
-      const bucket = await tx.one<{
-        id: string;
-        includedCredits: number;
-        committedCredits: number;
-        reservedCredits: number;
-      }>(
+      const bucket = await tx.one<UsageBucket>(
         `INSERT INTO usage_buckets (
-           id, organization_id, period_start, period_end, plan,
-           included_credits, updated_at
-         ) VALUES ($1, $2, $3, $4, $5::"Plan", $6, NOW())
-         ON CONFLICT (organization_id, period_start) DO UPDATE
-           SET plan = EXCLUDED.plan, included_credits = EXCLUDED.included_credits,
-               period_end = EXCLUDED.period_end, updated_at = NOW()
-         RETURNING id, included_credits, committed_credits, reserved_credits`,
+           id, organization_id, user_id, period_start, period_end, plan,
+           included_credits, quota_key, quota_limit, quota_exempt, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6::"Plan", $7, $8, $9, $10, NOW())
+         ON CONFLICT (user_id, period_start, quota_key, quota_exempt)
+           WHERE user_id IS NOT NULL
+         DO UPDATE SET
+           plan = EXCLUDED.plan,
+           included_credits = EXCLUDED.included_credits,
+           quota_limit = EXCLUDED.quota_limit,
+           period_end = EXCLUDED.period_end,
+           updated_at = NOW()
+         RETURNING id, quota_limit, committed_credits, reserved_credits`,
         [
           randomUUID(),
           input.tenant.organizationId,
+          input.tenant.userId,
           period.start,
           period.end,
-          plan,
-          includedCredits,
+          account.plan,
+          limit ?? 0,
+          quotaKey,
+          limit,
+          quotaExempt,
         ],
       );
-      const balance = await tx.one<{ availableCredits: number }>(
-        `INSERT INTO credit_balances (organization_id, updated_at)
-         VALUES ($1, NOW())
-         ON CONFLICT (organization_id) DO UPDATE SET updated_at = NOW()
-         RETURNING available_credits`,
-        [input.tenant.organizationId],
-      );
 
-      const includedAvailable = Math.max(
-        0,
-        bucket.includedCredits - bucket.committedCredits - bucket.reservedCredits,
-      );
-      const includedReservedCredits = Math.min(includedAvailable, input.credits);
-      const purchasedReservedCredits = input.credits - includedReservedCredits;
-      if (purchasedReservedCredits > balance.availableCredits) {
-        throw quotaExceeded(period.end);
+      if (
+        limit !== null &&
+        bucket.committedCredits + bucket.reservedCredits + input.units > limit
+      ) {
+        throw quotaExceeded(quotaKey, period.end);
       }
 
       await tx.query(
         `UPDATE usage_buckets
          SET reserved_credits = reserved_credits + $2, updated_at = NOW()
          WHERE id = $1`,
-        [bucket.id, includedReservedCredits],
+        [bucket.id, input.units],
       );
-      if (purchasedReservedCredits > 0) {
-        const debited = await tx.maybeOne<{ organizationId: string }>(
-          `UPDATE credit_balances
-           SET available_credits = available_credits - $2, updated_at = NOW()
-           WHERE organization_id = $1 AND available_credits >= $2
-           RETURNING organization_id`,
-          [input.tenant.organizationId, purchasedReservedCredits],
-        );
-        if (!debited) throw quotaExceeded(period.end);
-      }
 
       return tx.one<UsageOperation>(
         `INSERT INTO usage_operations (
            id, organization_id, user_id, project_id, bucket_id, operation_key,
            idempotency_key, reserved_credits, included_reserved_credits,
            purchased_reserved_credits, metadata, expires_at, updated_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, NOW())
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, 0, $9::jsonb, $10, NOW())
          RETURNING *`,
         [
           randomUUID(),
@@ -183,10 +182,8 @@ export class UsageService {
           bucket.id,
           input.operationKey,
           idempotencyKey,
-          input.credits,
-          includedReservedCredits,
-          purchasedReservedCredits,
-          JSON.stringify(input.metadata ?? {}),
+          input.units,
+          JSON.stringify({ quotaKey, ...(input.metadata && typeof input.metadata === 'object' ? input.metadata : {}) }),
           new Date(Date.now() + RESERVATION_TTL_MS),
         ],
       );
@@ -206,14 +203,14 @@ export class UsageService {
     return { count: rows.rowCount };
   }
 
-  async commit(id: string, actualCredits?: number) {
+  async commit(id: string, actualUnits?: number): Promise<UsageOperation> {
     return db.transaction(async (tx) => {
       const initial = await tx.maybeOne<UsageOperation>(
         'SELECT * FROM usage_operations WHERE id = $1',
         [id],
       );
       if (!initial) throw new NotFoundException('Usage reservation not found');
-      await lockOrganization(tx, initial.organizationId);
+      await lockUser(tx, initial.userId ?? initial.organizationId);
       const operation = await tx.one<UsageOperation>(
         'SELECT * FROM usage_operations WHERE id = $1 FOR UPDATE',
         [id],
@@ -222,29 +219,19 @@ export class UsageService {
       if (operation.status === 'RELEASED' || operation.status === 'EXPIRED') {
         throw new ConflictException('Usage reservation is no longer active');
       }
-      const charged = actualCredits ?? operation.reservedCredits;
+      const charged = actualUnits ?? operation.reservedCredits;
       if (!Number.isInteger(charged) || charged < 0 || charged > operation.reservedCredits) {
-        throw new ConflictException('Actual credits exceed the reservation');
+        throw new ConflictException('Actual usage exceeds the reservation');
       }
-      const includedCharged = Math.min(charged, operation.includedReservedCredits);
-      const purchasedCharged = Math.max(0, charged - includedCharged);
-      const purchasedRefund = operation.purchasedReservedCredits - purchasedCharged;
 
       await tx.query(
         `UPDATE usage_buckets
          SET reserved_credits = reserved_credits - $2,
-             committed_credits = committed_credits + $3, updated_at = NOW()
+             committed_credits = committed_credits + $3,
+             updated_at = NOW()
          WHERE id = $1`,
-        [operation.bucketId, operation.includedReservedCredits, includedCharged],
+        [operation.bucketId, operation.reservedCredits, charged],
       );
-      if (purchasedRefund > 0) {
-        await tx.query(
-          `UPDATE credit_balances
-           SET available_credits = available_credits + $2, updated_at = NOW()
-           WHERE organization_id = $1`,
-          [operation.organizationId, purchasedRefund],
-        );
-      }
       return tx.one<UsageOperation>(
         `UPDATE usage_operations
          SET status = 'COMMITTED'::"UsageReservationStatus",
@@ -255,14 +242,14 @@ export class UsageService {
     }, SERIALIZABLE);
   }
 
-  async release(id: string) {
+  async release(id: string): Promise<UsageOperation> {
     return db.transaction(async (tx) => {
       const initial = await tx.maybeOne<UsageOperation>(
         'SELECT * FROM usage_operations WHERE id = $1',
         [id],
       );
       if (!initial) throw new NotFoundException('Usage reservation not found');
-      await lockOrganization(tx, initial.organizationId);
+      await lockUser(tx, initial.userId ?? initial.organizationId);
       const operation = await tx.one<UsageOperation>(
         'SELECT * FROM usage_operations WHERE id = $1 FOR UPDATE',
         [id],
@@ -277,16 +264,8 @@ export class UsageService {
         `UPDATE usage_buckets
          SET reserved_credits = reserved_credits - $2, updated_at = NOW()
          WHERE id = $1`,
-        [operation.bucketId, operation.includedReservedCredits],
+        [operation.bucketId, operation.reservedCredits],
       );
-      if (operation.purchasedReservedCredits > 0) {
-        await tx.query(
-          `UPDATE credit_balances
-           SET available_credits = available_credits + $2, updated_at = NOW()
-           WHERE organization_id = $1`,
-          [operation.organizationId, operation.purchasedReservedCredits],
-        );
-      }
       return tx.one<UsageOperation>(
         `UPDATE usage_operations
          SET status = 'RELEASED'::"UsageReservationStatus",
@@ -297,22 +276,10 @@ export class UsageService {
     }, SERIALIZABLE);
   }
 
-  async grantPurchasedCredits(organizationId: string, credits: number): Promise<void> {
-    if (!Number.isInteger(credits) || credits <= 0) return;
-    await db.query(
-      `INSERT INTO credit_balances (organization_id, available_credits, updated_at)
-       VALUES ($1, $2, NOW())
-       ON CONFLICT (organization_id) DO UPDATE
-         SET available_credits = credit_balances.available_credits + EXCLUDED.available_credits,
-             updated_at = NOW()`,
-      [organizationId, credits],
-    );
-  }
-
   async reapExpired(limit = 100): Promise<number> {
     const expired = await db.query<{ id: string }>(
       `SELECT id FROM usage_operations
-       WHERE status IN ('RESERVED'::"UsageReservationStatus", 'PROCESSING'::"UsageReservationStatus")
+       WHERE status = 'RESERVED'::"UsageReservationStatus"
          AND expires_at < NOW()
        ORDER BY expires_at ASC LIMIT $1`,
       [limit],
@@ -336,41 +303,44 @@ export class UsageService {
     return released;
   }
 
-  async summary(organizationId: string): Promise<UsageSummary> {
+  async summary(tenant: TenantScope): Promise<UsageSummary> {
     const period = billingPeriod();
-    const [organization, bucket, balance] = await Promise.all([
-      db.maybeOne<{ plan: Plan }>('SELECT plan FROM organizations WHERE id = $1', [
-        organizationId,
-      ]),
-      db.maybeOne<{ committedCredits: number; reservedCredits: number }>(
-        `SELECT committed_credits, reserved_credits FROM usage_buckets
-         WHERE organization_id = $1 AND period_start = $2`,
-        [organizationId, period.start],
-      ),
-      db.maybeOne<{ availableCredits: number }>(
-        'SELECT available_credits FROM credit_balances WHERE organization_id = $1',
-        [organizationId],
-      ),
-    ]);
-    if (!organization) throw new NotFoundException('Organization not found');
-
-    const includedCredits = PLAN_ENTITLEMENTS[organization.plan].monthlyCredits;
-    const committedCredits = bucket?.committedCredits ?? 0;
-    const reservedCredits = bucket?.reservedCredits ?? 0;
-    const purchasedCredits = balance?.availableCredits ?? 0;
-    const remainingCredits =
-      includedCredits === null
-        ? null
-        : Math.max(0, includedCredits - committedCredits - reservedCredits) +
-          purchasedCredits;
+    const account = await db.maybeOne<{ plan: Plan; accessRole: 'ADMIN' | 'USER' }>(
+      'SELECT plan, access_role FROM users WHERE id = $1',
+      [tenant.userId],
+    );
+    if (!account) throw new NotFoundException('User account not found');
+    const exempt = account.accessRole === 'ADMIN';
+    const buckets = await db.query<{
+      quotaKey: string;
+      committedCredits: number;
+      reservedCredits: number;
+    }>(
+      `SELECT quota_key, committed_credits, reserved_credits
+       FROM usage_buckets
+       WHERE user_id = $1 AND period_start = $2
+         AND quota_key IN ('prompt.compose', 'image.generate')
+         AND quota_exempt = $3`,
+      [tenant.userId, period.start, exempt],
+    );
+    const byKey = new Map(buckets.rows.map((row) => [row.quotaKey, row]));
+    const summarize = (key: QuotaKey): QuotaSummary => {
+      const row = byKey.get(key);
+      const used = row?.committedCredits ?? 0;
+      const reserved = row?.reservedCredits ?? 0;
+      const limit = exempt ? null : PLAN_ENTITLEMENTS[account.plan].monthlyQuotas[key];
+      return {
+        limit,
+        used,
+        reserved,
+        remaining: limit === null ? null : Math.max(0, limit - used - reserved),
+      };
+    };
     return {
       periodStart: period.start.toISOString(),
       periodEnd: period.end.toISOString(),
-      includedCredits,
-      committedCredits,
-      reservedCredits,
-      purchasedCredits,
-      remainingCredits,
+      prompts: summarize('prompt.compose'),
+      logos: summarize('image.generate'),
     };
   }
 }

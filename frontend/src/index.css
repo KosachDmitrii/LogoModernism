@@ -30,6 +30,26 @@ body {
   min-height: 100vh;
 }
 
+:where(
+  a[href],
+  button:not(:disabled),
+  select:not(:disabled),
+  summary,
+  [role='button']:not([aria-disabled='true']),
+  [role='tab']:not([aria-disabled='true']),
+  [role='menuitem']:not([aria-disabled='true']),
+  label:has(input:not(:disabled)),
+  input[type='button']:not(:disabled),
+  input[type='submit']:not(:disabled),
+  input[type='reset']:not(:disabled),
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  input[type='color']:not(:disabled),
+  input[type='file']:not(:disabled)
+) {
+  cursor: pointer;
+}
+
 ::selection {
   background: #3f3f46;
   color: white;

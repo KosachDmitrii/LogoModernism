@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Copy, Check, ImageIcon, Loader2, Download, Heart } from 'lucide-react';
+import { Copy, ImageIcon, Loader2, Download, Heart } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -19,6 +19,7 @@ import { useT } from '../i18n';
 import { formatError } from '../lib/api-error';
 import { imageProviderLabel } from '../lib/translate-labels';
 import { ApiAbortError } from '../lib/api-client';
+import { useToast } from './ToastProvider';
 
 const MAX_LOGOS = 3;
 
@@ -57,9 +58,9 @@ export function PromptCard({
   getWorkSignal,
 }: PromptCardProps) {
   const t = useT();
-  const { activeMembership } = useAuth();
-  const canUseProduct = hasPermission(activeMembership?.role, 'product.use');
-  const [copied, setCopied] = useState(false);
+  const toast = useToast();
+  const { profile } = useAuth();
+  const canUseProduct = hasPermission(profile?.accessRole, 'product.use');
   const companyName = useAppStore((s) => s.companyName);
   const designBrief = useAppStore((s) => s.designBrief);
   const startGenerating = useAppStore((s) => s.startGenerating);
@@ -87,16 +88,21 @@ export function PromptCard({
       } else {
         setPromptSaved(prompt.id, result.saved);
       }
+      toast.success(t(result.saved ? 'toast.promptSaved' : 'toast.promptRemoved'));
     },
-    onError: (_error, _variables, context) => {
+    onError: (error, _variables, context) => {
       if (context) onSavedChange?.(context.previousSaved);
+      toast.error(formatError(error, t));
     },
   });
 
   const copy = async () => {
-    await navigator.clipboard.writeText(prompt.text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(prompt.text);
+      toast.success(t('toast.promptCopied'));
+    } catch (error) {
+      toast.error(formatError(error, t));
+    }
   };
 
   const brandName =
@@ -135,7 +141,7 @@ export function PromptCard({
         return;
       }
       console.error(err);
-      alert(formatError(err, t));
+      toast.error(formatError(err, t));
     } finally {
       stopGenerating(prompt.id);
     }
@@ -179,7 +185,7 @@ export function PromptCard({
             title={t('common.copyPrompt')}
             className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
-            {copied ? <Check size={16} /> : <Copy size={16} />}
+            <Copy size={16} />
           </button>
           {canUseProduct && (
             <button
@@ -291,9 +297,6 @@ export function PromptCard({
         </motion.div>
       )}
 
-      {toggleSave.isError && (
-        <p className="text-xs text-red-400 mt-1">{t('common.failedToSavePrompt')}</p>
-      )}
     </article>
   );
 }

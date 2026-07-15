@@ -97,14 +97,14 @@ const PROMPT_COLUMNS = `
 async function findPrompt(
   client: DatabaseClient,
   id: string,
-  organizationId?: string,
+  userId?: string,
   forUpdate = false,
 ): Promise<PromptRow | null> {
   return client.maybeOne<PromptRow>(
     `SELECT ${PROMPT_COLUMNS} FROM generated_prompts
-     WHERE id = $1 AND ($2::text IS NULL OR organization_id = $2)
+     WHERE id = $1 AND ($2::text IS NULL OR user_id = $2)
      ${forUpdate ? 'FOR UPDATE' : ''}`,
-    [id, organizationId ?? null],
+    [id, userId ?? null],
   );
 }
 
@@ -123,10 +123,11 @@ export class PromptRecordsService {
       const runId = randomUUID();
       await tx.query(
         `INSERT INTO prompt_generation_runs (
-           id, project_id, industry, company_name, request, result, best_score
-         ) VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7)`,
+           id, user_id, project_id, industry, company_name, request, result, best_score
+         ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8)`,
         [
           runId,
+          tenant?.userId ?? null,
           tenant?.projectId ?? null,
           request.industry,
           request.companyName ?? null,
@@ -142,16 +143,17 @@ export class PromptRecordsService {
       for (const [index, prompt] of result.prompts.entries()) {
         await tx.query(
           `INSERT INTO generated_prompts (
-             id, prompt_run_id, organization_id, project_id, industry, company_name,
+             id, prompt_run_id, user_id, organization_id, project_id, industry, company_name,
              text, scores, dna, metadata, selected_principles, rank, logos, saved,
              updated_at
            ) VALUES (
-             $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb,
-             $11::jsonb, $12, '[]'::jsonb, FALSE, NOW()
+             $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb,
+             $12::jsonb, $13, '[]'::jsonb, FALSE, NOW()
            ) ON CONFLICT (id) DO NOTHING`,
           [
             prompt.id,
             runId,
+            tenant?.userId ?? null,
             tenant?.organizationId ?? null,
             tenant?.projectId ?? null,
             prompt.industry,
@@ -170,7 +172,7 @@ export class PromptRecordsService {
   }
 
   async getById(id: string, tenant?: TenantScope) {
-    const record = await findPrompt(db, id, tenant?.organizationId);
+    const record = await findPrompt(db, id, tenant?.userId);
     if (!record) throw new NotFoundException(`Prompt not found: ${id}`);
     const logos = await this.logosForPrompt(id);
     return this.toClientRecord(record, logos);
@@ -183,7 +185,7 @@ export class PromptRecordsService {
     storage?: { storageKey: string; mimeType: string },
   ) {
     await db.transaction(async (tx) => {
-      const record = await findPrompt(tx, id, tenant?.organizationId, true);
+      const record = await findPrompt(tx, id, tenant?.userId, true);
       if (!record) throw new NotFoundException(`Prompt not found: ${id}`);
       const count = await tx.one<{ count: number }>(
         'SELECT COUNT(*)::int AS count FROM generated_logos WHERE prompt_id = $1',
@@ -194,13 +196,14 @@ export class PromptRecordsService {
       }
       await tx.query(
         `INSERT INTO generated_logos (
-           id, name, prompt_id, organization_id, public_url, storage_key, mime_type,
+           id, name, prompt_id, user_id, organization_id, public_url, storage_key, mime_type,
            prompt_text, provider, model, width, height, metadata, updated_at
          ) VALUES (
-           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, NOW()
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, NOW()
          )
          ON CONFLICT (id) DO UPDATE SET
            prompt_id = EXCLUDED.prompt_id, organization_id = EXCLUDED.organization_id,
+           user_id = EXCLUDED.user_id,
            public_url = EXCLUDED.public_url, storage_key = EXCLUDED.storage_key,
            mime_type = EXCLUDED.mime_type, prompt_text = EXCLUDED.prompt_text,
            provider = EXCLUDED.provider, model = EXCLUDED.model,
@@ -210,6 +213,7 @@ export class PromptRecordsService {
           image.id,
           record.companyName ?? 'Generated logo',
           id,
+          tenant?.userId ?? null,
           tenant?.organizationId ?? null,
           image.url,
           storage?.storageKey ?? null,
@@ -233,7 +237,7 @@ export class PromptRecordsService {
     tenant?: TenantScope,
   ) {
     return db.transaction(async (tx) => {
-      const record = await findPrompt(tx, id, tenant?.organizationId, true);
+      const record = await findPrompt(tx, id, tenant?.userId, true);
       if (!record) throw new NotFoundException(`Prompt not found: ${id}`);
       const count = await tx.one<{ count: number }>(
         'SELECT COUNT(*)::int AS count FROM generated_logos WHERE prompt_id = $1',
@@ -244,13 +248,14 @@ export class PromptRecordsService {
       }
       await tx.query(
         `INSERT INTO generated_logos (
-           id, name, prompt_id, organization_id, project_id, prompt_text,
+           id, name, prompt_id, user_id, organization_id, project_id, prompt_text,
            metadata, updated_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, '{"queued":true}'::jsonb, NOW())`,
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, '{"queued":true}'::jsonb, NOW())`,
         [
           imageId,
           record.companyName ?? 'Generated logo',
           id,
+          tenant?.userId ?? null,
           tenant?.organizationId ?? null,
           tenant?.projectId ?? null,
           promptText,
@@ -265,9 +270,9 @@ export class PromptRecordsService {
     const record = await db.maybeOne<PromptRow>(
       `UPDATE generated_prompts
        SET saved = $3, saved_at = CASE WHEN $3 THEN NOW() ELSE NULL END, updated_at = NOW()
-       WHERE id = $1 AND ($2::text IS NULL OR organization_id = $2)
+       WHERE id = $1 AND ($2::text IS NULL OR user_id = $2)
        RETURNING ${PROMPT_COLUMNS}`,
-      [id, tenant?.organizationId ?? null, saved],
+      [id, tenant?.userId ?? null, saved],
     );
     if (!record) throw new NotFoundException(`Prompt not found: ${id}`);
     return this.toClientRecord(record, await this.logosForPrompt(id));
@@ -307,9 +312,9 @@ export class PromptRecordsService {
   async setFeedback(id: string, feedback: PromptFeedback, tenant: TenantScope) {
     const updated = await db.maybeOne<PromptRow>(
       `UPDATE generated_prompts SET feedback = $3, updated_at = NOW()
-       WHERE id = $1 AND organization_id = $2
+       WHERE id = $1 AND user_id = $2
        RETURNING ${PROMPT_COLUMNS}`,
-      [id, tenant.organizationId, feedback],
+      [id, tenant.userId, feedback],
     );
     if (!updated) throw new NotFoundException(`Prompt not found: ${id}`);
     return this.toClientRecord(updated);
@@ -353,12 +358,12 @@ export class PromptRecordsService {
     const records = await db.query<PromptRow>(
       `SELECT ${PROMPT_COLUMNS} FROM generated_prompts
        WHERE saved = TRUE AND saved_at IS NOT NULL
-         AND ($1::text IS NULL OR organization_id = $1)
+         AND ($1::text IS NULL OR user_id = $1)
          AND ($2::timestamptz IS NULL OR saved_at < $2 OR (saved_at = $2 AND id < $3))
        ORDER BY saved_at DESC, id DESC
        LIMIT $4`,
       [
-        tenant?.organizationId ?? null,
+        tenant?.userId ?? null,
         cursor?.savedAt ?? null,
         cursor?.id ?? null,
         pageSize + 1,
@@ -401,13 +406,13 @@ export class PromptRecordsService {
     update: (logo: GeneratedImage) => GeneratedImage,
   ) {
     await db.transaction(async (tx) => {
-      const record = await findPrompt(tx, id, tenant.organizationId, true);
+      const record = await findPrompt(tx, id, tenant.userId, true);
       if (!record) throw new NotFoundException(`Prompt not found: ${id}`);
       const normalized = await tx.maybeOne<{ metadata: unknown }>(
         `SELECT metadata FROM generated_logos
-         WHERE id = $1 AND prompt_id = $2 AND organization_id = $3
+         WHERE id = $1 AND prompt_id = $2 AND user_id = $3
          FOR UPDATE`,
-        [logoId, id, tenant.organizationId],
+        [logoId, id, tenant.userId],
       );
       if (normalized) {
         const metadata =
@@ -421,11 +426,11 @@ export class PromptRecordsService {
         await tx.query(
           `UPDATE generated_logos
            SET metadata = $4::jsonb, updated_at = NOW()
-           WHERE id = $1 AND prompt_id = $2 AND organization_id = $3`,
+           WHERE id = $1 AND prompt_id = $2 AND user_id = $3`,
           [
             logoId,
             id,
-            tenant.organizationId,
+            tenant.userId,
             JSON.stringify({ ...metadata, feedback: next.feedback }),
           ],
         );
@@ -439,9 +444,9 @@ export class PromptRecordsService {
       await tx.query(
         `UPDATE generated_prompts
          SET logos = $3::jsonb, updated_at = NOW()
-         WHERE id = $1 AND organization_id = $2
+         WHERE id = $1 AND user_id = $2
          RETURNING id`,
-        [id, tenant.organizationId, JSON.stringify(logos)],
+        [id, tenant.userId, JSON.stringify(logos)],
       );
     }, { isolationLevel: 'READ COMMITTED' });
     return this.getById(id, tenant);

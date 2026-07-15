@@ -1,4 +1,4 @@
-import type { Plan } from './entitlements';
+import type { AccessRole, Plan } from './entitlements';
 import type { UsageSummary } from './usage';
 
 export const BILLING_SUBSCRIPTION_STATUSES = [
@@ -16,6 +16,7 @@ export type BillingSubscriptionStatus = (typeof BILLING_SUBSCRIPTION_STATUSES)[n
 
 export type BillingOverview = {
   plan: Plan;
+  accessRole: AccessRole;
   subscriptionStatus: BillingSubscriptionStatus;
   renewsAt?: string;
   endsAt?: string;

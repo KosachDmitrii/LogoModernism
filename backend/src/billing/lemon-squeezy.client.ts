@@ -15,6 +15,7 @@ export class LemonSqueezyClient {
 
   async createCheckout(input: {
     variantId: string;
+    userId: string;
     organizationId: string;
     checkoutSessionId: string;
     nonce: string;
@@ -29,6 +30,7 @@ export class LemonSqueezyClient {
           attributes: {
             checkout_data: {
               custom: {
+                user_id: input.userId,
                 organization_id: input.organizationId,
                 checkout_session_id: input.checkoutSessionId,
                 nonce: input.nonce,

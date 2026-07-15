@@ -8,9 +8,11 @@ import type { BriefInterviewResponse, DesignBrief } from '../../types';
 import { designBriefToBriefContext, parseMarkTypeFromBrief } from '../../lib/brief-mappers';
 import { useT } from '../../i18n';
 import { formatError } from '../../lib/api-error';
+import { useToast } from '../ToastProvider';
 
 export function BriefAnalyzeSection() {
   const t = useT();
+  const toast = useToast();
   const industry = useAppStore((s) => s.industry);
   const companyName = useAppStore((s) => s.companyName);
   const designBrief = useAppStore((s) => s.designBrief);
@@ -34,6 +36,7 @@ export function BriefAnalyzeSection() {
         : [...designBrief.sources, 'Brain interview'];
       updateDesignBrief({ sources });
     },
+    onError: (error) => toast.error(formatError(error, t)),
   });
 
   const applyAnswer = (questionId: string, field: string, value: string) => {
@@ -91,12 +94,6 @@ export function BriefAnalyzeSection() {
 
       {!canAnalyze && (
         <p className="text-xs text-amber-300/80">{t('brief.typography.setIndustryFirst')}</p>
-      )}
-
-      {interview.isError && (
-        <p className="text-xs text-red-400">
-          {formatError(interview.error, t)}
-        </p>
       )}
 
       {result && (

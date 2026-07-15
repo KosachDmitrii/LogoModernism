@@ -9,12 +9,11 @@ import {
 import { Reflector } from '@nestjs/core';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import { db } from '@logo-platform/database';
-import type { PlatformRole } from '@logo-platform/shared';
+import type { AccessRole } from '@logo-platform/shared';
 import { IS_PUBLIC_ROUTE } from './public.decorator';
 import { AUTHENTICATED_ONLY_ROUTE } from './authenticated.decorator';
 import type { AuthenticatedRequest } from './tenant-context';
-import { REQUIRED_ROLES, type TenantRole } from './roles.decorator';
-import { REQUIRED_PLATFORM_ROLES } from './platform-roles.decorator';
+import { REQUIRED_ACCESS_ROLES } from './platform-roles.decorator';
 
 @Injectable()
 export class TenantAuthGuard implements CanActivate {
@@ -49,20 +48,15 @@ export class TenantAuthGuard implements CanActivate {
       }
       if (authenticatedOnly) return true;
       if (!request.tenant) {
-        throw new UnauthorizedException(
-          'x-user-id and x-organization-id are required in development',
-        );
+        throw new UnauthorizedException('Development user scope is required');
       }
-      const developmentRole =
-        (this.readHeader(request, 'x-role', false)?.toUpperCase() as TenantRole | undefined) ??
-        'OWNER';
-      this.assertRoleAllowed(developmentRole, context);
-      const platformRole =
-        (this.readHeader(request, 'x-platform-role', false)?.toUpperCase() as
-          | PlatformRole
+      const accessRole =
+        (this.readHeader(request, 'x-access-role', false)?.toUpperCase() as
+          | AccessRole
           | undefined) ?? 'USER';
-      request.auth.platformRole = platformRole;
-      this.assertPlatformRoleAllowed(platformRole, context);
+      request.auth.accessRole = accessRole;
+      request.tenant.accessRole = accessRole;
+      this.assertAccessRoleAllowed(accessRole, context);
       return true;
     }
 
@@ -77,37 +71,41 @@ export class TenantAuthGuard implements CanActivate {
     };
     if (authenticatedOnly) return true;
 
-    const organizationId = this.readHeader(request, 'x-organization-id');
     const projectId = this.readHeader(request, 'x-project-id', false);
-    if (!organizationId) {
-      throw new UnauthorizedException('User and organization context are required');
-    }
-
-    const member = await db.maybeOne<{
-      id: string;
-      role: TenantRole;
-      platformRole: PlatformRole;
+    const account = await db.maybeOne<{
+      accessRole: AccessRole;
+      organizationId: string | null;
     }>(
-      `SELECT om.id, om.role, u.platform_role
-       FROM organization_members om
-       JOIN users u ON u.id = om.user_id
-       WHERE om.organization_id = $1 AND om.user_id = $2`,
-      [organizationId, userId],
+      `SELECT u.access_role,
+              (SELECT om.organization_id
+               FROM organization_members om
+               WHERE om.user_id = u.id
+               ORDER BY om.created_at ASC LIMIT 1) AS organization_id
+       FROM users u
+       WHERE u.id = $1`,
+      [userId],
     );
-    if (!member) throw new UnauthorizedException('Organization membership is required');
-    this.assertRoleAllowed(member.role, context);
-    request.auth.platformRole = member.platformRole;
-    this.assertPlatformRoleAllowed(member.platformRole, context);
+    if (!account) throw new UnauthorizedException('User account is required');
+    if (!account.organizationId) {
+      throw new UnauthorizedException('User data scope has not been provisioned');
+    }
+    request.auth.accessRole = account.accessRole;
+    this.assertAccessRoleAllowed(account.accessRole, context);
 
     if (projectId) {
       const project = await db.maybeOne<{ id: string }>(
-        'SELECT id FROM projects WHERE id = $1 AND organization_id = $2',
-        [projectId, organizationId],
+        'SELECT id FROM projects WHERE id = $1 AND user_id = $2',
+        [projectId, userId],
       );
-      if (!project) throw new UnauthorizedException('Project does not belong to organization');
+      if (!project) throw new UnauthorizedException('Project does not belong to user');
     }
 
-    request.tenant = { userId, organizationId, projectId };
+    request.tenant = {
+      userId,
+      organizationId: account.organizationId,
+      projectId,
+      accessRole: account.accessRole,
+    };
     return true;
   }
 
@@ -121,25 +119,14 @@ export class TenantAuthGuard implements CanActivate {
     }
   }
 
-  private assertRoleAllowed(role: TenantRole, context: ExecutionContext): void {
-    const metadata = this.reflector.getAllAndOverride<TenantRole[]>(REQUIRED_ROLES, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    const requiredRoles = Array.isArray(metadata) ? metadata : [];
-    if (requiredRoles.length && !requiredRoles.includes(role)) {
-      throw new ForbiddenException('Organization role is not permitted');
-    }
-  }
-
-  private assertPlatformRoleAllowed(role: PlatformRole, context: ExecutionContext): void {
-    const metadata = this.reflector.getAllAndOverride<PlatformRole[]>(
-      REQUIRED_PLATFORM_ROLES,
+  private assertAccessRoleAllowed(role: AccessRole, context: ExecutionContext): void {
+    const metadata = this.reflector.getAllAndOverride<AccessRole[]>(
+      REQUIRED_ACCESS_ROLES,
       [context.getHandler(), context.getClass()],
     );
     const requiredRoles = Array.isArray(metadata) ? metadata : [];
     if (requiredRoles.length && !requiredRoles.includes(role)) {
-      throw new ForbiddenException('Platform role is not permitted');
+      throw new ForbiddenException('Access role is not permitted');
     }
   }
 
@@ -191,6 +178,7 @@ export class TenantAuthGuard implements CanActivate {
       userId,
       organizationId,
       projectId: this.readHeader(request, 'x-project-id', false),
+      accessRole: 'USER',
     };
   }
 }

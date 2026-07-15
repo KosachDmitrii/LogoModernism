@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import { applyTheme } from './theme/theme-store';
 import { AuthProvider } from './auth/AuthProvider';
+import { ToastProvider } from './components/ToastProvider';
 
 applyTheme(
   (() => {
@@ -33,8 +34,10 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById('root')!).render(
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </ToastProvider>
   </QueryClientProvider>,
 );

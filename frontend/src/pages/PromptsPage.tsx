@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { PromptCard } from '../components/PromptCard';
 import { BriefWorkflowPanel } from '../components/brief/BriefWorkflowPanel';
 import { ProjectStep } from '../components/prompts/ProjectStep';
@@ -18,7 +19,7 @@ import { BrainPartnerPanel, type PartnerRegenerateAction } from '../components/p
 import { applyConstraintResolutions } from '../lib/apply-constraint-resolution';
 import type { ConstraintResolution } from '../types';
 import { useT, type MessageKey } from '../i18n';
-import { formatError } from '../lib/api-error';
+import { formatError, isQuotaExceededError } from '../lib/api-error';
 import {
   clearPersistedPromptsWizardStep,
   readPersistedPromptsWizardStep,
@@ -37,10 +38,44 @@ const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
   3: 'prompts.step.resultsSubtitle',
 };
 
+function ComposeErrorNotice({ error }: { error: unknown }) {
+  const t = useT();
+  const quotaExceeded = isQuotaExceededError(error);
+
+  return (
+    <div
+      className={`mt-4 flex items-start gap-3 rounded-xl border p-4 ${
+        quotaExceeded
+          ? 'border-amber-500/25 bg-amber-950/20'
+          : 'border-red-900/40 bg-red-950/20'
+      }`}
+    >
+      <AlertTriangle
+        size={18}
+        className={`mt-0.5 shrink-0 ${quotaExceeded ? 'text-amber-400' : 'text-red-400'}`}
+      />
+      <div className="min-w-0">
+        <p className={`text-sm font-medium ${quotaExceeded ? 'text-amber-300' : 'text-red-300'}`}>
+          {quotaExceeded ? t('errors.quotaExceededTitle') : t('common.generationFailed')}
+        </p>
+        <p className="mt-1 text-sm leading-6 text-zinc-500">{formatError(error, t)}</p>
+        {quotaExceeded && (
+          <Link
+            to="/pricing"
+            className="mt-3 inline-flex rounded-lg bg-violet-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-violet-500"
+          >
+            {t('errors.quotaExceededAction')}
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function PromptsPage() {
   const t = useT();
-  const { activeMembership } = useAuth();
-  const canUseProduct = hasPermission(activeMembership?.role, 'product.use');
+  const { profile } = useAuth();
+  const canUseProduct = hasPermission(profile?.accessRole, 'product.use');
   const prompts = useAppStore((s) => s.prompts);
   const brainPartner = useAppStore((s) => s.brainPartner);
   const industry = useAppStore((s) => s.industry);
@@ -257,9 +292,7 @@ export function PromptsPage() {
           )}
 
           {compose.isError && (
-            <p className="text-xs text-red-400 mt-4 text-center">
-              {formatError(compose.error, t)}
-            </p>
+            <ComposeErrorNotice error={compose.error} />
           )}
         </div>
       ) : (
@@ -277,9 +310,7 @@ export function PromptsPage() {
           )}
 
           {compose.isError && activeStep === 2 && (
-            <p className="text-xs text-red-400 mt-4">
-              {formatError(compose.error, t)}
-            </p>
+            <ComposeErrorNotice error={compose.error} />
           )}
         </div>
       )}

@@ -12,6 +12,7 @@ import { formatError } from '../../lib/api-error';
 import { BriefColorSelections } from './BriefColorSelections';
 import { BriefRadioOption } from './BriefRadioOption';
 import { CustomSelect } from '../CustomSelect';
+import { useToast } from '../ToastProvider';
 
 type RenderEffectMode = 'flat' | 'shadow' | '3d' | 'shadow_3d';
 
@@ -53,6 +54,7 @@ function defaultColorSelections(palette: DesignBrief['colorPalette']): string[] 
 
 export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => void }) {
   const t = useT();
+  const toast = useToast();
   const industry = useAppStore((s) => s.industry);
   const designBrief = useAppStore((s) => s.designBrief);
   const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
@@ -75,6 +77,7 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
       });
       onStepComplete?.();
     },
+    onError: (error) => toast.error(formatError(error, t)),
   });
 
   const needsColors = paletteNeedsColorSelections(designBrief.colorPalette);
@@ -175,12 +178,6 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
       )}
       {needsColors && !colorSlotsReady && (
         <p className="text-xs text-amber-400/90">{t('brief.style.pickColorsBeforeApply')}</p>
-      )}
-
-      {analysis.isError && (
-        <p className="text-xs text-red-400">
-          {formatError(analysis.error, t)}
-        </p>
       )}
 
       {analysis.data && (

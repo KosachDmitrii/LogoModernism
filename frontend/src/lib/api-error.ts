@@ -21,8 +21,31 @@ export async function parseApiError(res: Response, messageKey: MessageKey): Prom
   throw new ApiError(messageKey, res.status, detail || undefined);
 }
 
+function apiErrorPayload(error: ApiError): { code?: string; quotaKey?: string } {
+  if (!error.detail) return {};
+  try {
+    const payload = JSON.parse(error.detail) as { code?: unknown; quotaKey?: unknown };
+    return {
+      code: typeof payload.code === 'string' ? payload.code : undefined,
+      quotaKey: typeof payload.quotaKey === 'string' ? payload.quotaKey : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+export function isQuotaExceededError(error: unknown): boolean {
+  return error instanceof ApiError && apiErrorPayload(error).code === 'QUOTA_EXCEEDED';
+}
+
 export function formatError(error: unknown, t: TranslateFn): string {
   if (error instanceof ApiError) {
+    const payload = apiErrorPayload(error);
+    if (payload.code === 'QUOTA_EXCEEDED') {
+      return payload.quotaKey === 'image.generate'
+        ? t('errors.logoQuotaExceeded')
+        : t('errors.promptQuotaExceeded');
+    }
     const base = t(error.messageKey);
     if (error.detail) {
       return t('errors.api.withDetail', {

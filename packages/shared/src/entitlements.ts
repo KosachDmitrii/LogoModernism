@@ -1,8 +1,11 @@
-export const PLATFORM_ROLES = ['USER', 'PLATFORM_ADMIN'] as const;
-export type PlatformRole = (typeof PLATFORM_ROLES)[number];
+export const ACCESS_ROLES = ['ADMIN', 'USER'] as const;
+export type AccessRole = (typeof ACCESS_ROLES)[number];
 
-export const PLANS = ['FREE', 'PRO', 'ENTERPRISE'] as const;
+export const PLANS = ['FREE', 'PLUS', 'PRO'] as const;
 export type Plan = (typeof PLANS)[number];
+
+export const QUOTA_KEYS = ['prompt.compose', 'image.generate'] as const;
+export type QuotaKey = (typeof QUOTA_KEYS)[number];
 
 export const FEATURES = {
   catalogRead: 'catalog.read',
@@ -16,7 +19,7 @@ export const FEATURES = {
 export type FeatureKey = (typeof FEATURES)[keyof typeof FEATURES];
 
 export type PlanEntitlements = {
-  monthlyCredits: number | null;
+  monthlyQuotas: Record<QuotaKey, number>;
   features: ReadonlySet<FeatureKey>;
 };
 
@@ -29,15 +32,24 @@ const BASE_FEATURES = [
 
 export const PLAN_ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
   FREE: {
-    monthlyCredits: 100,
+    monthlyQuotas: {
+      'prompt.compose': 10,
+      'image.generate': 2,
+    },
     features: new Set(BASE_FEATURES),
   },
-  PRO: {
-    monthlyCredits: 2_000,
+  PLUS: {
+    monthlyQuotas: {
+      'prompt.compose': 100,
+      'image.generate': 20,
+    },
     features: new Set([...BASE_FEATURES, FEATURES.brainAdvanced, FEATURES.billingManage]),
   },
-  ENTERPRISE: {
-    monthlyCredits: null,
+  PRO: {
+    monthlyQuotas: {
+      'prompt.compose': 300,
+      'image.generate': 60,
+    },
     features: new Set([...BASE_FEATURES, FEATURES.brainAdvanced, FEATURES.billingManage]),
   },
 };

@@ -23,7 +23,6 @@ import type { PromptGenerationRequest } from '@logo-platform/shared';
 import {
   normalizeBrandName,
   resolvePromptGenerateIntent,
-  USAGE_OPERATION_COSTS,
   USAGE_OPERATIONS,
 } from '@logo-platform/shared';
 import { Tenant, type TenantScope } from '../auth/tenant-context';
@@ -96,7 +95,7 @@ export class PromptsController {
       reservation = await this.usage.reserve({
         tenant: tenant!,
         operationKey: USAGE_OPERATIONS.promptCompose,
-        credits: USAGE_OPERATION_COSTS[USAGE_OPERATIONS.promptCompose],
+        units: 1,
         idempotencyKey: operationIdempotencyKey,
       });
       const abort = new AbortController();
@@ -139,35 +138,23 @@ export class PromptsController {
   @Get('recommend/:industry')
   @Roles(...CONTRIBUTORS)
   async recommend(@Param('industry') industry: string, @Tenant() tenant?: TenantScope) {
-    const reservation = await this.usage.reserve({
-      tenant: tenant!,
-      operationKey: USAGE_OPERATIONS.promptRecommend,
-      credits: USAGE_OPERATION_COSTS[USAGE_OPERATIONS.promptRecommend],
-      idempotencyKey: `recommend:${tenant!.organizationId}:${randomUUID()}`,
-    });
-    try {
-      const result = await this.promptsService.generate(
-        {
-          industry,
-          variationCount: 1,
-        },
-        tenant,
-      );
-      await this.usage.commit(reservation.id);
-      return {
+    const result = await this.promptsService.generate(
+      {
         industry,
-        recommendations: result.recommendations,
-        suggestedPrinciples: result.bestPrompt.selectedPrinciples.map((p) => ({
-          id: p.id,
-          name: p.name,
-          category: p.category,
-        })),
-        dna: result.bestPrompt.dna,
-      };
-    } catch (error) {
-      await this.usage.release(reservation.id).catch(() => undefined);
-      throw error;
-    }
+        variationCount: 1,
+      },
+      tenant,
+    );
+    return {
+      industry,
+      recommendations: result.recommendations,
+      suggestedPrinciples: result.bestPrompt.selectedPrinciples.map((p) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+      })),
+      dna: result.bestPrompt.dna,
+    };
   }
 
   @Get('saved')
@@ -242,7 +229,7 @@ export class PromptsController {
       | undefined = await this.usage.reserve({
       tenant: tenant!,
       operationKey: USAGE_OPERATIONS.imageGenerate,
-      credits: USAGE_OPERATION_COSTS[USAGE_OPERATIONS.imageGenerate],
+      units: 1,
       idempotencyKey:
         idempotencyKey ??
         `prompt-logo:${tenant!.organizationId}:${id}:${randomUUID()}`,

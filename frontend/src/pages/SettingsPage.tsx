@@ -6,20 +6,42 @@ import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
 import { ThemeSwitcher } from '../components/ThemeSwitcher';
+import { useToast } from '../components/ToastProvider';
 import { useT } from '../i18n';
+import { formatError } from '../lib/api-error';
+
+type Quota = {
+  limit: number | null;
+  used: number;
+  reserved: number;
+  remaining: number | null;
+};
 
 export function SettingsPage() {
   const t = useT();
-  const { profile, activeMembership, signOut } = useAuth();
+  const toast = useToast();
+  const { profile, signOut } = useAuth();
   const billing = useQuery({
-    queryKey: ['billing-overview', activeMembership?.organization.id],
+    queryKey: ['billing-overview', profile?.id],
     queryFn: getBillingOverview,
-    enabled: Boolean(activeMembership),
+    enabled: Boolean(profile),
   });
 
   async function openPortal() {
-    const { url } = await createBillingPortal();
-    window.location.assign(url);
+    try {
+      const { url } = await createBillingPortal();
+      window.location.assign(url);
+    } catch (error) {
+      toast.error(formatError(error, t));
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      await signOut();
+    } catch (error) {
+      toast.error(formatError(error, t));
+    }
   }
 
   return (
@@ -38,16 +60,17 @@ export function SettingsPage() {
                   {profile?.name || profile?.email}
                 </h2>
                 <p className="mt-0.5 truncate text-xs text-zinc-500">
-                  {profile?.email} · {activeMembership?.organization.name}
+                  {profile?.email}
+                  {profile?.organizationName ? ` · ${profile.organizationName}` : ''}
                 </p>
               </div>
               <span className="account-role rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-wider">
-                {activeMembership?.role}
+                {profile?.accessRole}
               </span>
             </div>
             <button
               type="button"
-              onClick={() => void signOut()}
+              onClick={() => void handleSignOut()}
               className="flex items-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-400 transition hover:border-red-800 hover:bg-red-950/20 hover:text-red-300"
             >
               <LogOut size={14} />
@@ -63,12 +86,9 @@ export function SettingsPage() {
               <div>
                 <h2 className="text-sm font-semibold text-zinc-200">{t('billing.title')}</h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  {billing.data?.plan ?? activeMembership?.organization.plan} ·{' '}
-                  {billing.data?.usage.remainingCredits == null
-                    ? t('usage.unlimited')
-                    : t('usage.creditsRemaining', {
-                        count: billing.data?.usage.remainingCredits ?? 0,
-                      })}
+                  {profile?.accessRole === 'ADMIN'
+                    ? 'ADMIN'
+                    : (billing.data?.plan ?? profile?.plan)}
                 </p>
               </div>
             </div>
@@ -82,23 +102,15 @@ export function SettingsPage() {
               </button>
             )}
           </div>
-          {billing.data?.usage.includedCredits != null && (
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-800">
-              <div
-                className="h-full bg-violet-500"
-                style={{
-                  width: `${Math.max(
-                    0,
-                    Math.min(
-                      100,
-                      ((billing.data.usage.includedCredits -
-                        billing.data.usage.committedCredits -
-                        billing.data.usage.reservedCredits) /
-                        billing.data.usage.includedCredits) *
-                        100,
-                    ),
-                  )}%`,
-                }}
+          {billing.data?.usage && (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <QuotaMeter
+                label={t('usage.promptGenerations')}
+                quota={billing.data.usage.prompts}
+              />
+              <QuotaMeter
+                label={t('usage.logoGenerations')}
+                quota={billing.data.usage.logos}
               />
             </div>
           )}
@@ -127,5 +139,38 @@ export function SettingsPage() {
         </section>
       </div>
     </PageContainer>
+  );
+}
+
+function QuotaMeter({ label, quota }: { label: string; quota: Quota }) {
+  const t = useT();
+  const totalUsed = quota.used + quota.reserved;
+  const percent =
+    quota.limit == null || quota.limit === 0
+      ? 0
+      : Math.min(100, Math.round((totalUsed / quota.limit) * 100));
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-950/30 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-zinc-300">{label}</p>
+        <span className="text-xs text-zinc-500">
+          {quota.limit == null
+            ? t('usage.usedUnlimited', { count: totalUsed })
+            : t('usage.usedOf', { used: totalUsed, limit: quota.limit })}
+        </span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-800">
+        <div
+          className="h-full rounded-full bg-violet-500 transition-all"
+          style={{ width: quota.limit == null ? '100%' : `${percent}%` }}
+        />
+      </div>
+      <p className="mt-2 text-xs text-zinc-600">
+        {quota.remaining == null
+          ? t('usage.unlimited')
+          : t('usage.remaining', { count: quota.remaining })}
+      </p>
+    </div>
   );
 }

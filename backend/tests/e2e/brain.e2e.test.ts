@@ -14,20 +14,22 @@ describeE2e('Brain API (e2e)', () => {
   const userId = `${fixtureId}-user`;
   const organizationId = `${fixtureId}-org`;
 
-  function authenticated(test: Test, platformAdmin = false): Test {
+  function authenticated(test: Test, admin = false): Test {
     const withTenant = test
       .set('x-user-id', userId)
       .set('x-organization-id', organizationId);
-    return platformAdmin
-      ? withTenant.set('x-platform-role', 'PLATFORM_ADMIN')
+    return admin
+      ? withTenant.set('x-access-role', 'ADMIN')
       : withTenant;
   }
 
   beforeAll(async () => {
     database = await getTestDatabase();
     await database.query(
-      `INSERT INTO users (id, email, platform_role, updated_at)
-       VALUES ($1, $2, 'PLATFORM_ADMIN'::"PlatformRole", NOW())`,
+      `INSERT INTO users (id, email, platform_role, access_role, updated_at)
+       VALUES (
+         $1, $2, 'PLATFORM_ADMIN'::"PlatformRole", 'ADMIN'::"AccessRole", NOW()
+       )`,
       [userId, `${userId}@example.test`],
     );
     await database.query(

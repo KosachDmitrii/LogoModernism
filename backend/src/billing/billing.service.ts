@@ -20,6 +20,7 @@ type LemonWebhook = {
   meta?: {
     event_name?: string;
     custom_data?: {
+      user_id?: string;
       organization_id?: string;
       checkout_session_id?: string;
       nonce?: string;
@@ -44,6 +45,7 @@ type CheckoutCustomData = NonNullable<
   NonNullable<LemonWebhook['meta']>['custom_data']
 >;
 type SubscriptionRow = {
+  userId: string;
   organizationId: string;
   providerCustomerId: string | null;
   status: BillingSubscriptionStatus;
@@ -53,6 +55,7 @@ type SubscriptionRow = {
 };
 type CheckoutRow = {
   id: string;
+  userId: string;
   organizationId: string;
 };
 
@@ -82,43 +85,57 @@ export class BillingService {
   ) {}
 
   async overview(tenant: TenantScope): Promise<BillingOverview> {
-    const [organization, membership, subscription, usage] = await Promise.all([
-      db.maybeOne<{ plan: Plan }>('SELECT plan FROM organizations WHERE id = $1', [
-        tenant.organizationId,
-      ]),
-      db.maybeOne<{ role: string }>(
-        `SELECT role FROM organization_members
-         WHERE organization_id = $1 AND user_id = $2`,
-        [tenant.organizationId, tenant.userId],
+    const [account, subscription, usage] = await Promise.all([
+      db.maybeOne<{ plan: Plan; accessRole: 'ADMIN' | 'USER' }>(
+        'SELECT plan, access_role FROM users WHERE id = $1',
+        [tenant.userId],
       ),
       db.maybeOne<SubscriptionRow>(
-        'SELECT * FROM billing_subscriptions WHERE organization_id = $1',
-        [tenant.organizationId],
+        'SELECT * FROM billing_subscriptions WHERE user_id = $1',
+        [tenant.userId],
       ),
-      this.usage.summary(tenant.organizationId),
+      this.usage.summary(tenant),
     ]);
-    if (!organization || !membership) throw new NotFoundException('Organization not found');
+    if (!account) throw new NotFoundException('User account not found');
     return {
-      plan: organization.plan,
+      plan: account.plan,
+      accessRole: account.accessRole,
       subscriptionStatus: subscription?.status ?? 'INACTIVE',
       renewsAt: subscription?.renewsAt?.toISOString(),
       endsAt: subscription?.endsAt?.toISOString(),
       usage,
-      canManageBilling: membership.role === 'OWNER' || membership.role === 'ADMIN',
+      canManageBilling: account.accessRole !== 'ADMIN',
     };
   }
 
   async createCheckout(tenant: TenantScope, requestedPlan: Plan) {
-    await this.assertBillingManager(tenant);
-    if (requestedPlan !== 'PRO') {
-      throw new BadRequestException('Only the PRO plan is available through self-service');
+    if (tenant.accessRole === 'ADMIN') {
+      throw new BadRequestException('Administrator accounts do not require a subscription');
+    }
+    if (requestedPlan !== 'PLUS' && requestedPlan !== 'PRO') {
+      throw new BadRequestException('Only PLUS and PRO plans are available');
+    }
+    const existing = await db.maybeOne<SubscriptionRow>(
+      `SELECT * FROM billing_subscriptions
+       WHERE user_id = $1
+         AND status IN (
+           'ACTIVE'::"BillingSubscriptionStatus",
+           'ON_TRIAL'::"BillingSubscriptionStatus",
+           'CANCELLED'::"BillingSubscriptionStatus"
+         )`,
+      [tenant.userId],
+    );
+    if (existing?.providerCustomerId) {
+      return {
+        url: await this.lemon.getCustomerPortalUrl(existing.providerCustomerId),
+      };
     }
     const variantId = this.variantForPlan(requestedPlan);
     const nonce = randomBytes(24).toString('base64url');
     const session = await db.one<{ id: string }>(
-      `INSERT INTO billing_checkout_sessions (
-         id, organization_id, requested_by, plan, variant_id, nonce_hash, expires_at
-       ) VALUES ($1, $2, $3, $4::"Plan", $5, $6, $7)
+        `INSERT INTO billing_checkout_sessions (
+         id, organization_id, user_id, requested_by, plan, variant_id, nonce_hash, expires_at
+       ) VALUES ($1, $2, $3, $3, $4::"Plan", $5, $6, $7)
        RETURNING id`,
       [
         randomUUID(),
@@ -133,6 +150,7 @@ export class BillingService {
     try {
       const url = await this.lemon.createCheckout({
         variantId,
+        userId: tenant.userId,
         organizationId: tenant.organizationId,
         checkoutSessionId: session.id,
         nonce,
@@ -146,10 +164,9 @@ export class BillingService {
   }
 
   async customerPortal(tenant: TenantScope) {
-    await this.assertBillingManager(tenant);
     const subscription = await db.maybeOne<SubscriptionRow>(
-      'SELECT * FROM billing_subscriptions WHERE organization_id = $1',
-      [tenant.organizationId],
+      'SELECT * FROM billing_subscriptions WHERE user_id = $1',
+      [tenant.userId],
     );
     if (!subscription?.providerCustomerId) {
       throw new NotFoundException('No billing customer exists for this organization');
@@ -219,7 +236,10 @@ export class BillingService {
       : await this.validCheckout(payload.meta?.custom_data, plan, variantId);
     const organizationId =
       existingSubscription?.organizationId ?? checkout?.organizationId;
-    if (!organizationId) throw new ForbiddenException('Webhook is not linked to a checkout');
+    const userId = existingSubscription?.userId ?? checkout?.userId;
+    if (!organizationId || !userId) {
+      throw new ForbiddenException('Webhook is not linked to a checkout');
+    }
     const effectivePlan = this.entitledPlan(plan, status, endsAt, providerUpdatedAt);
 
     try {
@@ -248,14 +268,14 @@ export class BillingService {
         }
         await tx.query(
           `INSERT INTO billing_subscriptions (
-             id, organization_id, provider_subscription_id, provider_customer_id,
+             id, organization_id, user_id, provider_subscription_id, provider_customer_id,
              provider_order_id, product_id, variant_id, plan, status, renews_at,
              ends_at, provider_updated_at, updated_at
            ) VALUES (
-             $1, $2, $3, $4, $5, $6, $7, $8::"Plan",
-             $9::"BillingSubscriptionStatus", $10, $11, $12, NOW()
+             $1, $2, $3, $4, $5, $6, $7, $8, $9::"Plan",
+             $10::"BillingSubscriptionStatus", $11, $12, $13, NOW()
            )
-           ON CONFLICT (organization_id) DO UPDATE SET
+           ON CONFLICT (user_id) WHERE user_id IS NOT NULL DO UPDATE SET
              provider_subscription_id = EXCLUDED.provider_subscription_id,
              provider_customer_id = EXCLUDED.provider_customer_id,
              provider_order_id = EXCLUDED.provider_order_id,
@@ -266,6 +286,7 @@ export class BillingService {
           [
             randomUUID(),
             organizationId,
+            userId,
             resourceId,
             String(attributes.customer_id ?? '') || null,
             String(attributes.order_id ?? '') || null,
@@ -279,8 +300,8 @@ export class BillingService {
           ],
         );
         await tx.query(
-          'UPDATE organizations SET plan = $2::"Plan", updated_at = NOW() WHERE id = $1',
-          [organizationId, effectivePlan],
+          'UPDATE users SET plan = $2::"Plan", updated_at = NOW() WHERE id = $1',
+          [userId, effectivePlan],
         );
         if (checkout) {
           await tx.query(
@@ -309,17 +330,21 @@ export class BillingService {
     plan: Plan,
     variantId: string,
   ) {
-    if (!custom?.organization_id || !custom.checkout_session_id || !custom.nonce) {
+    if (!custom?.checkout_session_id || !custom.nonce) {
       return Promise.resolve(null);
     }
     return db.maybeOne<CheckoutRow>(
-      `SELECT id, organization_id FROM billing_checkout_sessions
-       WHERE id = $1 AND organization_id = $2 AND plan = $3::"Plan"
-         AND variant_id = $4 AND nonce_hash = $5
+      `SELECT id, user_id, organization_id FROM billing_checkout_sessions
+       WHERE id = $1
+         AND ($2::text IS NULL OR user_id = $2)
+         AND ($3::text IS NULL OR organization_id = $3)
+         AND plan = $4::"Plan"
+         AND variant_id = $5 AND nonce_hash = $6
          AND consumed_at IS NULL AND expires_at > NOW()`,
       [
         custom.checkout_session_id,
-        custom.organization_id,
+        custom.user_id ?? null,
+        custom.organization_id ?? null,
         plan,
         variantId,
         sha256(custom.nonce),
@@ -359,9 +384,9 @@ export class BillingService {
 
   private variantForPlan(plan: Plan): string {
     const variants =
-      plan === 'PRO'
-        ? process.env.LEMON_SQUEEZY_PRO_VARIANT_IDS
-        : process.env.LEMON_SQUEEZY_ENTERPRISE_VARIANT_IDS;
+      plan === 'PLUS'
+        ? process.env.LEMON_SQUEEZY_PLUS_VARIANT_IDS
+        : process.env.LEMON_SQUEEZY_PRO_VARIANT_IDS;
     const variant = variants?.split(',').map((value) => value.trim()).find(Boolean);
     if (!variant) throw new ConflictException(`No Lemon Squeezy variant configured for ${plan}`);
     return variant;
@@ -370,19 +395,8 @@ export class BillingService {
   private planForVariant(variantId: string): Plan | null {
     const includes = (value?: string) =>
       value?.split(',').map((item) => item.trim()).includes(variantId) ?? false;
+    if (includes(process.env.LEMON_SQUEEZY_PLUS_VARIANT_IDS)) return 'PLUS';
     if (includes(process.env.LEMON_SQUEEZY_PRO_VARIANT_IDS)) return 'PRO';
-    if (includes(process.env.LEMON_SQUEEZY_ENTERPRISE_VARIANT_IDS)) return 'ENTERPRISE';
     return null;
-  }
-
-  private async assertBillingManager(tenant: TenantScope): Promise<void> {
-    const membership = await db.maybeOne<{ role: string }>(
-      `SELECT role FROM organization_members
-       WHERE organization_id = $1 AND user_id = $2`,
-      [tenant.organizationId, tenant.userId],
-    );
-    if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
-      throw new ForbiddenException('Only organization owners can manage billing');
-    }
   }
 }

@@ -13,6 +13,8 @@ import {
   starsToScore,
 } from '../lib/logo-feedback';
 import { useT } from '../i18n';
+import { formatError } from '../lib/api-error';
+import { useToast } from './ToastProvider';
 
 interface LogoFeedbackBarProps {
   promptId: string;
@@ -37,6 +39,7 @@ const tagButtonClass = (active: boolean, saving: boolean) =>
 
 export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarProps) {
   const t = useT();
+  const toast = useToast();
   const existing = logo.feedback;
   const [workedTags, setWorkedTags] = useState<string[]>(existing?.workedTags ?? []);
   const [missedTags, setMissedTags] = useState<string[]>(existing?.missedTags ?? []);
@@ -57,12 +60,18 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
     mutationFn: (body: { score: number; emoji: string }) =>
       submitLogoFeedback(promptId, logo.id, body),
     onSuccess: onSaved,
+    onError: (error) => toast.error(formatError(error, t)),
   });
 
   const saveTags = useMutation({
     mutationFn: (body: { workedTags?: string[]; missedTags?: string[] }) =>
       submitLogoTags(promptId, logo.id, body),
     onSuccess: onSaved,
+    onError: (error) => {
+      setWorkedTags(existing?.workedTags ?? []);
+      setMissedTags(existing?.missedTags ?? []);
+      toast.error(formatError(error, t));
+    },
   });
 
   useEffect(() => {

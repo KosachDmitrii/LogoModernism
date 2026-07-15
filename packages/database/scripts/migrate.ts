@@ -45,7 +45,6 @@ async function main(): Promise<void> {
   const byName = new Map(migrations.map((migration) => [migration.name, migration]));
   const client = await pool.connect();
   try {
-    await client.query(`SELECT pg_advisory_lock(hashtext('logo-platform:migrations'))`);
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         name TEXT PRIMARY KEY,
@@ -119,6 +118,22 @@ async function main(): Promise<void> {
 
       await client.query('BEGIN');
       try {
+        await client.query(
+          `SELECT pg_advisory_xact_lock(hashtext('logo-platform:migrations'))`,
+        );
+        const concurrent = await client.query<{ checksum: string }>(
+          'SELECT checksum FROM schema_migrations WHERE name = $1',
+          [migration.name],
+        );
+        if (concurrent.rows[0]) {
+          if (concurrent.rows[0].checksum !== migration.checksum) {
+            throw new Error(
+              `Migration checksum changed after apply: ${migration.name}`,
+            );
+          }
+          await client.query('COMMIT');
+          continue;
+        }
         await client.query(normalizeTransaction(migration.sql));
         await client.query(
           `INSERT INTO schema_migrations (name, checksum) VALUES ($1, $2)`,
@@ -132,9 +147,6 @@ async function main(): Promise<void> {
       }
     }
   } finally {
-    await client
-      .query(`SELECT pg_advisory_unlock(hashtext('logo-platform:migrations'))`)
-      .catch(() => undefined);
     client.release();
     await pool.end();
   }

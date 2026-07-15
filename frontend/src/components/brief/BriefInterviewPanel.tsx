@@ -8,9 +8,11 @@ import type { BriefInterviewResponse } from '../../types';
 import { designBriefToBriefContext, parseMarkTypeFromBrief } from '../../lib/brief-mappers';
 import { useT } from '../../i18n';
 import { formatError } from '../../lib/api-error';
+import { useToast } from '../ToastProvider';
 
 export function BriefInterviewPanel() {
   const t = useT();
+  const toast = useToast();
   const industry = useAppStore((s) => s.industry);
   const companyName = useAppStore((s) => s.companyName);
   const designBrief = useAppStore((s) => s.designBrief);
@@ -30,6 +32,7 @@ export function BriefInterviewPanel() {
       setResult(data);
       setAnswers({});
     },
+    onError: (error) => toast.error(formatError(error, t)),
   });
 
   const applyAnswer = (questionId: string, field: string, value: string) => {
@@ -66,12 +69,6 @@ export function BriefInterviewPanel() {
           {t('brief.analyze.button')}
         </button>
       </div>
-
-      {interview.isError && (
-        <p className="text-xs text-red-400">
-          {formatError(interview.error, t)}
-        </p>
-      )}
 
       {result && (
         <div className="space-y-3 pt-2 border-t border-zinc-800">

@@ -5,6 +5,7 @@ import {
   BookOpen,
   Brain,
   CheckCircle2,
+  ChevronDown,
   Compass,
   Loader2,
   RefreshCw,
@@ -129,6 +130,7 @@ export function BrainPartnerPanel({
   onResolveConflicts,
 }: BrainPartnerPanelProps) {
   const t = useT();
+  const [isExpanded, setIsExpanded] = useState(false);
   const [viewTerritoryId, setViewTerritoryId] = useState(partner.selectedTerritoryId);
   const [selectedResolutionByViolation, setSelectedResolutionByViolation] = useState<
     Record<string, string>
@@ -182,7 +184,15 @@ export function BrainPartnerPanel({
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden mb-6">
-      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between gap-3">
+      <button
+        type="button"
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((current) => !current)}
+        className={clsx(
+          'w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:cursor-pointer',
+          isExpanded && 'border-b border-zinc-800',
+        )}
+      >
         <div className="flex items-center gap-2">
           <Brain size={16} className="text-violet-400" />
           <div>
@@ -196,15 +206,16 @@ export function BrainPartnerPanel({
               {t('prompts.partner.critiqueScore', { score: partner.critique.overallScore.toFixed(1) })}
             </span>
           )}
-          <span className="px-2 py-1 rounded-md bg-zinc-800">
-            {partner.partnerAttempts === 1
-              ? t('prompts.partner.passes', { count: partner.partnerAttempts })
-              : t('prompts.partner.passesPlural', { count: partner.partnerAttempts })}
-          </span>
+          <ChevronDown
+            size={16}
+            className={clsx('transition-transform', isExpanded && 'rotate-180')}
+          />
         </div>
-      </div>
+      </button>
 
-      <div className="px-4 py-3 border-b border-zinc-800/80 bg-zinc-950/30">
+      {isExpanded && (
+        <>
+          <div className="px-4 py-3 border-b border-zinc-800/80 bg-zinc-950/30">
         <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">{t('prompts.partner.howToUse')}</p>
         <ol className="grid gap-2 sm:grid-cols-3">
           {WORKFLOW_STEPS.map((step, index) => (
@@ -223,9 +234,9 @@ export function BrainPartnerPanel({
             </li>
           ))}
         </ol>
-      </div>
+          </div>
 
-      <div className="p-4 space-y-5">
+          <div className="p-4 space-y-5">
         <section id="partner-step-compare" className="scroll-mt-6">
           <div className="flex items-center justify-between gap-2 mb-1">
             <div className="flex items-center gap-1.5">
@@ -463,7 +474,9 @@ export function BrainPartnerPanel({
             <p className="text-xs text-zinc-500">{t('prompts.partner.noCatalogMatches')}</p>
           )}
         </section>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

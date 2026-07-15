@@ -10,6 +10,6 @@ export class UsageController {
   @Get('overview')
   @Roles(...ALL_MEMBERS)
   overview(@Tenant() tenant?: TenantScope) {
-    return this.usage.summary(tenant!.organizationId);
+    return this.usage.summary(tenant!);
   }
 }

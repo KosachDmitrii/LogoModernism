@@ -113,16 +113,17 @@ async function main(): Promise<void> {
       const user = await tx.one<{
         id: string;
         email: string;
-        platformRole: 'PLATFORM_ADMIN';
+        accessRole: 'ADMIN';
       }>(
-        `INSERT INTO users (id, email, name, platform_role, updated_at)
-         VALUES ($1, $2, $3, 'PLATFORM_ADMIN'::"PlatformRole", NOW())
+        `INSERT INTO users (id, email, name, platform_role, access_role, updated_at)
+         VALUES ($1, $2, $3, 'PLATFORM_ADMIN'::"PlatformRole", 'ADMIN'::"AccessRole", NOW())
          ON CONFLICT (id) DO UPDATE
            SET email = EXCLUDED.email,
                name = EXCLUDED.name,
                platform_role = EXCLUDED.platform_role,
+               access_role = EXCLUDED.access_role,
                updated_at = NOW()
-         RETURNING id, email, platform_role`,
+         RETURNING id, email, access_role`,
         [authUser.id, email, name],
       );
       const organization =
@@ -155,7 +156,7 @@ async function main(): Promise<void> {
         organizationId: result.organization.id,
         organizationSlug: result.organization.slug,
         role: result.membership.role,
-        platformRole: result.user.platformRole,
+        accessRole: result.user.accessRole,
         temporaryPassword: generatedPassword,
         passwordChanged: Boolean(generatedPassword),
       },

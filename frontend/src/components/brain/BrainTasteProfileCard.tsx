@@ -99,7 +99,8 @@ function TasteSection({
   items: string[];
   tone: 'positive' | 'neutral' | 'negative';
 }) {
-  if (items.length === 0) return null;
+  const uniqueItems = [...new Set(items)];
+  if (uniqueItems.length === 0) return null;
 
   const Icon = tone === 'negative' ? ThumbsDown : ThumbsUp;
 
@@ -120,7 +121,7 @@ function TasteSection({
         <p className="text-xs font-medium text-zinc-400">{label}</p>
       </div>
       <ul className="flex flex-wrap gap-1.5" role="list">
-        {items.map((item) => (
+        {uniqueItems.map((item) => (
           <li key={item}>
             <span className={`inline-block text-xs px-2.5 py-1 rounded-full border ${chipClass}`}>
               {formatBrainLabel(item)}
