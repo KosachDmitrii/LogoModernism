@@ -1,5 +1,5 @@
 import './load-env';
-import { prisma } from '../src/index';
+import { db, disconnect } from '../src';
 
 async function main() {
   if (!process.env.DATABASE_URL) {
@@ -10,26 +10,28 @@ async function main() {
   const safeUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':***@');
   console.log('Connecting to:', safeUrl);
 
-  await prisma.$queryRaw`SELECT 1`;
+  await db.query('SELECT $1::integer AS connection_check', [1]);
   console.log('✓ PostgreSQL connection OK');
 
-  const extensions = await prisma.$queryRaw<Array<{ extname: string }>>`
-    SELECT extname FROM pg_extension WHERE extname = 'vector'
-  `;
-  if (extensions.length) {
+  const extensions = await db.query<{ extname: string }>(
+    'SELECT extname FROM pg_extension WHERE extname = $1',
+    ['vector'],
+  );
+  if (extensions.rows.length) {
     console.log('✓ pgvector extension enabled');
   } else {
     console.log('✗ pgvector not enabled — run: npm run db:brain-setup');
   }
 
-  const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`
-    SELECT tablename FROM pg_tables
-    WHERE schemaname = 'public' AND tablename = 'BrainExperience'
-  `;
-  if (tables.length) {
-    console.log('✓ BrainExperience table exists');
+  const tables = await db.query<{ tablename: string }>(
+    `SELECT tablename FROM pg_tables
+     WHERE schemaname = $1 AND tablename = $2`,
+    ['public', 'design_brain_experiences'],
+  );
+  if (tables.rows.length) {
+    console.log('✓ design_brain_experiences table exists');
   } else {
-    console.log('✗ Schema not pushed — run: npm run db:push');
+    console.log('✗ Schema not migrated — run: npm run db:migrate');
   }
 }
 
@@ -38,6 +40,4 @@ main()
     console.error('Connection failed:', error instanceof Error ? error.message : error);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => disconnect());

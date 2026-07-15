@@ -24,7 +24,7 @@ Evolution Engine → SVG Blueprint → Logo Critic
 |-------|------|
 | Frontend | React 19, Vite, Tailwind 4, React Router, Zustand, React Query |
 | Backend | NestJS, TypeScript |
-| Database | PostgreSQL, Prisma |
+| Database | PostgreSQL, node-postgres (`pg`) |
 | Core | shared, knowledge-base, prompt-engine, ai-engines, database |
 
 ## Quick Start
@@ -69,7 +69,7 @@ logo-platform/
 │   ├── knowledge-base/  # 1050+ principles, graph, templates
 │   ├── prompt-engine/   # Rules engine, composer, scorer
 │   ├── ai-engines/      # 12 AI engines + orchestrator
-│   └── database/        # Prisma schema
+│   └── database/        # SQL client and migrations
 └── docs/             # Enterprise documentation (10 sections)
 ```
 
@@ -83,11 +83,11 @@ See [docs/README.md](./docs/README.md) for full enterprise documentation includi
 - [x] 12 AI engines with orchestrator
 - [x] Knowledge graph compatibility
 - [x] Full React dashboard with routing
-- [x] PostgreSQL + Prisma schema
+- [x] PostgreSQL + parameterized SQL
 - [x] OpenAPI specification
 - [x] Image generation (OpenAI DALL·E 3 + mock fallback)
 - [x] Enterprise /docs structure
-- [ ] Database persistence wired to API
-- [ ] Redis + BullMQ job queue
+- [x] Database persistence wired to API
+- [x] PostgreSQL-backed PDF/OCR and research tasks
 - [ ] Flux / Ideogram providers
 - [ ] pgvector RAG search

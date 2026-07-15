@@ -28,20 +28,20 @@
   - Task: BrandDNA, Geometry, Pipeline, Critic pages
 
 ## Epic: Database
-- **Feature:** Prisma Schema
+- **Feature:** PostgreSQL Schema
   - Story: Full entity model for SaaS
-  - Task: `packages/database/prisma/schema.prisma`
+  - Task: `packages/database/sql/migrations`
 - **Feature:** Persistence Layer
   - Story: Save pipeline results to database
-  - Task: Wire EnginesService to Prisma (future)
+  - Task: Wire EnginesService to parameterized SQL
 
 ## Epic: Image Generation (Future)
 - **Feature:** Provider Adapter
   - Story: Generate images from composed prompts
   - Task: Integrate OpenAI Images API
-- **Feature:** Job Queue
-  - Story: Async generation with status polling
-  - Task: BullMQ + Redis setup
+- **Feature:** Durable Long Tasks
+  - Story: PDF/OCR and research survive API restarts
+  - Task: PostgreSQL task runner with progress and cancellation
 
 ## User Stories Sample (300+ total in full spec)
 

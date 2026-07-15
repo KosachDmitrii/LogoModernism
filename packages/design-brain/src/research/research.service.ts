@@ -6,7 +6,7 @@ import type {
   BrainResearchRunResult,
   BrainTenantScope,
 } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '../storage/database-types';
 import { extractPrinciplesFromText, summarizeText } from '../ingest/principle-extractor';
 import { ingestWebResearch } from '../ingest/ingest-web';
 import { expandResearchQueries } from './query-expander';
@@ -66,7 +66,7 @@ function findSupportingQuote(
 }
 
 async function buildCandidateFromUrl(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   scope: BrainTenantScope,
   topic: string,
   url: string,
@@ -75,7 +75,7 @@ async function buildCandidateFromUrl(
   fallbackSnippet?: string,
   initialScore?: number,
 ): Promise<BrainResearchCandidate> {
-  const existing = await findCandidateByUrl(prisma, url, scope);
+  const existing = await findCandidateByUrl(client, url, scope);
   if (existing && existing.status === 'pending') {
     return existing;
   }
@@ -102,7 +102,7 @@ async function buildCandidateFromUrl(
     text,
   );
 
-  return saveResearchCandidate(prisma, scope, {
+  return saveResearchCandidate(client, scope, {
     query: topic,
     sourceUrl: url,
     sourceTitle: fetched.title || fallbackTitle || url,
@@ -139,11 +139,13 @@ async function collectHitsFromQueries(
 }
 
 export async function runWebResearch(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   topic: string,
   scope: BrainTenantScope,
   maxSources = 30,
+  signal?: AbortSignal,
 ): Promise<BrainResearchRunResult> {
+  signal?.throwIfAborted();
   const trimmedTopic = topic.trim();
   if (!trimmedTopic) {
     return {
@@ -158,16 +160,19 @@ export async function runWebResearch(
   }
 
   const { selectedQueries, discoveredQueries } = await expandResearchQueries(trimmedTopic);
+  signal?.throwIfAborted();
   const hits = await collectHitsFromQueries(
     selectedQueries,
     Math.min(maxSources, 35),
   );
+  signal?.throwIfAborted();
   const candidates: BrainResearchCandidate[] = [];
   const skippedUrls: string[] = [];
   const seenCandidateIds = new Set<string>();
 
   for (const hit of hits) {
-    const existing = await findCandidateByUrl(prisma, hit.url, scope);
+    signal?.throwIfAborted();
+    const existing = await findCandidateByUrl(client, hit.url, scope);
     if (existing?.status === 'approved' || existing?.status === 'pending') {
       skippedUrls.push(hit.url);
       if (existing.status === 'pending' && !seenCandidateIds.has(existing.id)) {
@@ -179,7 +184,7 @@ export async function runWebResearch(
 
     try {
       const candidate = await buildCandidateFromUrl(
-        prisma,
+        client,
         scope,
         trimmedTopic,
         hit.url,
@@ -193,6 +198,7 @@ export async function runWebResearch(
         seenCandidateIds.add(candidate.id);
       }
     } catch (error) {
+      if (signal?.aborted) throw error;
       skippedUrls.push(hit.url);
       console.warn('[design-brain] research fetch failed:', hit.url, error);
     }
@@ -210,32 +216,32 @@ export async function runWebResearch(
 }
 
 export async function previewWebResearch(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   query: string,
   url: string,
   scope: BrainTenantScope,
 ): Promise<BrainResearchCandidate> {
-  return buildCandidateFromUrl(prisma, scope, query, url, query);
+  return buildCandidateFromUrl(client, scope, query, url, query);
 }
 
 export function listCandidates(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   scope: BrainTenantScope,
   status?: BrainResearchCandidate['status'],
 ) {
-  return listResearchCandidates(prisma, scope, status);
+  return listResearchCandidates(client, scope, status);
 }
 
-export function getCandidate(prisma: PrismaClient, id: string, scope: BrainTenantScope) {
-  return getResearchCandidate(prisma, id, scope);
+export function getCandidate(client: DatabaseClient, id: string, scope: BrainTenantScope) {
+  return getResearchCandidate(client, id, scope);
 }
 
 export async function approveResearchCandidate(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   id: string,
   scope?: BrainTenantScope,
 ): Promise<{ candidate: BrainResearchCandidate; ingest: BrainIngestResult }> {
-  const candidate = await getResearchCandidate(prisma, id, scope ?? {});
+  const candidate = await getResearchCandidate(client, id, scope ?? {});
   if (!candidate) {
     throw new Error(`Research candidate not found: ${id}`);
   }
@@ -243,8 +249,8 @@ export async function approveResearchCandidate(
     throw new Error('Candidate is already approved');
   }
 
-  const ingest = await ingestWebResearch(prisma, candidate, scope);
-  const updated = await updateResearchCandidate(prisma, id, scope ?? {}, {
+  const ingest = await ingestWebResearch(client, candidate, scope);
+  const updated = await updateResearchCandidate(client, id, scope ?? {}, {
     status: 'approved',
     reviewedAt: new Date().toISOString(),
     reviewedBy: scope?.userId,
@@ -255,16 +261,16 @@ export async function approveResearchCandidate(
 }
 
 export async function rejectResearchCandidate(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   id: string,
   scope: BrainTenantScope,
 ): Promise<BrainResearchCandidate> {
-  const candidate = await getResearchCandidate(prisma, id, scope);
+  const candidate = await getResearchCandidate(client, id, scope);
   if (!candidate) {
     throw new Error(`Research candidate not found: ${id}`);
   }
 
-  return updateResearchCandidate(prisma, id, scope, {
+  return updateResearchCandidate(client, id, scope, {
     status: 'rejected',
     reviewedAt: new Date().toISOString(),
     reviewedBy: scope.userId,

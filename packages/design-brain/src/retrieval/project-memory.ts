@@ -1,5 +1,5 @@
 import type { BrainExperienceRecord, BrainTenantScope } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
+import type { BrainExperienceRow, DatabaseClient } from '../storage/database-types';
 import { toExperienceRecord } from '../storage/experience.repository';
 import { semanticSearch } from './semantic-search';
 
@@ -19,7 +19,7 @@ function metadataMatches(
 }
 
 export async function searchProjectMemory(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   opts: { companyName?: string; industry?: string; limit?: number } & BrainTenantScope,
 ): Promise<BrainExperienceRecord[]> {
   if (!opts.organizationId) {
@@ -32,26 +32,14 @@ export async function searchProjectMemory(
 
   const query = [companyName, industry].filter(Boolean).join(' ');
   const [searchResult, feedbackRows] = await Promise.all([
-    semanticSearch(prisma, {
+    semanticSearch(client, {
       query,
       limit,
       minSimilarity: 0.4,
       organizationId: opts.organizationId,
       projectId: opts.projectId,
     }),
-    prisma.brainExperience.findMany({
-      where: {
-        sourceType: 'FEEDBACK',
-        organizationId: opts.organizationId,
-        ...(opts.projectId ? { projectId: opts.projectId } : {}),
-        OR: [
-          companyName ? { content: { contains: companyName, mode: 'insensitive' } } : undefined,
-          industry ? { content: { contains: industry, mode: 'insensitive' } } : undefined,
-        ].filter(Boolean) as Array<{ content: { contains: string; mode: 'insensitive' } }>,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    }),
+    findFeedbackRows(client, opts.organizationId, opts.projectId, companyName, industry, limit),
   ]);
 
   const seen = new Set<string>();
@@ -78,4 +66,36 @@ export async function searchProjectMemory(
   }
 
   return merged.slice(0, limit);
+}
+
+async function findFeedbackRows(
+  client: DatabaseClient,
+  organizationId: string,
+  projectId: string | undefined,
+  companyName: string | undefined,
+  industry: string | undefined,
+  limit: number,
+): Promise<BrainExperienceRow[]> {
+  const values: unknown[] = [organizationId];
+  const filters = [`source_type = 'FEEDBACK'::"BrainSourceType"`, 'organization_id = $1'];
+  if (projectId) {
+    values.push(projectId);
+    filters.push(`project_id = $${values.length}`);
+  }
+  const contentFilters: string[] = [];
+  for (const term of [companyName, industry]) {
+    if (!term) continue;
+    values.push(`%${term}%`);
+    contentFilters.push(`content ILIKE $${values.length}`);
+  }
+  if (contentFilters.length) filters.push(`(${contentFilters.join(' OR ')})`);
+  values.push(limit);
+  const { rows } = await client.query<BrainExperienceRow>(
+    `SELECT * FROM design_brain_experiences
+     WHERE ${filters.join(' AND ')}
+     ORDER BY created_at DESC
+     LIMIT $${values.length}`,
+    values,
+  );
+  return rows;
 }

@@ -13,7 +13,7 @@ interface OpenAIImageResponse {
 }
 
 const OPENAI_IMAGE_RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504, 520, 522, 524]);
-const OPENAI_IMAGE_MAX_ATTEMPTS = 3;
+const OPENAI_IMAGE_MAX_ATTEMPTS = 1;
 const DEFAULT_OPENAI_IMAGE_TIMEOUT_MS = 15 * 60_000;
 
 function readEnv(name: string, fallback: string): string {

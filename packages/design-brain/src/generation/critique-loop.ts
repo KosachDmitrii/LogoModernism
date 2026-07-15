@@ -1,5 +1,5 @@
 import type { BrainCritiqueGenerateRequest, BrainCritiqueGenerateResult } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '../storage/database-types';
 import { critiqueLogo } from '@logo-platform/ai-engines';
 import { generateImages } from '@logo-platform/image-generator';
 import { embedText } from '../embedding/embedding.service';
@@ -26,7 +26,7 @@ function enrichRequestWithCritique(
 }
 
 export async function storeGenerationExperience(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   input: {
     companyName?: string;
     industry: string;
@@ -48,7 +48,7 @@ export async function storeGenerationExperience(
     .filter(Boolean)
     .join('\n');
 
-  const experience = await createExperience(prisma, {
+  const experience = await createExperience(client, {
     sourceType: 'TEXT',
     title: `Generation: ${input.companyName ?? input.industry}`,
     content,
@@ -64,12 +64,12 @@ export async function storeGenerationExperience(
   });
 
   const embedding = await embedText(content);
-  await upsertExperienceEmbedding(prisma, experience.id, embedding);
+  await upsertExperienceEmbedding(client, experience.id, embedding);
   return experience.id;
 }
 
 export async function generateWithCritiqueLoop(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   request: BrainCritiqueGenerateRequest,
 ): Promise<BrainCritiqueGenerateResult> {
   if (!request.organizationId) {
@@ -78,15 +78,15 @@ export async function generateWithCritiqueLoop(
   const maxRetries = Math.min(request.maxRetries ?? 3, 5);
   const qualityThreshold = request.qualityThreshold ?? 7;
   let currentRequest = { ...request };
-  let lastPipeline = await runBriefCompilerPipeline(prisma, currentRequest);
+  let lastPipeline = await runBriefCompilerPipeline(client, currentRequest);
   let lastCritique = critiqueLogo({ prompt: lastPipeline.bestPrompt });
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    lastPipeline = await runBriefCompilerPipeline(prisma, currentRequest);
+    lastPipeline = await runBriefCompilerPipeline(client, currentRequest);
     lastCritique = critiqueLogo({ prompt: lastPipeline.bestPrompt });
 
     if (lastCritique.overallScore >= qualityThreshold) {
-      const storedExperienceId = await storeGenerationExperience(prisma, {
+      const storedExperienceId = await storeGenerationExperience(client, {
         companyName: request.companyName,
         industry: request.industry,
         promptText: lastPipeline.bestPrompt.text,
@@ -96,7 +96,7 @@ export async function generateWithCritiqueLoop(
         projectId: request.projectId,
       });
 
-      await ingestFeedback(prisma, {
+      await ingestFeedback(client, {
         signalType: 'APPROVE',
         score: lastCritique.overallScore,
         context: `Successful generation: ${lastPipeline.bestPrompt.text.slice(0, 300)}`,
@@ -153,7 +153,7 @@ export async function generateWithCritiqueLoop(
     }
   }
 
-  await ingestFeedback(prisma, {
+  await ingestFeedback(client, {
     signalType: 'REJECT',
     score: lastCritique.overallScore,
     context: `Failed quality threshold after ${maxRetries} attempts: ${lastCritique.feedback.join('; ')}`,

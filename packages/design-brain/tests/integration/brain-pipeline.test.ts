@@ -1,48 +1,44 @@
-import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
-import type { PrismaClient } from '@logo-platform/database';
+import { describe, expect, it, beforeAll, beforeEach } from 'vitest';
+import type { DatabaseClient } from '@logo-platform/database';
 import { runBriefCompilerPipeline } from '../../src/reasoning/brain-compiler-pipeline';
 import { reasonDesignDecision } from '../../src/reasoning/brain-reasoning';
 import { buildBrainArchitecture } from '../../src/reasoning/brain-architecture';
 import {
-  createTestPrisma,
+  createTestDatabase,
   isBrainDbReady,
   resetBrainTables,
   seedExperienceWithEmbedding,
   seedLearnedPrinciple,
+  seedTasteSignal,
 } from '../helpers/db';
 import { SAMPLE_SWISS_TEXT, sampleGenerateRequest } from '../helpers/fixtures';
 
 const describeIntegration = isBrainDbReady() ? describe : describe.skip;
 
 describeIntegration('brain prompt pipeline (integration)', () => {
-  let prisma: PrismaClient;
+  let database: DatabaseClient;
 
   beforeAll(async () => {
-    prisma = createTestPrisma();
-    await prisma.$connect();
-  });
-
-  afterAll(async () => {
-    await prisma.$disconnect();
+    database = createTestDatabase();
   });
 
   beforeEach(async () => {
-    await resetBrainTables(prisma);
+    await resetBrainTables(database);
   });
 
   it('runs end-to-end without OpenAI using fallback reasoning', async () => {
-    await seedExperienceWithEmbedding(prisma, {
+    await seedExperienceWithEmbedding(database, {
       title: 'Swiss Typography Notes',
       content: SAMPLE_SWISS_TEXT,
     });
-    await seedLearnedPrinciple(prisma, {
+    await seedLearnedPrinciple(database, {
       promptFragment: 'Helvetica-inspired geometric sans-serif',
       weight: 1.4,
       confidence: 0.85,
     });
 
     const result = await runBriefCompilerPipeline(
-      prisma,
+      database,
       sampleGenerateRequest({ variationCount: 3 }),
     );
 
@@ -56,17 +52,15 @@ describeIntegration('brain prompt pipeline (integration)', () => {
   });
 
   it('uses taste profile avoided patterns in fallback decision', async () => {
-    await prisma.brainTasteSignal.create({
-      data: {
-        signalType: 'DISLIKE',
-        score: 9,
-        context: 'Too much gradient and photoreal shadow clutter',
-        metadata: { missedTags: ['gradients', 'photoreal'] },
-      },
+    await seedTasteSignal(database, {
+      signalType: 'DISLIKE',
+      score: 9,
+      context: 'Too much gradient and photoreal shadow clutter',
+      metadata: { missedTags: ['gradients', 'photoreal'] },
     });
 
     const taste = await import('../../src/learning/taste-profile').then((m) =>
-      m.computeTasteProfile(prisma),
+      m.computeTasteProfile(database),
     );
 
     const decision = await reasonDesignDecision({
@@ -88,14 +82,17 @@ describeIntegration('brain prompt pipeline (integration)', () => {
   it('builds brain architecture from brief and retrieved memory', async () => {
     const experiences = [
       (
-        await seedExperienceWithEmbedding(prisma, {
+        await seedExperienceWithEmbedding(database, {
           title: 'Swiss Grid Case Study',
           content: SAMPLE_SWISS_TEXT,
         })
       ).id,
     ];
 
-    const stored = await prisma.brainExperience.findMany({ where: { id: { in: experiences } } });
+    const stored = (await database.query<import('../../src/storage/database-types').BrainExperienceRow>(
+      'SELECT * FROM design_brain_experiences WHERE id = ANY($1::text[])',
+      [experiences],
+    )).rows;
     const records = stored.map((row) => ({
       id: row.id,
       sourceType: row.sourceType,
@@ -109,7 +106,7 @@ describeIntegration('brain prompt pipeline (integration)', () => {
     }));
 
     const architecture = await buildBrainArchitecture(
-      prisma,
+      database,
       sampleGenerateRequest(),
       records,
     );

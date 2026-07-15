@@ -4,7 +4,7 @@ import type {
   BrainResearchCandidateStatus,
   BrainTenantScope,
 } from '@logo-platform/shared';
-import type { Prisma, PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient, ResearchCandidateRow } from '../storage/database-types';
 
 function tenantWhere(scope?: BrainTenantScope): { organizationId: string; projectId?: string } {
   if (!scope?.organizationId) {
@@ -16,9 +16,7 @@ function tenantWhere(scope?: BrainTenantScope): { organizationId: string; projec
   };
 }
 
-type CandidateRow = Awaited<ReturnType<PrismaClient['brainResearchCandidate']['findFirst']>>;
-
-function toCandidate(row: NonNullable<CandidateRow>): BrainResearchCandidate {
+function toCandidate(row: ResearchCandidateRow): BrainResearchCandidate {
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -41,44 +39,67 @@ function toCandidate(row: NonNullable<CandidateRow>): BrainResearchCandidate {
 }
 
 export async function listResearchCandidates(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   scope: BrainTenantScope,
   status?: BrainResearchCandidateStatus,
 ): Promise<BrainResearchCandidate[]> {
-  const rows = await prisma.brainResearchCandidate.findMany({
-    where: { ...tenantWhere(scope), ...(status ? { status } : {}) },
-    orderBy: { createdAt: 'desc' },
-  });
+  const tenant = tenantWhere(scope);
+  const values: unknown[] = [tenant.organizationId];
+  const filters = ['organization_id = $1'];
+  if (tenant.projectId) {
+    values.push(tenant.projectId);
+    filters.push(`project_id = $${values.length}`);
+  }
+  if (status) {
+    values.push(status);
+    filters.push(`status = $${values.length}`);
+  }
+  const { rows } = await client.query<ResearchCandidateRow>(
+    `SELECT * FROM brain_research_candidates
+     WHERE ${filters.join(' AND ')}
+     ORDER BY created_at DESC`,
+    values,
+  );
   return rows.map(toCandidate);
 }
 
 export async function getResearchCandidate(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   id: string,
   scope: BrainTenantScope,
 ): Promise<BrainResearchCandidate | null> {
-  const row = await prisma.brainResearchCandidate.findFirst({
-    where: { id, ...tenantWhere(scope) },
-  });
+  const { clause, values } = candidateIdentity(id, scope);
+  const row = await client.maybeOne<ResearchCandidateRow>(
+    `SELECT * FROM brain_research_candidates WHERE ${clause}`,
+    values,
+  );
   return row ? toCandidate(row) : null;
 }
 
 export async function findCandidateByUrl(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   url: string,
   scope: BrainTenantScope,
 ): Promise<BrainResearchCandidate | null> {
-  const row = await prisma.brainResearchCandidate.findFirst({
-    where: {
-      ...tenantWhere(scope),
-      sourceUrl: { equals: url.trim(), mode: 'insensitive' },
-    },
-  });
+  const tenant = tenantWhere(scope);
+  const values: unknown[] = [tenant.organizationId, url.trim()];
+  const filters = ['organization_id = $1', 'LOWER(source_url) = LOWER($2)'];
+  if (tenant.projectId) {
+    values.push(tenant.projectId);
+    filters.push(`project_id = $${values.length}`);
+  }
+  const row = await client.maybeOne<ResearchCandidateRow>(
+    `SELECT * FROM brain_research_candidates
+     WHERE ${filters.join(' AND ')}
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    values,
+  );
   return row ? toCandidate(row) : null;
 }
 
 export async function saveResearchCandidate(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   scope: BrainTenantScope,
   input: Omit<
     BrainResearchCandidate,
@@ -89,47 +110,78 @@ export async function saveResearchCandidate(
   },
 ): Promise<BrainResearchCandidate> {
   const tenant = tenantWhere(scope);
-  const row = await prisma.brainResearchCandidate.create({
-    data: {
-      id: input.id ?? randomUUID(),
-      ...tenant,
-      createdBy: scope.userId,
-      query: input.query,
-      status: input.status ?? 'pending',
-      sourceUrl: input.sourceUrl,
-      sourceTitle: input.sourceTitle,
-      snippet: input.snippet,
-      summary: input.summary,
-      extractedText: input.extractedText,
-      principles: input.principles as unknown as Prisma.InputJsonValue,
-      sourceScore: input.sourceScore,
-    },
-  });
+  const row = await client.one<ResearchCandidateRow>(
+    `INSERT INTO brain_research_candidates
+       (id, organization_id, project_id, created_by, query, status, source_url,
+        source_title, snippet, summary, extracted_text, principles, source_score, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, NOW())
+     RETURNING *`,
+    [
+      input.id ?? randomUUID(),
+      tenant.organizationId,
+      tenant.projectId ?? null,
+      scope.userId ?? null,
+      input.query,
+      input.status ?? 'pending',
+      input.sourceUrl,
+      input.sourceTitle,
+      input.snippet,
+      input.summary,
+      input.extractedText,
+      JSON.stringify(input.principles),
+      input.sourceScore ?? null,
+    ],
+  );
   return toCandidate(row);
 }
 
 export async function updateResearchCandidate(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   id: string,
   scope: BrainTenantScope,
   patch: Partial<BrainResearchCandidate>,
 ): Promise<BrainResearchCandidate> {
-  const existing = await prisma.brainResearchCandidate.findFirst({
-    where: { id, ...tenantWhere(scope) },
-  });
+  const identity = candidateIdentity(id, scope);
+  const existing = await client.maybeOne<ResearchCandidateRow>(
+    `SELECT * FROM brain_research_candidates WHERE ${identity.clause}`,
+    identity.values,
+  );
   if (!existing) {
     throw new Error(`Research candidate not found: ${id}`);
   }
-  const updated = await prisma.brainResearchCandidate.update({
-    where: { id },
-    data: {
-      ...(patch.status ? { status: patch.status } : {}),
-      ...(patch.reviewedAt ? { reviewedAt: new Date(patch.reviewedAt) } : {}),
-      ...(patch.reviewedBy ? { reviewedBy: patch.reviewedBy } : {}),
-      ...(patch.ingestResult
-        ? { ingestResult: patch.ingestResult as unknown as Prisma.InputJsonValue }
-        : {}),
-    },
-  });
+  const updated = await client.one<ResearchCandidateRow>(
+    `UPDATE brain_research_candidates
+     SET status = CASE WHEN $2 THEN $3 ELSE status END,
+         reviewed_at = CASE WHEN $4 THEN $5 ELSE reviewed_at END,
+         reviewed_by = CASE WHEN $6 THEN $7 ELSE reviewed_by END,
+         ingest_result = CASE WHEN $8 THEN $9::jsonb ELSE ingest_result END
+     WHERE id = $1
+     RETURNING *`,
+    [
+      existing.id,
+      Boolean(patch.status),
+      patch.status ?? null,
+      Boolean(patch.reviewedAt),
+      patch.reviewedAt ? new Date(patch.reviewedAt) : null,
+      Boolean(patch.reviewedBy),
+      patch.reviewedBy ?? null,
+      Boolean(patch.ingestResult),
+      patch.ingestResult ? JSON.stringify(patch.ingestResult) : null,
+    ],
+  );
   return toCandidate(updated);
+}
+
+function candidateIdentity(
+  id: string,
+  scope: BrainTenantScope,
+): { clause: string; values: unknown[] } {
+  const tenant = tenantWhere(scope);
+  const values: unknown[] = [id, tenant.organizationId];
+  const filters = ['id = $1', 'organization_id = $2'];
+  if (tenant.projectId) {
+    values.push(tenant.projectId);
+    filters.push(`project_id = $${values.length}`);
+  }
+  return { clause: filters.join(' AND '), values };
 }

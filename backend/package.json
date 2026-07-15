@@ -6,8 +6,7 @@
     "build": "nest build",
     "dev": "npm run build -w @logo-platform/design-brain && nest build && nest start --watch",
     "start": "node dist/main.js",
-    "start:worker": "node dist/worker.js",
-    "dev:worker": "node dist/worker.js",
+    "cleanup:legacy-queue": "nest build && node dist/scripts/cleanup-legacy-queue.js --confirm",
     "test:e2e": "nest build && vitest run --config vitest.config.ts",
     "test:unit": "vitest run --config vitest.unit.config.ts"
   },
@@ -27,7 +26,6 @@
     "@opentelemetry/auto-instrumentations-node": "^0.78.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.220.0",
     "@opentelemetry/sdk-node": "^0.220.0",
-    "bullmq": "^5.80.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^16.4.7",

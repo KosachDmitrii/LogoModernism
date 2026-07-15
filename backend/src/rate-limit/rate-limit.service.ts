@@ -3,7 +3,6 @@ import {
   HttpException,
   HttpStatus,
   OnModuleDestroy,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import Redis from 'ioredis';
 
@@ -38,9 +37,6 @@ export class RateLimitService implements OnModuleDestroy {
       return;
     }
 
-    if (process.env.NODE_ENV === 'production') {
-      throw new ServiceUnavailableException('Rate limiting is unavailable');
-    }
     const now = Date.now();
     const existing = this.memory.get(key);
     const counter =

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '../storage/database-types';
 import type { BrainPdfIngestCheck } from '@logo-platform/shared';
 import type { BrainTenantScope } from '@logo-platform/shared';
 
@@ -19,7 +19,7 @@ type PdfMetadata = {
 };
 
 export async function checkPdfIngestStatus(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   bookTitle: string,
   contentHash: string,
   scope: BrainTenantScope,
@@ -29,14 +29,16 @@ export async function checkPdfIngestStatus(
     throw new Error('Organization scope is required for PDF ingest');
   }
   const normalizedTitle = normalizeBookTitle(bookTitle);
-  const rows = await prisma.brainExperience.findMany({
-    where: {
-      sourceType: 'PDF',
-      organizationId: scope.organizationId,
-      ...(scope.projectId ? { projectId: scope.projectId } : {}),
-    },
-    select: { id: true, metadata: true },
-  });
+  const values: unknown[] = [scope.organizationId];
+  const filters = [`source_type = 'PDF'::"BrainSourceType"`, 'organization_id = $1'];
+  if (scope.projectId) {
+    values.push(scope.projectId);
+    filters.push(`project_id = $${values.length}`);
+  }
+  const { rows } = await client.query<{ id: string; metadata: unknown }>(
+    `SELECT id, metadata FROM design_brain_experiences WHERE ${filters.join(' AND ')}`,
+    values,
+  );
 
   const matching = rows.filter((row) => {
     const meta = row.metadata as PdfMetadata;

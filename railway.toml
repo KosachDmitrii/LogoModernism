@@ -10,11 +10,10 @@
 #           FRONTEND_URL=https://<frontend-host>  (on backend service)
 #           CORS_ORIGINS=https://<frontend-host>,http://localhost:5173
 #
-# API env: DATABASE_POOLER_URL=:6543, DIRECT_URL=:5432, REDIS_URL,
-# QUEUE_ASYNC_ENABLED=true,
+# API env: DATABASE_POOLER_URL=:6543, DIRECT_URL=:5432,
+# BACKGROUND_TASK_CONCURRENCY=1,
 # AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE, OBJECT_STORAGE_*,
 # OTEL_EXPORTER_OTLP_ENDPOINT.
-# Configure a second service with railway.worker.toml for BullMQ workers.
 
 [build]
 builder = "nixpacks"

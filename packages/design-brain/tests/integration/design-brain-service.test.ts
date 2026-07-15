@@ -1,9 +1,9 @@
-import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
-import type { PrismaClient } from '@logo-platform/database';
+import { describe, expect, it, beforeAll, beforeEach } from 'vitest';
+import type { DatabaseClient } from '@logo-platform/database';
 import { designBrain } from '../../src/brain.service';
 import { ingestFeedback } from '../../src/ingest/ingest-feedback';
 import {
-  createTestPrisma,
+  createTestDatabase,
   isBrainDbReady,
   resetBrainTables,
   seedExperienceWithEmbedding,
@@ -13,19 +13,14 @@ import { SAMPLE_SWISS_TEXT, sampleFeedback } from '../helpers/fixtures';
 const describeIntegration = isBrainDbReady() ? describe : describe.skip;
 
 describeIntegration('DesignBrainService (integration)', () => {
-  let prisma: PrismaClient;
+  let database: DatabaseClient;
 
   beforeAll(async () => {
-    prisma = createTestPrisma();
-    await prisma.$connect();
-  });
-
-  afterAll(async () => {
-    await prisma.$disconnect();
+    database = createTestDatabase();
   });
 
   beforeEach(async () => {
-    await resetBrainTables(prisma);
+    await resetBrainTables(database);
   });
 
   it('reports capabilities and stats accurately', async () => {
@@ -33,11 +28,11 @@ describeIntegration('DesignBrainService (integration)', () => {
     expect(caps.databaseConfigured).toBe(true);
     expect(caps.embeddingConfigured).toBe(true);
 
-    await seedExperienceWithEmbedding(prisma, {
+    await seedExperienceWithEmbedding(database, {
       title: 'Stats test',
       content: SAMPLE_SWISS_TEXT,
     });
-    await ingestFeedback(prisma, sampleFeedback());
+    await ingestFeedback(database, sampleFeedback());
 
     const stats = await designBrain.getStats();
     expect(stats.experiences).toBeGreaterThanOrEqual(2);
@@ -47,7 +42,7 @@ describeIntegration('DesignBrainService (integration)', () => {
   });
 
   it('lists experiences and principles after learning', async () => {
-    await seedExperienceWithEmbedding(prisma, {
+    await seedExperienceWithEmbedding(database, {
       title: 'Listed experience',
       content: SAMPLE_SWISS_TEXT,
       sourceType: 'TEXT',
@@ -62,7 +57,7 @@ describeIntegration('DesignBrainService (integration)', () => {
   });
 
   it('computes taste profile through service API', async () => {
-    await ingestFeedback(prisma, sampleFeedback({ signalType: 'APPROVE', score: 9 }));
+    await ingestFeedback(database, sampleFeedback({ signalType: 'APPROVE', score: 9 }));
 
     const taste = await designBrain.getTasteProfile();
     expect(taste.signalCount).toBe(1);

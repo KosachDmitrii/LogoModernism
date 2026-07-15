@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  getQueueConcurrency,
-  getRedisConnectionOptions,
-  isAsyncQueueEnabled,
-} from '../../src/queue/queue.config';
-import { isPrismaPoolTimeout } from '../../src/common/prisma-pool-timeout.filter';
+import { isPostgreSqlPoolTimeout } from '../../src/common/postgresql-pool-timeout.filter';
 import { TenantAuthGuard } from '../../src/auth/tenant-auth.guard';
 import { AUTHENTICATED_ONLY_ROUTE } from '../../src/auth/authenticated.decorator';
 import { REQUIRED_ROLES } from '../../src/auth/roles.decorator';
@@ -23,62 +18,17 @@ function authContext(headers: Record<string, string>) {
 }
 
 describe('scalability guardrails', () => {
-  it('uses bounded provider-specific worker concurrency', () => {
-    expect(getQueueConcurrency('pdf')).toBe(1);
-    expect(getQueueConcurrency('image')).toBe(1);
-    expect(getQueueConcurrency('prompt')).toBe(2);
-    expect(getQueueConcurrency('feedback')).toBe(5);
-  });
-
-  it('parses managed TLS Redis URLs without request retries', () => {
-    const previous = process.env.REDIS_URL;
-    process.env.REDIS_URL = 'rediss://user:secret@example.test:6380/2';
-    try {
-      const options = getRedisConnectionOptions();
-      expect(options).toMatchObject({
-        host: 'example.test',
-        port: 6380,
-        username: 'user',
-        password: 'secret',
-        db: 2,
-        maxRetriesPerRequest: null,
-        tls: {},
-      });
-    } finally {
-      process.env.REDIS_URL = previous;
-    }
-  });
-
-  it('does not enqueue jobs merely because Redis is configured', () => {
-    const previousRedis = process.env.REDIS_URL;
-    const previousQueueFlag = process.env.QUEUE_ASYNC_ENABLED;
-    try {
-      process.env.REDIS_URL = 'redis://localhost:6379';
-      delete process.env.QUEUE_ASYNC_ENABLED;
-      expect(isAsyncQueueEnabled()).toBe(false);
-      process.env.QUEUE_ASYNC_ENABLED = 'true';
-      expect(isAsyncQueueEnabled()).toBe(true);
-      delete process.env.REDIS_URL;
-      expect(isAsyncQueueEnabled()).toBe(false);
-    } finally {
-      if (previousRedis === undefined) delete process.env.REDIS_URL;
-      else process.env.REDIS_URL = previousRedis;
-      if (previousQueueFlag === undefined) delete process.env.QUEUE_ASYNC_ENABLED;
-      else process.env.QUEUE_ASYNC_ENABLED = previousQueueFlag;
-    }
-  });
-
-  it('activates the in-process nightly scheduler when queues are disabled', () => {
+  it('activates the PostgreSQL-backed nightly scheduler', () => {
     const previousEnabled = process.env.BRAIN_NIGHTLY_RESEARCH;
     const previousHour = process.env.BRAIN_NIGHTLY_RESEARCH_HOUR_UTC;
-    const previousQueueFlag = process.env.QUEUE_ASYNC_ENABLED;
-    const scheduler = new NightlyBrainSchedulerService();
+    const scheduler = new NightlyBrainSchedulerService({
+      create: async () => ({ id: 'nightly-task' }),
+    } as never);
     try {
       process.env.BRAIN_NIGHTLY_RESEARCH = 'true';
       process.env.BRAIN_NIGHTLY_RESEARCH_HOUR_UTC = String(
         (new Date().getUTCHours() + 1) % 24,
       );
-      process.env.QUEUE_ASYNC_ENABLED = 'false';
       scheduler.onModuleInit();
       expect(scheduler.isActive()).toBe(true);
     } finally {
@@ -87,14 +37,15 @@ describe('scalability guardrails', () => {
       else process.env.BRAIN_NIGHTLY_RESEARCH = previousEnabled;
       if (previousHour === undefined) delete process.env.BRAIN_NIGHTLY_RESEARCH_HOUR_UTC;
       else process.env.BRAIN_NIGHTLY_RESEARCH_HOUR_UTC = previousHour;
-      if (previousQueueFlag === undefined) delete process.env.QUEUE_ASYNC_ENABLED;
-      else process.env.QUEUE_ASYNC_ENABLED = previousQueueFlag;
     }
   });
 
-  it.each(['P1008', 'P2024'])('maps Prisma %s saturation to bounded 503 handling', (code) => {
-    expect(isPrismaPoolTimeout({ code })).toBe(true);
-  });
+  it.each(['53300', '57P03', 'ETIMEDOUT'])(
+    'maps PostgreSQL %s saturation to bounded 503 handling',
+    (code) => {
+      expect(isPostgreSqlPoolTimeout({ code })).toBe(true);
+    },
+  );
 
   it('attaches an explicit development tenant scope', async () => {
     const previousNodeEnv = process.env.NODE_ENV;

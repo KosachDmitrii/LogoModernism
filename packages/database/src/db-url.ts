@@ -1,8 +1,7 @@
-const DEFAULT_PRODUCTION_CONNECTION_LIMIT = '2';
-// Local development runs both the API and worker, so this is a per-process
-// limit. Keep their combined pool within typical Supabase free-tier capacity.
+// One API process owns interactive requests and a low-concurrency DB task runner.
+const DEFAULT_PRODUCTION_CONNECTION_LIMIT = '5';
 const DEFAULT_DEVELOPMENT_CONNECTION_LIMIT = '5';
-const DEFAULT_POOL_TIMEOUT_SECONDS = '5';
+const DEFAULT_POOL_TIMEOUT_SECONDS = '15';
 
 export function isSupabasePoolerUrl(url: string): boolean {
   try {
@@ -40,9 +39,10 @@ export function enhanceDatabaseUrl(url: string): string {
     if (!params.has('connection_limit')) {
       params.set(
         'connection_limit',
-        process.env.NODE_ENV === 'production'
-          ? DEFAULT_PRODUCTION_CONNECTION_LIMIT
-          : DEFAULT_DEVELOPMENT_CONNECTION_LIMIT,
+        process.env.DATABASE_CONNECTION_LIMIT ??
+          (process.env.NODE_ENV === 'production'
+            ? DEFAULT_PRODUCTION_CONNECTION_LIMIT
+            : DEFAULT_DEVELOPMENT_CONNECTION_LIMIT),
       );
     }
     if (!params.has('application_name')) {

@@ -24,7 +24,6 @@ export interface ComposePromptsOptions {
 
 export interface ComposeWorkControl {
   getSignal(): AbortSignal;
-  onJobQueued(jobId: string): void;
 }
 
 function toBrainPartnerState(
@@ -117,7 +116,6 @@ export function useComposePrompts(workControl?: ComposeWorkControl) {
         workControl
           ? {
               signal: workControl.getSignal(),
-              onJobQueued: workControl.onJobQueued,
             }
           : undefined,
       ).then((data) => ({ data, options }));

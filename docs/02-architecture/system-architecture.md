@@ -28,7 +28,7 @@
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
-│              PostgreSQL (Prisma) — Future Persistence        │
+│          PostgreSQL (parameterized SQL) — Persistence        │
 │  Users │ Organizations │ Projects │ Brands │ Logos          │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -45,7 +45,7 @@ logo-platform/
 │   ├── knowledge-base/   # Principles, graph, templates
 │   ├── prompt-engine/    # Rules, composer, scorer
 │   ├── ai-engines/       # 12 AI engines
-│   └── database/         # Prisma schema
+│   └── database/         # SQL client and migrations
 └── docs/             # Enterprise documentation
 ```
 

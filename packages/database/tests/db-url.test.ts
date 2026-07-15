@@ -6,14 +6,14 @@ import {
   isSupabaseTransactionPoolerUrl,
 } from '../src/db-url';
 
-test('adds bounded development Prisma pool defaults for runtime URLs', () => {
+test('adds bounded development pool defaults for runtime URLs', () => {
   const result = new URL(
     enhanceDatabaseUrl(
       'postgresql://postgres.example:secret@aws-0-eu.pooler.supabase.com:6543/postgres',
     ),
   );
   assert.equal(result.searchParams.get('connection_limit'), '5');
-  assert.equal(result.searchParams.get('pool_timeout'), '5');
+  assert.equal(result.searchParams.get('pool_timeout'), '15');
   assert.equal(result.searchParams.get('pgbouncer'), 'true');
 });
 

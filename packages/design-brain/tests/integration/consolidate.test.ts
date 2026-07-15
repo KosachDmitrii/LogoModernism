@@ -1,47 +1,45 @@
-import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, expect, it, beforeAll, beforeEach } from 'vitest';
 import {
-  createTestPrisma,
+  createTestDatabase,
+  getTestPrinciple,
   isBrainDbReady,
   resetBrainTables,
   seedLearnedPrinciple,
+  listTestPrinciples,
+  seedTasteSignal,
 } from '../helpers/db';
 import { consolidateBrain } from '../../src/learning/consolidate';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '@logo-platform/database';
 
 const describeIntegration = isBrainDbReady() ? describe : describe.skip;
 
 describeIntegration('consolidateBrain (integration)', () => {
-  let prisma: PrismaClient;
+  let database: DatabaseClient;
 
   beforeAll(async () => {
-    prisma = createTestPrisma();
-    await prisma.$connect();
-  });
-
-  afterAll(async () => {
-    await prisma.$disconnect();
+    database = createTestDatabase();
   });
 
   beforeEach(async () => {
-    await resetBrainTables(prisma);
+    await resetBrainTables(database);
   });
 
   it('merges duplicate learned principles by promptFragment', async () => {
-    await seedLearnedPrinciple(prisma, {
+    await seedLearnedPrinciple(database, {
       promptFragment: 'modular grid construction',
       weight: 1.2,
       confidence: 0.8,
       sourceIds: ['src-a'],
     });
-    await seedLearnedPrinciple(prisma, {
+    await seedLearnedPrinciple(database, {
       promptFragment: 'Modular Grid Construction!',
       weight: 0.8,
       confidence: 0.6,
       sourceIds: ['src-b'],
     });
 
-    const result = await consolidateBrain(prisma);
-    const remaining = await prisma.learnedPrinciple.findMany();
+    const result = await consolidateBrain(database);
+    const remaining = await listTestPrinciples(database);
 
     expect(result.mergedPrinciples).toBe(1);
     expect(remaining).toHaveLength(1);
@@ -50,20 +48,20 @@ describeIntegration('consolidateBrain (integration)', () => {
   });
 
   it('prunes weak principles with low weight and confidence', async () => {
-    await seedLearnedPrinciple(prisma, {
+    await seedLearnedPrinciple(database, {
       promptFragment: 'weak principle',
       weight: 0.2,
       confidence: 0.1,
       sourceIds: ['only-one'],
     });
-    await seedLearnedPrinciple(prisma, {
+    await seedLearnedPrinciple(database, {
       promptFragment: 'strong principle',
       weight: 1.5,
       confidence: 0.9,
     });
 
-    const result = await consolidateBrain(prisma);
-    const remaining = await prisma.learnedPrinciple.findMany();
+    const result = await consolidateBrain(database);
+    const remaining = await listTestPrinciples(database);
 
     expect(result.prunedPrinciples).toBe(1);
     expect(remaining).toHaveLength(1);
@@ -71,23 +69,21 @@ describeIntegration('consolidateBrain (integration)', () => {
   });
 
   it('updates principle weights from taste signal metadata during consolidate', async () => {
-    const principle = await seedLearnedPrinciple(prisma, {
+    const principle = await seedLearnedPrinciple(database, {
       promptFragment: 'flat vector rendering',
       weight: 1,
       confidence: 0.5,
     });
 
-    await prisma.brainTasteSignal.create({
-      data: {
-        signalType: 'LIKE',
-        score: 10,
-        context: 'Loved the flat vector look',
-        metadata: { principleIds: [principle.id] },
-      },
+    await seedTasteSignal(database, {
+      signalType: 'LIKE',
+      score: 10,
+      context: 'Loved the flat vector look',
+      metadata: { principleIds: [principle.id] },
     });
 
-    const result = await consolidateBrain(prisma);
-    const updated = await prisma.learnedPrinciple.findUnique({ where: { id: principle.id } });
+    const result = await consolidateBrain(database);
+    const updated = await getTestPrinciple(database, principle.id);
 
     expect(result.updatedWeights).toBeGreaterThan(0);
     expect(updated?.weight).toBeGreaterThan(1);
@@ -95,11 +91,11 @@ describeIntegration('consolidateBrain (integration)', () => {
   });
 
   it('keeps weights and confidence within safe bounds after consolidate', async () => {
-    await seedLearnedPrinciple(prisma, { promptFragment: 'principle-a', weight: 2.9, confidence: 0.95 });
-    await seedLearnedPrinciple(prisma, { promptFragment: 'principle-b', weight: 0.15, confidence: 0.15, sourceIds: ['x'] });
+    await seedLearnedPrinciple(database, { promptFragment: 'principle-a', weight: 2.9, confidence: 0.95 });
+    await seedLearnedPrinciple(database, { promptFragment: 'principle-b', weight: 0.15, confidence: 0.15, sourceIds: ['x'] });
 
-    await consolidateBrain(prisma);
-    const principles = await prisma.learnedPrinciple.findMany();
+    await consolidateBrain(database);
+    const principles = await listTestPrinciples(database);
 
     for (const principle of principles) {
       expect(principle.weight).toBeGreaterThanOrEqual(0.1);

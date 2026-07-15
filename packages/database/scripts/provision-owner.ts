@@ -1,7 +1,11 @@
 import './load-env';
-import { randomBytes } from 'node:crypto';
-import { createClient, type User as SupabaseUser } from '@supabase/supabase-js';
-import { prisma } from '../src';
+import { randomBytes, randomUUID } from 'node:crypto';
+import {
+  createClient,
+  type SupabaseClient,
+  type User as SupabaseUser,
+} from '@supabase/supabase-js';
+import { db, disconnect } from '../src';
 
 const email = (process.env.OWNER_EMAIL ?? '').trim().toLowerCase();
 const name = (process.env.OWNER_NAME ?? 'Dmitrii Kosach').trim();
@@ -23,7 +27,7 @@ function temporaryPassword(): string {
 }
 
 async function findAuthUser(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient<any, any, any, any, any>,
 ): Promise<SupabaseUser | null> {
   const perPage = 1_000;
   for (let page = 1; ; page += 1) {
@@ -69,15 +73,21 @@ async function main(): Promise<void> {
     authUser = data.user;
   }
 
-  const result = await prisma.$transaction(
+  const result = await db.transaction(
     async (tx) => {
       const [sameEmail, sameId, existingOrganization] = await Promise.all([
-        tx.user.findUnique({ where: { email } }),
-        tx.user.findUnique({ where: { id: authUser.id } }),
-        tx.organization.findUnique({
-          where: { slug: organizationSlug },
-          include: { members: { select: { userId: true, role: true } } },
-        }),
+        tx.maybeOne<{ id: string; email: string }>(
+          'SELECT id, email FROM users WHERE email = $1',
+          [email],
+        ),
+        tx.maybeOne<{ id: string; email: string }>(
+          'SELECT id, email FROM users WHERE id = $1',
+          [authUser.id],
+        ),
+        tx.maybeOne<{ id: string; name: string; slug: string }>(
+          'SELECT id, name, slug FROM organizations WHERE slug = $1',
+          [organizationSlug],
+        ),
       ]);
       if (sameEmail && sameEmail.id !== authUser.id) {
         throw new Error(`Application user ${email} is linked to a different Auth UUID`);
@@ -87,7 +97,12 @@ async function main(): Promise<void> {
       }
       if (
         existingOrganization &&
-        !existingOrganization.members.some((member) => member.userId === authUser.id) &&
+        !(await tx.maybeOne<{ userId: string }>(
+          `SELECT user_id
+           FROM organization_members
+           WHERE organization_id = $1 AND user_id = $2`,
+          [existingOrganization.id, authUser.id],
+        )) &&
         !attachExistingOrganization
       ) {
         throw new Error(
@@ -95,33 +110,40 @@ async function main(): Promise<void> {
         );
       }
 
-      const user = await tx.user.upsert({
-        where: { id: authUser.id },
-        create: { id: authUser.id, email, name, platformRole: 'PLATFORM_ADMIN' },
-        update: { email, name, platformRole: 'PLATFORM_ADMIN' },
-      });
+      const user = await tx.one<{
+        id: string;
+        email: string;
+        platformRole: 'PLATFORM_ADMIN';
+      }>(
+        `INSERT INTO users (id, email, name, platform_role, updated_at)
+         VALUES ($1, $2, $3, 'PLATFORM_ADMIN'::"PlatformRole", NOW())
+         ON CONFLICT (id) DO UPDATE
+           SET email = EXCLUDED.email,
+               name = EXCLUDED.name,
+               platform_role = EXCLUDED.platform_role,
+               updated_at = NOW()
+         RETURNING id, email, platform_role`,
+        [authUser.id, email, name],
+      );
       const organization =
         existingOrganization ??
-        (await tx.organization.create({
-          data: { name: organizationName, slug: organizationSlug },
-        }));
-      const membership = await tx.organizationMember.upsert({
-        where: {
-          organizationId_userId: {
-            organizationId: organization.id,
-            userId: user.id,
-          },
-        },
-        create: {
-          organizationId: organization.id,
-          userId: user.id,
-          role: 'OWNER',
-        },
-        update: { role: 'OWNER' },
-      });
+        (await tx.one<{ id: string; name: string; slug: string }>(
+          `INSERT INTO organizations (id, name, slug, updated_at)
+           VALUES ($1, $2, $3, NOW())
+           RETURNING id, name, slug`,
+          [randomUUID(), organizationName, organizationSlug],
+        ));
+      const membership = await tx.one<{ role: 'OWNER' }>(
+        `INSERT INTO organization_members (id, organization_id, user_id, role)
+         VALUES ($1, $2, $3, 'OWNER'::"Role")
+         ON CONFLICT (organization_id, user_id) DO UPDATE
+           SET role = EXCLUDED.role
+         RETURNING role`,
+        [randomUUID(), organization.id, user.id],
+      );
       return { user, organization, membership };
     },
-    { maxWait: 10_000, timeout: 30_000 },
+    { isolationLevel: 'READ COMMITTED' },
   );
 
   console.log(
@@ -148,4 +170,4 @@ void main()
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   })
-  .finally(() => prisma.$disconnect());
+  .finally(() => disconnect());

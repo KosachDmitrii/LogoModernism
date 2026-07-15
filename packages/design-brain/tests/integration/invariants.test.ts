@@ -1,10 +1,11 @@
-import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
-import type { PrismaClient } from '@logo-platform/database';
+import { describe, expect, it, beforeAll, beforeEach } from 'vitest';
+import type { DatabaseClient } from '@logo-platform/database';
 import { consolidateBrain } from '../../src/learning/consolidate';
 import { ingestFeedback } from '../../src/ingest/ingest-feedback';
 import { upsertLearnedPrinciple } from '../../src/storage/experience.repository';
 import {
-  createTestPrisma,
+  createTestDatabase,
+  getTestPrinciple,
   isBrainDbReady,
   resetBrainTables,
   seedExperienceWithEmbedding,
@@ -14,41 +15,36 @@ import { sampleFeedback } from '../helpers/fixtures';
 const describeIntegration = isBrainDbReady() ? describe : describe.skip;
 
 describeIntegration('brain invariants (integration)', () => {
-  let prisma: PrismaClient;
+  let database: DatabaseClient;
 
   beforeAll(async () => {
-    prisma = createTestPrisma();
-    await prisma.$connect();
-  });
-
-  afterAll(async () => {
-    await prisma.$disconnect();
+    database = createTestDatabase();
   });
 
   beforeEach(async () => {
-    await resetBrainTables(prisma);
+    await resetBrainTables(database);
   });
 
   it('never leaves orphan embeddings after experience deletion', async () => {
-    const experience = await seedExperienceWithEmbedding(prisma, {
+    const experience = await seedExperienceWithEmbedding(database, {
       title: 'Temporary',
       content: 'Temporary memory for orphan check',
     });
 
-    await prisma.brainExperience.delete({ where: { id: experience.id } });
+    await database.query('DELETE FROM design_brain_experiences WHERE id = $1', [experience.id]);
 
-    const orphanRows = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
+    const orphanRows = await database.query<{ count: bigint }>(
       `SELECT COUNT(*)::bigint AS count FROM design_brain_experience_embeddings WHERE experience_id = $1`,
-      experience.id,
+      [experience.id],
     );
 
-    expect(Number(orphanRows[0]?.count ?? 0)).toBe(0);
+    expect(Number(orphanRows.rows[0]?.count ?? 0)).toBe(0);
   });
 
   it(
     'maintains principle weight/confidence bounds after repeated feedback and consolidate cycles',
     async () => {
-      const principle = await upsertLearnedPrinciple(prisma, {
+      const principle = await upsertLearnedPrinciple(database, {
         category: 'geometry',
         ruleText: 'Use grids.',
         promptFragment: 'strict modular grid',
@@ -58,17 +54,17 @@ describeIntegration('brain invariants (integration)', () => {
 
       for (let i = 0; i < 5; i++) {
         await ingestFeedback(
-          prisma,
+          database,
           sampleFeedback({
             signalType: i % 2 === 0 ? 'LIKE' : 'DISLIKE',
             score: 10,
             metadata: { principleIds: [principle.id] },
           }),
         );
-        await consolidateBrain(prisma);
+        await consolidateBrain(database);
       }
 
-      const final = await prisma.learnedPrinciple.findUnique({ where: { id: principle.id } });
+      const final = await getTestPrinciple(database, principle.id);
       expect(final?.weight).toBeGreaterThanOrEqual(0.1);
       expect(final?.weight).toBeLessThanOrEqual(3);
       expect(final?.confidence).toBeGreaterThanOrEqual(0.1);
@@ -81,20 +77,24 @@ describeIntegration('brain invariants (integration)', () => {
     const sharedContent = 'Identical Swiss grid typography content for deduplication test';
     const sharedTitle = 'Shared Swiss Grid Notes';
 
-    await seedExperienceWithEmbedding(prisma, {
+    await seedExperienceWithEmbedding(database, {
       title: sharedTitle,
       content: sharedContent,
     });
-    await seedExperienceWithEmbedding(prisma, {
+    await seedExperienceWithEmbedding(database, {
       title: sharedTitle,
       content: sharedContent,
     });
 
-    const before = await prisma.brainExperience.count();
+    const before = (await database.one<{ count: number }>(
+      'SELECT COUNT(*)::int AS count FROM design_brain_experiences',
+    )).count;
     expect(before).toBeGreaterThanOrEqual(2);
 
-    const result = await consolidateBrain(prisma);
-    const after = await prisma.brainExperience.count();
+    const result = await consolidateBrain(database);
+    const after = (await database.one<{ count: number }>(
+      'SELECT COUNT(*)::int AS count FROM design_brain_experiences',
+    )).count;
 
     expect(result.deduplicatedExperiences).toBeGreaterThanOrEqual(1);
     expect(after).toBeLessThan(before);

@@ -1,11 +1,13 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
-import { prisma } from '@logo-platform/database';
-import Redis from 'ioredis';
+import { db } from '@logo-platform/database';
 import { Public } from './auth/public.decorator';
+import { BackgroundTasksService } from './background-tasks/background-tasks.service';
 
 @Public()
 @Controller('health')
 export class HealthController {
+  constructor(private readonly tasks: BackgroundTasksService) {}
+
   @Get()
   check() {
     return { status: 'ok', service: 'logo-platform-api' };
@@ -22,27 +24,31 @@ export class HealthController {
 
   @Get('ready')
   async ready() {
+    const startedAt = performance.now();
     try {
-      const migrationRows = await prisma.$queryRawUnsafe<
-        Array<{ failed: bigint; schema_ready: boolean }>
-      >(`
+      const schema = await db.one<{ schemaReady: boolean }>(`
         SELECT
-          COUNT(*) FILTER (WHERE finished_at IS NULL AND rolled_back_at IS NULL)::bigint AS failed,
-          to_regclass('public.generated_prompts') IS NOT NULL AS schema_ready
-        FROM "_prisma_migrations"
+          to_regclass('public.generated_prompts') IS NOT NULL
+            AND to_regclass('public.background_tasks') IS NOT NULL
+            AND to_regclass('public.usage_operations') IS NOT NULL
+            AND to_regclass('public.billing_webhook_events') IS NOT NULL AS schema_ready
       `);
-      const migrations = migrationRows[0];
-      if (!migrations?.schema_ready || Number(migrations.failed) > 0) {
+      if (!schema.schemaReady) {
         throw new Error('Database migrations are incomplete');
       }
-      const redis = await this.checkRedis();
+      const backlog = await this.tasks.backlog();
       return {
         status: 'ok',
         service: 'logo-platform-api',
         checks: {
-          database: { status: 'ok' },
+          database: {
+            status: 'ok',
+            latencyMs: Math.round(performance.now() - startedAt),
+          },
           migrations: { status: 'ok' },
-          redis: { status: redis },
+          backgroundTasks: Object.fromEntries(
+            backlog.map((item) => [item.status, item.count]),
+          ),
         },
       };
     } catch (error) {
@@ -52,30 +58,11 @@ export class HealthController {
         checks: {
           database: { status: 'error' },
           migrations: { status: 'error' },
-          redis: { status: 'error' },
+          backgroundTasks: { status: 'unknown' },
         },
         detail: error instanceof Error ? error.message : String(error),
       });
     }
   }
 
-  private async checkRedis(): Promise<'ok' | 'not_configured'> {
-    if (!process.env.REDIS_URL) {
-      if (process.env.NODE_ENV === 'production') throw new Error('REDIS_URL is not configured');
-      return 'not_configured';
-    }
-    const redis = new Redis(process.env.REDIS_URL, {
-      lazyConnect: true,
-      connectTimeout: 2_000,
-      commandTimeout: 2_000,
-      maxRetriesPerRequest: 0,
-    });
-    try {
-      await redis.connect();
-      if ((await redis.ping()) !== 'PONG') throw new Error('Redis ping failed');
-      return 'ok';
-    } finally {
-      redis.disconnect();
-    }
-  }
 }

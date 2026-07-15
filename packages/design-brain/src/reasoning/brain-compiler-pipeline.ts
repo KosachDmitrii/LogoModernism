@@ -13,8 +13,8 @@ import type {
   Recommendation,
   TasteProfile,
 } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
-import { compileBrief, createPromptExperience } from '@logo-platform/brief-compiler';
+import type { DatabaseClient } from '../storage/database-types';
+import { compileBrief } from '@logo-platform/brief-compiler';
 import { getPrincipleById } from '@logo-platform/knowledge-base';
 import { buildCompileKnowledgeContext } from '../knowledge/build-compile-knowledge';
 import { buildTerritoriesFromCompile } from './compiler-territories';
@@ -25,7 +25,6 @@ import { computeTasteProfile } from '../learning/taste-profile';
 import { semanticSearch } from '../retrieval/semantic-search';
 import { searchProjectMemory } from '../retrieval/project-memory';
 import { resolveCatalogIntelligence } from '../retrieval/catalog-intelligence';
-import { ingestFeedback } from '../ingest/ingest-feedback';
 
 export interface BrainPipelineResult {
   prompts: ComposedPrompt[];
@@ -129,7 +128,7 @@ function buildConstraintReport(
 }
 
 export async function runBriefCompilerPipeline(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   request: BrainGenerateRequest,
 ): Promise<BrainPipelineResult> {
   if (!request.organizationId) {
@@ -147,20 +146,20 @@ export async function runBriefCompilerPipeline(
 
   const [searchResult, tasteProfile, projectMemory, architecture, catalogResolved] =
     await Promise.all([
-      semanticSearch(prisma, {
+      semanticSearch(client, {
         query: retrievalQuery,
         limit: 4,
         organizationId: request.organizationId,
         projectId: request.projectId,
       }),
-      computeTasteProfile(prisma, request),
-      searchProjectMemory(prisma, {
+      computeTasteProfile(client, request),
+      searchProjectMemory(client, {
         companyName: request.companyName,
         industry: request.industry,
         organizationId: request.organizationId,
         projectId: request.projectId,
       }),
-      buildBrainArchitecture(prisma, request, []),
+      buildBrainArchitecture(client, request, []),
       Promise.resolve(resolveCatalogIntelligence(request)),
     ]);
 
@@ -198,27 +197,6 @@ export async function runBriefCompilerPipeline(
   const bestPrompt = [...prompts].sort(
     (a, b) => (b.scores?.promptQuality ?? 0) - (a.scores?.promptQuality ?? 0),
   )[0]!;
-
-  for (const compiled of compile.prompts) {
-    const experience = createPromptExperience(compiled, 'generated');
-    await ingestFeedback(prisma, {
-      signalType: 'APPROVE',
-      score: Math.round(scoreCompiledPrompt(compiled.positive, compile, catalogRequest).promptQuality),
-      context: `Brief compiler generated: ${experience.positive.slice(0, 200)}`,
-      organizationId: request.organizationId,
-      projectId: request.projectId,
-      metadata: {
-        briefCompiler: true,
-        briefHash: experience.briefHash,
-        schemaVersion: experience.schemaVersion,
-        variantAxis: experience.variantAxis,
-        overrides: compile.resolved.overrides,
-        readiness: compile.readiness,
-        companyName: catalogRequest.companyName,
-        industry: catalogRequest.industry,
-      },
-    }).catch(() => undefined);
-  }
 
   return {
     prompts,

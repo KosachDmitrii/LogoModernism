@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
-import { pushSchema, ensureBrainSchema, createTestPrisma } from './helpers/db';
+import { pushSchema, ensureBrainSchema, createTestDatabase } from './helpers/db';
 
 const REPO_ROOT = resolve(__dirname, '../../..');
 process.env.LOGO_PLATFORM_ROOT = REPO_ROOT;
@@ -13,7 +13,7 @@ export async function setup(): Promise<() => Promise<void>> {
     return async () => undefined;
   }
 
-  let databaseUrl = process.env.BRAIN_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+  let databaseUrl = process.env.BRAIN_TEST_DATABASE_URL;
 
   if (!databaseUrl && process.env.BRAIN_USE_TESTCONTAINERS !== '0') {
     try {
@@ -49,10 +49,8 @@ export async function setup(): Promise<() => Promise<void>> {
 
   try {
     await pushSchema(databaseUrl);
-    const prisma = createTestPrisma();
-    await prisma.$connect();
-    await ensureBrainSchema(prisma);
-    await prisma.$disconnect();
+    const client = createTestDatabase();
+    await ensureBrainSchema(client);
     process.env.BRAIN_DB_READY = 'true';
     console.info('[brain-tests] Database ready for integration tests');
   } catch (error) {

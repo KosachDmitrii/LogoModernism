@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { prisma } from '@logo-platform/database';
+import { db } from '@logo-platform/database';
 import { consolidateBrain } from '../learning/consolidate';
 import { ensureBrainSchema } from '../storage/pgvector';
 import { loadProjectEnv } from '../load-env';
@@ -22,16 +22,12 @@ async function main() {
     process.exit(1);
   }
 
-  await ensureBrainSchema(prisma);
-  const result = await consolidateBrain(prisma);
+  await ensureBrainSchema(db);
+  const result = await consolidateBrain(db);
   console.log(JSON.stringify(result, null, 2));
 }
 
-main()
-  .catch((error) => {
+main().catch((error) => {
     console.error(error);
     process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
   });

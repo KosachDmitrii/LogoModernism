@@ -40,4 +40,4 @@ npm run db:push -w @logo-platform/database
 
 ## Schema Location
 
-`packages/database/prisma/schema.prisma`
+`packages/database/sql/migrations`

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   ConflictException,
   HttpException,
@@ -5,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, prisma } from '@logo-platform/database';
+import { db, type DatabaseClient } from '@logo-platform/database';
 import {
   PLAN_ENTITLEMENTS,
   type Plan,
@@ -16,11 +17,27 @@ import type { TenantScope } from '../auth/tenant-context';
 
 const RESERVATION_TTL_MS = 30 * 60 * 1_000;
 const UNLIMITED_BUCKET_CREDITS = 1_000_000_000;
-const USAGE_TRANSACTION_OPTIONS = {
-  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-  maxWait: 10_000,
-  timeout: 20_000,
-} as const;
+const SERIALIZABLE = { isolationLevel: 'SERIALIZABLE' } as const;
+
+type UsageOperation = {
+  id: string;
+  organizationId: string;
+  userId: string | null;
+  projectId: string | null;
+  bucketId: string;
+  operationKey: string;
+  idempotencyKey: string;
+  status: 'RESERVED' | 'PROCESSING' | 'COMMITTED' | 'RELEASED' | 'EXPIRED';
+  reservedCredits: number;
+  includedReservedCredits: number;
+  purchasedReservedCredits: number;
+  actualCredits: number | null;
+  jobId: string | null;
+  metadata: unknown;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 function billingPeriod(now = new Date()): { start: Date; end: Date } {
   return {
@@ -40,6 +57,10 @@ function quotaExceeded(resetAt: Date): HttpException {
   );
 }
 
+async function lockOrganization(tx: DatabaseClient, organizationId: string) {
+  await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [organizationId]);
+}
+
 @Injectable()
 export class UsageService {
   async reserve(input: {
@@ -47,7 +68,7 @@ export class UsageService {
     operationKey: UsageOperationKey;
     credits: number;
     idempotencyKey: string;
-    metadata?: Prisma.InputJsonValue;
+    metadata?: unknown;
   }) {
     if (!Number.isInteger(input.credits) || input.credits <= 0) {
       throw new ConflictException('Reservation credits must be a positive integer');
@@ -55,228 +76,261 @@ export class UsageService {
     const idempotencyKey = input.idempotencyKey.trim();
     if (!idempotencyKey) throw new ConflictException('Idempotency key is required');
 
-    return prisma.$transaction(
-      async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.tenant.organizationId}))`;
-
-        const existing = await tx.usageOperation.findUnique({
-          where: {
-            organizationId_idempotencyKey: {
-              organizationId: input.tenant.organizationId,
-              idempotencyKey,
-            },
-          },
-        });
-        if (existing) {
-          if (
-            existing.operationKey !== input.operationKey ||
-            existing.reservedCredits !== input.credits
-          ) {
-            throw new ConflictException({
-              code: 'IDEMPOTENCY_CONFLICT',
-              message: 'Idempotency key was already used for another operation',
-            });
-          }
+    return db.transaction(async (tx) => {
+      await lockOrganization(tx, input.tenant.organizationId);
+      const existing = await tx.maybeOne<UsageOperation>(
+        `SELECT * FROM usage_operations
+         WHERE organization_id = $1 AND idempotency_key = $2`,
+        [input.tenant.organizationId, idempotencyKey],
+      );
+      if (existing) {
+        if (
+          existing.operationKey !== input.operationKey ||
+          existing.reservedCredits !== input.credits
+        ) {
           throw new ConflictException({
-            code: 'IDEMPOTENCY_REPLAY',
-            message: 'This operation is already in progress or completed',
-            usageOperationId: existing.id,
+            code: 'IDEMPOTENCY_CONFLICT',
+            message: 'Idempotency key was already used for another operation',
           });
         }
-
-        const organization = await tx.organization.findUnique({
-          where: { id: input.tenant.organizationId },
-          select: { plan: true },
+        throw new ConflictException({
+          code: 'IDEMPOTENCY_REPLAY',
+          message: 'This operation is already in progress or completed',
+          usageOperationId: existing.id,
         });
-        if (!organization) throw new NotFoundException('Organization not found');
+      }
 
-        const plan = organization.plan as Plan;
-        const entitlement = PLAN_ENTITLEMENTS[plan];
-        const includedCredits = entitlement.monthlyCredits ?? UNLIMITED_BUCKET_CREDITS;
-        const period = billingPeriod();
-        const bucket = await tx.usageBucket.upsert({
-          where: {
-            organizationId_periodStart: {
-              organizationId: input.tenant.organizationId,
-              periodStart: period.start,
-            },
-          },
-          create: {
-            organizationId: input.tenant.organizationId,
-            periodStart: period.start,
-            periodEnd: period.end,
-            plan,
-            includedCredits,
-          },
-          update: {
-            plan,
-            includedCredits,
-            periodEnd: period.end,
-          },
-        });
-        const balance = await tx.creditBalance.upsert({
-          where: { organizationId: input.tenant.organizationId },
-          create: { organizationId: input.tenant.organizationId },
-          update: {},
-        });
+      const organization = await tx.maybeOne<{ plan: Plan }>(
+        'SELECT plan FROM organizations WHERE id = $1',
+        [input.tenant.organizationId],
+      );
+      if (!organization) throw new NotFoundException('Organization not found');
 
-        const includedAvailable = Math.max(
-          0,
-          bucket.includedCredits - bucket.committedCredits - bucket.reservedCredits,
+      const plan = organization.plan;
+      const includedCredits =
+        PLAN_ENTITLEMENTS[plan].monthlyCredits ?? UNLIMITED_BUCKET_CREDITS;
+      const period = billingPeriod();
+      const bucket = await tx.one<{
+        id: string;
+        includedCredits: number;
+        committedCredits: number;
+        reservedCredits: number;
+      }>(
+        `INSERT INTO usage_buckets (
+           id, organization_id, period_start, period_end, plan,
+           included_credits, updated_at
+         ) VALUES ($1, $2, $3, $4, $5::"Plan", $6, NOW())
+         ON CONFLICT (organization_id, period_start) DO UPDATE
+           SET plan = EXCLUDED.plan, included_credits = EXCLUDED.included_credits,
+               period_end = EXCLUDED.period_end, updated_at = NOW()
+         RETURNING id, included_credits, committed_credits, reserved_credits`,
+        [
+          randomUUID(),
+          input.tenant.organizationId,
+          period.start,
+          period.end,
+          plan,
+          includedCredits,
+        ],
+      );
+      const balance = await tx.one<{ availableCredits: number }>(
+        `INSERT INTO credit_balances (organization_id, updated_at)
+         VALUES ($1, NOW())
+         ON CONFLICT (organization_id) DO UPDATE SET updated_at = NOW()
+         RETURNING available_credits`,
+        [input.tenant.organizationId],
+      );
+
+      const includedAvailable = Math.max(
+        0,
+        bucket.includedCredits - bucket.committedCredits - bucket.reservedCredits,
+      );
+      const includedReservedCredits = Math.min(includedAvailable, input.credits);
+      const purchasedReservedCredits = input.credits - includedReservedCredits;
+      if (purchasedReservedCredits > balance.availableCredits) {
+        throw quotaExceeded(period.end);
+      }
+
+      await tx.query(
+        `UPDATE usage_buckets
+         SET reserved_credits = reserved_credits + $2, updated_at = NOW()
+         WHERE id = $1`,
+        [bucket.id, includedReservedCredits],
+      );
+      if (purchasedReservedCredits > 0) {
+        const debited = await tx.maybeOne<{ organizationId: string }>(
+          `UPDATE credit_balances
+           SET available_credits = available_credits - $2, updated_at = NOW()
+           WHERE organization_id = $1 AND available_credits >= $2
+           RETURNING organization_id`,
+          [input.tenant.organizationId, purchasedReservedCredits],
         );
-        const includedReservedCredits = Math.min(includedAvailable, input.credits);
-        const purchasedReservedCredits = input.credits - includedReservedCredits;
-        if (purchasedReservedCredits > balance.availableCredits) {
-          throw quotaExceeded(period.end);
-        }
+        if (!debited) throw quotaExceeded(period.end);
+      }
 
-        await tx.usageBucket.update({
-          where: { id: bucket.id },
-          data: { reservedCredits: { increment: includedReservedCredits } },
-        });
-        if (purchasedReservedCredits > 0) {
-          await tx.creditBalance.update({
-            where: { organizationId: input.tenant.organizationId },
-            data: { availableCredits: { decrement: purchasedReservedCredits } },
-          });
-        }
-
-        return tx.usageOperation.create({
-          data: {
-            organizationId: input.tenant.organizationId,
-            userId: input.tenant.userId,
-            projectId: input.tenant.projectId,
-            bucketId: bucket.id,
-            operationKey: input.operationKey,
-            idempotencyKey,
-            reservedCredits: input.credits,
-            includedReservedCredits,
-            purchasedReservedCredits,
-            metadata: input.metadata ?? {},
-            expiresAt: new Date(Date.now() + RESERVATION_TTL_MS),
-          },
-        });
-      },
-      USAGE_TRANSACTION_OPTIONS,
-    );
+      return tx.one<UsageOperation>(
+        `INSERT INTO usage_operations (
+           id, organization_id, user_id, project_id, bucket_id, operation_key,
+           idempotency_key, reserved_credits, included_reserved_credits,
+           purchased_reserved_credits, metadata, expires_at, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, NOW())
+         RETURNING *`,
+        [
+          randomUUID(),
+          input.tenant.organizationId,
+          input.tenant.userId,
+          input.tenant.projectId ?? null,
+          bucket.id,
+          input.operationKey,
+          idempotencyKey,
+          input.credits,
+          includedReservedCredits,
+          purchasedReservedCredits,
+          JSON.stringify(input.metadata ?? {}),
+          new Date(Date.now() + RESERVATION_TTL_MS),
+        ],
+      );
+    }, SERIALIZABLE);
   }
 
   async markProcessing(id: string, jobId?: string) {
-    return prisma.usageOperation.updateMany({
-      where: { id, status: { in: ['RESERVED', 'PROCESSING'] } },
-      data: {
-        status: 'PROCESSING',
-        jobId,
-        expiresAt: new Date(Date.now() + RESERVATION_TTL_MS),
-      },
-    });
+    const rows = await db.query<{ id: string }>(
+      `UPDATE usage_operations
+       SET status = 'PROCESSING'::"UsageReservationStatus", job_id = $2,
+           expires_at = $3, updated_at = NOW()
+       WHERE id = $1
+         AND status IN ('RESERVED'::"UsageReservationStatus", 'PROCESSING'::"UsageReservationStatus")
+       RETURNING id`,
+      [id, jobId ?? null, new Date(Date.now() + RESERVATION_TTL_MS)],
+    );
+    return { count: rows.rowCount };
   }
 
   async commit(id: string, actualCredits?: number) {
-    return prisma.$transaction(
-      async (tx) => {
-        const operation = await tx.usageOperation.findUnique({ where: { id } });
-        if (!operation) throw new NotFoundException('Usage reservation not found');
-        if (operation.status === 'COMMITTED') return operation;
-        if (['RELEASED', 'EXPIRED'].includes(operation.status)) {
-          throw new ConflictException('Usage reservation is no longer active');
-        }
+    return db.transaction(async (tx) => {
+      const initial = await tx.maybeOne<UsageOperation>(
+        'SELECT * FROM usage_operations WHERE id = $1',
+        [id],
+      );
+      if (!initial) throw new NotFoundException('Usage reservation not found');
+      await lockOrganization(tx, initial.organizationId);
+      const operation = await tx.one<UsageOperation>(
+        'SELECT * FROM usage_operations WHERE id = $1 FOR UPDATE',
+        [id],
+      );
+      if (operation.status === 'COMMITTED') return operation;
+      if (operation.status === 'RELEASED' || operation.status === 'EXPIRED') {
+        throw new ConflictException('Usage reservation is no longer active');
+      }
+      const charged = actualCredits ?? operation.reservedCredits;
+      if (!Number.isInteger(charged) || charged < 0 || charged > operation.reservedCredits) {
+        throw new ConflictException('Actual credits exceed the reservation');
+      }
+      const includedCharged = Math.min(charged, operation.includedReservedCredits);
+      const purchasedCharged = Math.max(0, charged - includedCharged);
+      const purchasedRefund = operation.purchasedReservedCredits - purchasedCharged;
 
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${operation.organizationId}))`;
-        const charged = actualCredits ?? operation.reservedCredits;
-        if (!Number.isInteger(charged) || charged < 0 || charged > operation.reservedCredits) {
-          throw new ConflictException('Actual credits exceed the reservation');
-        }
-        const includedCharged = Math.min(charged, operation.includedReservedCredits);
-        const purchasedCharged = Math.max(0, charged - includedCharged);
-        const purchasedRefund =
-          operation.purchasedReservedCredits - purchasedCharged;
-
-        await tx.usageBucket.update({
-          where: { id: operation.bucketId },
-          data: {
-            reservedCredits: { decrement: operation.includedReservedCredits },
-            committedCredits: { increment: includedCharged },
-          },
-        });
-        if (purchasedRefund > 0) {
-          await tx.creditBalance.update({
-            where: { organizationId: operation.organizationId },
-            data: { availableCredits: { increment: purchasedRefund } },
-          });
-        }
-        return tx.usageOperation.update({
-          where: { id },
-          data: { status: 'COMMITTED', actualCredits: charged },
-        });
-      },
-      USAGE_TRANSACTION_OPTIONS,
-    );
+      await tx.query(
+        `UPDATE usage_buckets
+         SET reserved_credits = reserved_credits - $2,
+             committed_credits = committed_credits + $3, updated_at = NOW()
+         WHERE id = $1`,
+        [operation.bucketId, operation.includedReservedCredits, includedCharged],
+      );
+      if (purchasedRefund > 0) {
+        await tx.query(
+          `UPDATE credit_balances
+           SET available_credits = available_credits + $2, updated_at = NOW()
+           WHERE organization_id = $1`,
+          [operation.organizationId, purchasedRefund],
+        );
+      }
+      return tx.one<UsageOperation>(
+        `UPDATE usage_operations
+         SET status = 'COMMITTED'::"UsageReservationStatus",
+             actual_credits = $2, updated_at = NOW()
+         WHERE id = $1 RETURNING *`,
+        [id, charged],
+      );
+    }, SERIALIZABLE);
   }
 
   async release(id: string) {
-    return prisma.$transaction(
-      async (tx) => {
-        const operation = await tx.usageOperation.findUnique({ where: { id } });
-        if (!operation) throw new NotFoundException('Usage reservation not found');
-        if (['RELEASED', 'EXPIRED'].includes(operation.status)) return operation;
-        if (operation.status === 'COMMITTED') {
-          throw new ConflictException('Committed usage cannot be released');
-        }
-
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${operation.organizationId}))`;
-        await tx.usageBucket.update({
-          where: { id: operation.bucketId },
-          data: {
-            reservedCredits: { decrement: operation.includedReservedCredits },
-          },
-        });
-        if (operation.purchasedReservedCredits > 0) {
-          await tx.creditBalance.update({
-            where: { organizationId: operation.organizationId },
-            data: {
-              availableCredits: { increment: operation.purchasedReservedCredits },
-            },
-          });
-        }
-        return tx.usageOperation.update({
-          where: { id },
-          data: { status: 'RELEASED', actualCredits: 0 },
-        });
-      },
-      USAGE_TRANSACTION_OPTIONS,
-    );
+    return db.transaction(async (tx) => {
+      const initial = await tx.maybeOne<UsageOperation>(
+        'SELECT * FROM usage_operations WHERE id = $1',
+        [id],
+      );
+      if (!initial) throw new NotFoundException('Usage reservation not found');
+      await lockOrganization(tx, initial.organizationId);
+      const operation = await tx.one<UsageOperation>(
+        'SELECT * FROM usage_operations WHERE id = $1 FOR UPDATE',
+        [id],
+      );
+      if (operation.status === 'RELEASED' || operation.status === 'EXPIRED') {
+        return operation;
+      }
+      if (operation.status === 'COMMITTED') {
+        throw new ConflictException('Committed usage cannot be released');
+      }
+      await tx.query(
+        `UPDATE usage_buckets
+         SET reserved_credits = reserved_credits - $2, updated_at = NOW()
+         WHERE id = $1`,
+        [operation.bucketId, operation.includedReservedCredits],
+      );
+      if (operation.purchasedReservedCredits > 0) {
+        await tx.query(
+          `UPDATE credit_balances
+           SET available_credits = available_credits + $2, updated_at = NOW()
+           WHERE organization_id = $1`,
+          [operation.organizationId, operation.purchasedReservedCredits],
+        );
+      }
+      return tx.one<UsageOperation>(
+        `UPDATE usage_operations
+         SET status = 'RELEASED'::"UsageReservationStatus",
+             actual_credits = 0, updated_at = NOW()
+         WHERE id = $1 RETURNING *`,
+        [id],
+      );
+    }, SERIALIZABLE);
   }
 
   async grantPurchasedCredits(organizationId: string, credits: number): Promise<void> {
     if (!Number.isInteger(credits) || credits <= 0) return;
-    await prisma.creditBalance.upsert({
-      where: { organizationId },
-      create: { organizationId, availableCredits: credits },
-      update: { availableCredits: { increment: credits } },
-    });
+    await db.query(
+      `INSERT INTO credit_balances (organization_id, available_credits, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (organization_id) DO UPDATE
+         SET available_credits = credit_balances.available_credits + EXCLUDED.available_credits,
+             updated_at = NOW()`,
+      [organizationId, credits],
+    );
   }
 
   async reapExpired(limit = 100): Promise<number> {
-    const expired = await prisma.usageOperation.findMany({
-      where: {
-        status: { in: ['RESERVED', 'PROCESSING'] },
-        expiresAt: { lt: new Date() },
-      },
-      select: { id: true },
-      take: limit,
-    });
+    const expired = await db.query<{ id: string }>(
+      `SELECT id FROM usage_operations
+       WHERE status IN ('RESERVED'::"UsageReservationStatus", 'PROCESSING'::"UsageReservationStatus")
+         AND expires_at < NOW()
+       ORDER BY expires_at ASC LIMIT $1`,
+      [limit],
+    );
     let released = 0;
-    for (const operation of expired) {
+    for (const operation of expired.rows) {
       try {
         await this.release(operation.id);
-        await prisma.usageOperation.updateMany({
-          where: { id: operation.id, status: 'RELEASED' },
-          data: { status: 'EXPIRED' },
-        });
-        released += 1;
+        const rows = await db.query<{ id: string }>(
+          `UPDATE usage_operations
+           SET status = 'EXPIRED'::"UsageReservationStatus", updated_at = NOW()
+           WHERE id = $1 AND status = 'RELEASED'::"UsageReservationStatus"
+           RETURNING id`,
+          [operation.id],
+        );
+        released += rows.rowCount;
       } catch {
-        // Another API/worker instance may have committed or released it.
+        // Another process may have committed or released it.
       }
     }
     return released;
@@ -285,24 +339,22 @@ export class UsageService {
   async summary(organizationId: string): Promise<UsageSummary> {
     const period = billingPeriod();
     const [organization, bucket, balance] = await Promise.all([
-      prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: { plan: true },
-      }),
-      prisma.usageBucket.findUnique({
-        where: {
-          organizationId_periodStart: {
-            organizationId,
-            periodStart: period.start,
-          },
-        },
-      }),
-      prisma.creditBalance.findUnique({ where: { organizationId } }),
+      db.maybeOne<{ plan: Plan }>('SELECT plan FROM organizations WHERE id = $1', [
+        organizationId,
+      ]),
+      db.maybeOne<{ committedCredits: number; reservedCredits: number }>(
+        `SELECT committed_credits, reserved_credits FROM usage_buckets
+         WHERE organization_id = $1 AND period_start = $2`,
+        [organizationId, period.start],
+      ),
+      db.maybeOne<{ availableCredits: number }>(
+        'SELECT available_credits FROM credit_balances WHERE organization_id = $1',
+        [organizationId],
+      ),
     ]);
     if (!organization) throw new NotFoundException('Organization not found');
 
-    const plan = organization.plan as Plan;
-    const includedCredits = PLAN_ENTITLEMENTS[plan].monthlyCredits;
+    const includedCredits = PLAN_ENTITLEMENTS[organization.plan].monthlyCredits;
     const committedCredits = bucket?.committedCredits ?? 0;
     const reservedCredits = bucket?.reservedCredits ?? 0;
     const purchasedCredits = balance?.availableCredits ?? 0;
@@ -311,7 +363,6 @@ export class UsageService {
         ? null
         : Math.max(0, includedCredits - committedCredits - reservedCredits) +
           purchasedCredits;
-
     return {
       periodStart: period.start.toISOString(),
       periodEnd: period.end.toISOString(),

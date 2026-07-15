@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@logo-platform/database';
+import type { BrainTasteSignalRow, DatabaseClient } from '../storage/database-types';
 import type { BrainTenantScope } from '@logo-platform/shared';
 
 export interface ProjectMemory {
@@ -30,7 +30,7 @@ function extractMotifs(text: string): string[] {
 }
 
 export async function loadProjectMemory(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   companyName?: string,
   scope?: BrainTenantScope,
 ): Promise<ProjectMemory | undefined> {
@@ -40,18 +40,22 @@ export async function loadProjectMemory(
   const name = companyName?.trim();
   if (!name) return undefined;
 
-  const signals = await prisma.brainTasteSignal.findMany({
-    where: {
-      organizationId: scope.organizationId,
-      ...(scope.projectId ? { projectId: scope.projectId } : {}),
-      OR: [
-        { context: { contains: name, mode: 'insensitive' } },
-        { metadata: { path: ['companyName'], equals: name } },
-      ],
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-  });
+  const values: unknown[] = [scope.organizationId, `%${name}%`, name];
+  const filters = [
+    'organization_id = $1',
+    `(context ILIKE $2 OR metadata->>'companyName' = $3)`,
+  ];
+  if (scope.projectId) {
+    values.push(scope.projectId);
+    filters.push(`project_id = $${values.length}`);
+  }
+  const { rows: signals } = await client.query<BrainTasteSignalRow>(
+    `SELECT * FROM design_brain_taste_signals
+     WHERE ${filters.join(' AND ')}
+     ORDER BY created_at DESC
+     LIMIT 100`,
+    values,
+  );
 
   if (!signals.length) return undefined;
 

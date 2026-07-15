@@ -18,6 +18,7 @@ interface VisionPageResult {
 async function ocrPdfBatch(
   pdfBase64: string,
   pageNumbers: number[],
+  signal?: AbortSignal,
 ): Promise<VisionPageResult[]> {
   const apiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
   if (!apiKey) {
@@ -43,6 +44,7 @@ async function ocrPdfBatch(
           },
         ],
       }),
+      signal,
     },
     { timeoutMs: 60_000 },
   );
@@ -87,12 +89,16 @@ async function ocrPdfBatch(
   return results;
 }
 
-export async function extractPdfTextWithOcr(buffer: Buffer): Promise<{
+export async function extractPdfTextWithOcr(
+  buffer: Buffer,
+  signal?: AbortSignal,
+): Promise<{
   pages: string[];
   pageCount: number;
   ocrUsed: boolean;
   ocrPages: number;
 }> {
+  signal?.throwIfAborted();
   const parsed = await pdfParse(buffer);
   const embeddedText = parsed.text.replace(/\s+/g, ' ').trim();
   const pageCount = Math.max(1, parsed.numpages || 1);
@@ -119,12 +125,13 @@ export async function extractPdfTextWithOcr(buffer: Buffer): Promise<{
   const ocrPages: string[] = [];
 
   for (let start = 1; start <= maxPages; start += OCR_PAGES_PER_REQUEST) {
+    signal?.throwIfAborted();
     const batch = Array.from(
       { length: Math.min(OCR_PAGES_PER_REQUEST, maxPages - start + 1) },
       (_, index) => start + index,
     );
 
-    const batchResults = await ocrPdfBatch(pdfBase64, batch);
+    const batchResults = await ocrPdfBatch(pdfBase64, batch, signal);
     for (const result of batchResults.sort((a, b) => a.pageNumber - b.pageNumber)) {
       ocrPages[result.pageNumber - 1] = result.text;
     }

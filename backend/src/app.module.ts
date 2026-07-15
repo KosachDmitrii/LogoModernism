@@ -7,14 +7,14 @@ import { ImagesModule } from './images/images.module';
 import { DesignBrainModule } from './design-brain/design-brain.module';
 import { HealthController } from './health.controller';
 import { requestIdMiddleware } from './common/request-id.middleware';
-import { PrismaPoolTimeoutFilter } from './common/prisma-pool-timeout.filter';
+import { PostgreSqlPoolTimeoutFilter } from './common/postgresql-pool-timeout.filter';
 import { DatabaseShutdownService } from './common/database-shutdown.service';
 import { RequestTimingInterceptor } from './observability/request-timing.interceptor';
 import { AuthModule } from './auth/auth.module';
-import { QueueModule } from './queue/queue.module';
 import { UsageModule } from './usage/usage.module';
 import { BillingModule } from './billing/billing.module';
 import { GuestModule } from './guest/guest.module';
+import { BackgroundTasksModule } from './background-tasks/background-tasks.module';
 
 @Module({
   imports: [
@@ -22,7 +22,7 @@ import { GuestModule } from './guest/guest.module';
     UsageModule,
     BillingModule,
     GuestModule,
-    QueueModule,
+    BackgroundTasksModule,
     PromptsModule,
     PrinciplesModule,
     EnginesModule,
@@ -38,7 +38,7 @@ import { GuestModule } from './guest/guest.module';
     },
     {
       provide: APP_FILTER,
-      useClass: PrismaPoolTimeoutFilter,
+      useClass: PostgreSqlPoolTimeoutFilter,
     },
   ],
 })

@@ -22,7 +22,10 @@ export class ImagesService {
     return this.toPersistedResult(result);
   }
 
-  async generateFromComposedPrompt(dto: GenerateFromComposedPromptDto) {
+  async generateFromComposedPrompt(
+    dto: GenerateFromComposedPromptDto,
+    signal?: AbortSignal,
+  ) {
     const result = await generateImages({
       prompt: dto.text,
       companyName: normalizeBrandName(dto.companyName),
@@ -35,6 +38,7 @@ export class ImagesService {
       colorSelections: dto.colorSelections,
       allowShadows: dto.allowShadows,
       allowPhotoreal: dto.allowPhotoreal,
+      signal,
     });
     return this.toPersistedResult(result);
   }

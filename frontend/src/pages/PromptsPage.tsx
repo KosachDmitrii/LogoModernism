@@ -30,7 +30,6 @@ import { getBriefReadiness } from '../lib/brief-readiness';
 import { toPromptGenerateIntent } from '../lib/prompt-generate-intent';
 import { useAuth } from '../auth/AuthProvider';
 import { hasPermission } from '../auth/permissions';
-import { cancelBackgroundJob } from '../api';
 
 const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
   1: 'prompts.step.projectSubtitle',
@@ -87,12 +86,9 @@ export function PromptsPage() {
   const [regeneratingAction, setRegeneratingAction] = useState<PartnerRegenerateAction | null>(null);
 
   const workControllerRef = useRef(new AbortController());
-  const activeJobIdsRef = useRef(new Set<string>());
   const getWorkSignal = () => workControllerRef.current.signal;
-  const registerJob = (jobId: string) => activeJobIdsRef.current.add(jobId);
   const compose = useComposePrompts({
     getSignal: getWorkSignal,
-    onJobQueued: registerJob,
   });
 
   const canGoToStep = (step: PromptWizardStep) => {
@@ -148,9 +144,6 @@ export function PromptsPage() {
 
   const confirmStartOver = () => {
     workControllerRef.current.abort();
-    const activeJobIds = [...activeJobIdsRef.current];
-    activeJobIdsRef.current.clear();
-    void Promise.allSettled(activeJobIds.map((jobId) => cancelBackgroundJob(jobId)));
     workControllerRef.current = new AbortController();
     compose.reset();
     resetWizard();
@@ -246,7 +239,6 @@ export function PromptsPage() {
                     selected={selectedPromptId === prompt.id}
                     onSelect={() => selectPrompt(prompt.id)}
                     getWorkSignal={getWorkSignal}
-                    onJobQueued={registerJob}
                   />
                 ))}
               </div>

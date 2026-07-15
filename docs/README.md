@@ -10,7 +10,7 @@ Enterprise SaaS platform for AI-powered modernist logo design.
 | [02-architecture](./02-architecture/) | System architecture, diagrams |
 | [03-ai](./03-ai/) | AI engines specification |
 | [04-knowledge](./04-knowledge/) | Knowledge base, Brand DNA |
-| [05-database](./05-database/) | PostgreSQL schema, Prisma |
+| [05-database](./05-database/) | PostgreSQL schema and SQL migrations |
 | [06-api](./06-api/) | OpenAPI specification |
 | [07-ui](./07-ui/) | UI/UX design system |
 | [08-development](./08-development/) | Roadmap, Cursor backlog |
@@ -51,5 +51,5 @@ npm run dev
 
 - **Frontend:** React 19, Vite, Tailwind 4, React Router, Zustand, React Query
 - **Backend:** NestJS, TypeScript
-- **Database:** PostgreSQL, Prisma
+- **Database:** PostgreSQL, node-postgres (`pg`)
 - **Packages:** shared, knowledge-base, prompt-engine, ai-engines, database

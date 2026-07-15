@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -27,7 +27,7 @@ export interface StoredImage {
 }
 
 @Injectable()
-export class ObjectStorageService implements OnModuleDestroy {
+export class ObjectStorageService implements OnModuleDestroy, OnModuleInit {
   private readonly bucket: string;
   private readonly client: S3Client;
 
@@ -48,6 +48,14 @@ export class ObjectStorageService implements OnModuleDestroy {
     });
   }
 
+  onModuleInit(): void {
+    if (process.env.NODE_ENV === 'production' && !this.isConfigured()) {
+      throw new Error(
+        'Production object storage is required: configure OBJECT_STORAGE_BUCKET or Supabase Storage',
+      );
+    }
+  }
+
   isConfigured(): boolean {
     return Boolean(
       this.bucket ||
@@ -61,6 +69,13 @@ export class ObjectStorageService implements OnModuleDestroy {
     options: PutObjectOptions = {},
   ): Promise<StoredObject> {
     const normalizedKey = this.normalizeKey(key);
+    if (!this.bucket) {
+      await this.putSupabase(normalizedKey, body, options.contentType);
+      return {
+        bucket: this.supabaseBucket(),
+        key: normalizedKey,
+      };
+    }
     const response = await this.client.send(
       new PutObjectCommand({
         Bucket: this.requireBucket(),
@@ -81,6 +96,18 @@ export class ObjectStorageService implements OnModuleDestroy {
   }
 
   async get(key: string): Promise<Buffer> {
+    if (!this.bucket) {
+      const normalizedKey = this.normalizeKey(key);
+      const response = await fetch(this.supabaseObjectUrl(normalizedKey), {
+        headers: this.supabaseHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(
+          `Supabase Storage download failed: ${response.status} ${await response.text()}`,
+        );
+      }
+      return Buffer.from(await response.arrayBuffer());
+    }
     const response = await this.client.send(
       new GetObjectCommand({
         Bucket: this.requireBucket(),
@@ -119,7 +146,13 @@ export class ObjectStorageService implements OnModuleDestroy {
 
   publicUrl(key: string): string | undefined {
     const base = process.env.OBJECT_STORAGE_PUBLIC_URL?.replace(/\/+$/, '');
-    if (!base) return undefined;
+    if (!base) {
+      const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '');
+      if (!supabaseUrl) return undefined;
+      return `${supabaseUrl}/storage/v1/object/public/${encodeURIComponent(
+        this.supabaseBucket(),
+      )}/${this.objectPath(key)}`;
+    }
     return `${base}/${this.normalizeKey(key)
       .split('/')
       .map((part) => encodeURIComponent(part))
@@ -143,34 +176,10 @@ export class ObjectStorageService implements OnModuleDestroy {
       return { storageKey: normalizedKey, publicUrl, mimeType };
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '');
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const bucket = process.env.SUPABASE_GENERATED_LOGOS_BUCKET || 'catalog-logos';
-    if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error('S3-compatible or Supabase object storage is not configured');
-    }
-    const objectPath = normalizedKey.split('/').map(encodeURIComponent).join('/');
-    const response = await fetch(
-      `${supabaseUrl}/storage/v1/object/${encodeURIComponent(bucket)}/${objectPath}`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${serviceRoleKey}`,
-          apikey: serviceRoleKey,
-          'Content-Type': mimeType,
-          'x-upsert': 'true',
-        },
-        body: new Uint8Array(body),
-      },
-    );
-    if (!response.ok) {
-      throw new Error(`Supabase Storage upload failed: ${response.status} ${await response.text()}`);
-    }
+    await this.putSupabase(normalizedKey, body, mimeType);
     return {
       storageKey: normalizedKey,
-      publicUrl: `${supabaseUrl}/storage/v1/object/public/${encodeURIComponent(
-        bucket,
-      )}/${objectPath}`,
+      publicUrl: this.publicUrl(normalizedKey)!,
       mimeType,
     };
   }
@@ -184,6 +193,58 @@ export class ObjectStorageService implements OnModuleDestroy {
       throw new Error('OBJECT_STORAGE_BUCKET is not configured');
     }
     return this.bucket;
+  }
+
+  private async putSupabase(
+    key: string,
+    body: Buffer,
+    contentType = 'application/octet-stream',
+  ): Promise<void> {
+    const response = await fetch(this.supabaseObjectUrl(key), {
+      method: 'POST',
+      headers: {
+        ...this.supabaseHeaders(),
+        'Content-Type': contentType,
+        'x-upsert': 'true',
+      },
+      body: new Uint8Array(body),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Supabase Storage upload failed: ${response.status} ${await response.text()}`,
+      );
+    }
+  }
+
+  private supabaseHeaders(): Record<string, string> {
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!process.env.SUPABASE_URL || !serviceRoleKey) {
+      throw new Error(
+        'S3-compatible or Supabase object storage is not configured',
+      );
+    }
+    return {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+    };
+  }
+
+  private supabaseBucket(): string {
+    return process.env.SUPABASE_GENERATED_LOGOS_BUCKET || 'catalog-logos';
+  }
+
+  private supabaseObjectUrl(key: string): string {
+    const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '');
+    if (!supabaseUrl) {
+      throw new Error('SUPABASE_URL is not configured');
+    }
+    return `${supabaseUrl}/storage/v1/object/${encodeURIComponent(
+      this.supabaseBucket(),
+    )}/${this.objectPath(key)}`;
+  }
+
+  private objectPath(key: string): string {
+    return this.normalizeKey(key).split('/').map(encodeURIComponent).join('/');
   }
 
   private normalizeKey(key: string): string {

@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import type { BrainIngestResult } from '@logo-platform/shared';
 import { fetchWithDeadline } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '../storage/database-types';
 import { reverseAnalyzeLogo } from '@logo-platform/ai-engines';
 import { embedText } from '../embedding/embedding.service';
 import { createExperience, upsertLearnedPrinciple } from '../storage/experience.repository';
@@ -51,7 +51,7 @@ interface VisionAnalysis {
 }
 
 export async function ingestImage(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   options: IngestImageOptions,
 ): Promise<BrainIngestResult> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -141,7 +141,7 @@ export async function ingestImage(
     .filter(Boolean)
     .join('\n');
 
-  const experience = await createExperience(prisma, {
+  const experience = await createExperience(client, {
     sourceType: 'IMAGE',
     title,
     content: enrichedContent,
@@ -158,13 +158,13 @@ export async function ingestImage(
   });
 
   const embedding = await embedText(enrichedContent);
-  await upsertExperienceEmbedding(prisma, experience.id, embedding);
+  await upsertExperienceEmbedding(client, experience.id, embedding);
 
   const principles = await extractPrinciplesFromText(enrichedContent, `Logo image: ${title}`);
   let principlesExtracted = 0;
 
   for (const principle of principles) {
-    await upsertLearnedPrinciple(prisma, {
+    await upsertLearnedPrinciple(client, {
       category: principle.category,
       ruleText: principle.ruleText,
       promptFragment: principle.promptFragment,

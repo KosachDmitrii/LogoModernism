@@ -44,7 +44,6 @@ interface PromptCardProps {
   onStateChange?: () => void;
   onSavedChange?: (saved: boolean) => void;
   getWorkSignal?: () => AbortSignal;
-  onJobQueued?: (jobId: string) => void;
 }
 
 export function PromptCard({
@@ -56,7 +55,6 @@ export function PromptCard({
   onStateChange,
   onSavedChange,
   getWorkSignal,
-  onJobQueued,
 }: PromptCardProps) {
   const t = useT();
   const { activeMembership } = useAuth();
@@ -125,7 +123,6 @@ export function PromptCard({
         },
         {
           signal: getWorkSignal?.(),
-          onJobQueued,
         },
       );
       if (standalone) {

@@ -9,6 +9,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PromptsService } from './prompts.service';
@@ -20,18 +21,15 @@ import { LogoFeedbackDto } from './dto/logo-feedback.dto';
 import { LogoTagsDto } from './dto/logo-tags.dto';
 import type { PromptGenerationRequest } from '@logo-platform/shared';
 import {
-  JOB_PAYLOAD_VERSION,
   normalizeBrandName,
-  QUEUE_NAMES,
   resolvePromptGenerateIntent,
   USAGE_OPERATION_COSTS,
   USAGE_OPERATIONS,
 } from '@logo-platform/shared';
 import { Tenant, type TenantScope } from '../auth/tenant-context';
-import { QueueService } from '../queue/queue.service';
-import { isAsyncQueueEnabled } from '../queue/queue.config';
 import { ALL_MEMBERS, CONTRIBUTORS, Roles } from '../auth/roles.decorator';
 import { UsageService } from '../usage/usage.service';
+import type { Request } from 'express';
 
 type PipelineOutput = Awaited<ReturnType<PromptsService['generate']>>;
 
@@ -42,18 +40,18 @@ export class PromptsController {
 
   constructor(
     private readonly promptsService: PromptsService,
-    private readonly queues: QueueService,
     private readonly usage: UsageService,
   ) {}
 
   @Post('generate')
   @Roles(...CONTRIBUTORS)
-  @HttpCode(HttpStatus.ACCEPTED)
+  @HttpCode(HttpStatus.OK)
   async generate(
     @Body() dto: GeneratePromptDto,
     @Query('intent') queryIntent?: string,
     @Tenant() tenant?: TenantScope,
     @Headers('idempotency-key') idempotencyKey?: string,
+    @Req() httpRequest?: Request,
   ) {
     const intent = resolvePromptGenerateIntent(dto.intent, queryIntent);
     const request: PromptGenerationRequest = {
@@ -101,31 +99,13 @@ export class PromptsController {
         credits: USAGE_OPERATION_COSTS[USAGE_OPERATIONS.promptCompose],
         idempotencyKey: operationIdempotencyKey,
       });
-      if (isAsyncQueueEnabled()) {
-        const submission = await this.queues.enqueue(QUEUE_NAMES.prompt, {
-          version: JOB_PAYLOAD_VERSION,
-          idempotencyKey: operationIdempotencyKey,
-          requestedAt: new Date().toISOString(),
-          organizationId: tenant?.organizationId,
-          projectId: tenant?.projectId,
-          requestedBy: tenant?.userId,
-          usageReservationId: reservation.id,
-          request,
-        });
-        reservation = undefined;
-        this.logger.log(
-          JSON.stringify({
-            event: 'prompt.generate.queued',
-            intent,
-            industry: request.industry,
-            durationMs: Date.now() - startedAt,
-            jobId: submission.id,
-          }),
-        );
-        return { ...submission, status: 'queued' as const };
-      }
-
-      const response = await this.promptsService.generateResponse(request, tenant);
+      const abort = new AbortController();
+      httpRequest?.once('aborted', () => abort.abort());
+      const response = await this.promptsService.generateResponse(
+        request,
+        tenant,
+        abort.signal,
+      );
       await this.usage.commit(reservation.id);
       reservation = undefined;
       this.logger.log(
@@ -246,12 +226,13 @@ export class PromptsController {
 
   @Post(':id/logos/generate')
   @Roles(...CONTRIBUTORS)
-  @HttpCode(HttpStatus.ACCEPTED)
+  @HttpCode(HttpStatus.OK)
   async generateLogo(
     @Param('id') id: string,
     @Body() body: GeneratePromptLogoDto,
     @Tenant() tenant?: TenantScope,
     @Headers('idempotency-key') idempotencyKey?: string,
+    @Req() httpRequest?: Request,
   ) {
     if (body.provider === 'mock') {
       return this.promptsService.generateLogoForPrompt(id, body, tenant);
@@ -267,18 +248,16 @@ export class PromptsController {
         `prompt-logo:${tenant!.organizationId}:${id}:${randomUUID()}`,
     });
     try {
+      const abort = new AbortController();
+      httpRequest?.once('aborted', () => abort.abort());
       const result = await this.promptsService.generateLogoForPrompt(
         id,
         body,
         tenant,
-        reservation.id,
+        abort.signal,
       );
-      if ('status' in result && result.status === 'queued') {
-        reservation = undefined;
-      } else {
-        await this.usage.commit(reservation.id);
-        reservation = undefined;
-      }
+      await this.usage.commit(reservation.id);
+      reservation = undefined;
       return result;
     } catch (error) {
       if (reservation) {

@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import type { PromptGenerationRequest } from '@logo-platform/shared';
-import { JOB_PAYLOAD_VERSION, normalizeBrandName, QUEUE_NAMES } from '@logo-platform/shared';
+import { normalizeBrandName } from '@logo-platform/shared';
 import { designBrain } from '@logo-platform/design-brain';
 import { evaluateRequestPromptCompliance } from '@logo-platform/design-brain';
 import { runPromptPipeline, critiqueDesign, evolvePrompt } from '@logo-platform/prompt-engine';
@@ -9,8 +8,6 @@ import { ImagesService } from '../images/images.service';
 import { PromptRecordsService } from './prompt-records.service';
 import type { GeneratePromptLogoDto } from './dto/generate-prompt-logo.dto';
 import type { TenantScope } from '../auth/tenant-context';
-import { QueueService } from '../queue/queue.service';
-import { isAsyncQueueEnabled } from '../queue/queue.config';
 import type { BrainPipelineResult } from '@logo-platform/design-brain';
 import { slimPipelineResult } from './prompt-response';
 import { ObjectStorageService } from '../storage/object-storage.service';
@@ -21,7 +18,6 @@ export class PromptsService {
   constructor(
     private readonly imagesService: ImagesService,
     private readonly promptRecords: PromptRecordsService,
-    private readonly queues: QueueService,
     private readonly objectStorage: ObjectStorageService,
   ) {}
 
@@ -176,6 +172,14 @@ export class PromptsService {
     }
 
     const updated = await this.promptRecords.setSaved(promptId, saved, idempotencyKey, tenant);
+    if (saved && tenant) {
+      this.learnInBackground(tenant, {
+        signalType: 'APPROVE',
+        score: 100,
+        context: `Saved prompt: ${updated.text.slice(0, 600)}`,
+        metadata: { promptId, source: 'prompt.saved' },
+      });
+    }
 
     return { promptId, saved: updated.saved ?? saved };
   }
@@ -216,6 +220,12 @@ export class PromptsService {
     );
 
     const savedLogo = updated.logos.find((item) => item.id === logoId);
+    this.learnInBackground(tenant, {
+      signalType: 'RATING',
+      score: body.score,
+      context: `Logo feedback ${body.emoji} for prompt ${promptId}`,
+      metadata: { promptId, logoId, source: 'logo.feedback' },
+    });
     return {
       promptId,
       logoId,
@@ -247,6 +257,12 @@ export class PromptsService {
     const updated = await this.promptRecords.setLogoTags(promptId, logoId, body, tenant);
 
     const savedLogo = updated.logos.find((item) => item.id === logoId);
+    this.learnInBackground(tenant, {
+      signalType: 'RATING',
+      score: body.workedTags?.length ? 80 : 50,
+      context: `Logo tags for prompt ${promptId}`,
+      metadata: { promptId, logoId, ...body, source: 'logo.tags' },
+    });
     return {
       promptId,
       logoId,
@@ -268,6 +284,12 @@ export class PromptsService {
 
     await this.promptRecords.getById(promptId, tenant);
     const updated = await this.promptRecords.setFeedback(promptId, signalType, tenant);
+    this.learnInBackground(tenant, {
+      signalType,
+      score: signalType === 'LIKE' ? 100 : 0,
+      context: `Prompt ${signalType.toLowerCase()}: ${promptId}`,
+      metadata: { promptId, source: 'prompt.feedback' },
+    });
 
     return {
       promptId,
@@ -279,7 +301,7 @@ export class PromptsService {
     promptId: string,
     body: GeneratePromptLogoDto,
     tenant?: TenantScope,
-    usageReservationId?: string,
+    signal?: AbortSignal,
   ) {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store prompt logos');
@@ -303,39 +325,6 @@ export class PromptsService {
       throw new BadRequestException('Maximum 3 logos per prompt');
     }
 
-    if (isAsyncQueueEnabled()) {
-      const imageId = randomUUID();
-      const reservation = await this.promptRecords.reserveLogo(
-        promptId,
-        imageId,
-        record.text,
-        tenant,
-      );
-      const outputKey = [
-        'generated-logos',
-        tenant?.organizationId ?? 'unscoped',
-        `${imageId}.png`,
-      ].join('/');
-      const job = await this.queues.enqueue(QUEUE_NAMES.image, {
-        version: JOB_PAYLOAD_VERSION,
-        idempotencyKey: `prompt:${promptId}:image:${imageId}`,
-        requestedAt: new Date().toISOString(),
-        organizationId: tenant?.organizationId,
-        projectId: tenant?.projectId,
-        usageReservationId,
-        imageId,
-        prompt: record.text,
-        outputKey,
-        provider: body.provider,
-      });
-      return {
-        status: 'queued' as const,
-        jobId: job.id,
-        imageId,
-        remaining: reservation.remaining,
-      };
-    }
-
     const generation = await this.imagesService.generateFromComposedPrompt({
       text: record.text,
       companyName: normalizeBrandName(body.companyName ?? record.companyName),
@@ -347,7 +336,8 @@ export class PromptsService {
       colorSelections: stylePreferences?.colorSelections,
       allowShadows: stylePreferences?.allowShadows,
       allowPhotoreal: stylePreferences?.allowPhotoreal,
-    });
+    }, signal);
+    signal?.throwIfAborted();
 
     let image = generation.images[0];
     if (!image) {
@@ -363,6 +353,7 @@ export class PromptsService {
       image = { ...image, url: stored.publicUrl };
       storage = { storageKey: stored.storageKey, mimeType: stored.mimeType };
     }
+    signal?.throwIfAborted();
 
     const updated = await this.promptRecords.appendLogo(promptId, image, tenant, storage);
     return {
@@ -391,5 +382,27 @@ export class PromptsService {
   evolve(promptId: string, pipelineResult: Awaited<ReturnType<typeof this.generate>>) {
     const prompt = pipelineResult.prompts.find((p) => p.id === promptId) ?? pipelineResult.bestPrompt;
     return evolvePrompt(prompt);
+  }
+
+  private learnInBackground(
+    tenant: TenantScope,
+    input: {
+      signalType: 'LIKE' | 'DISLIKE' | 'APPROVE' | 'REJECT' | 'RATING';
+      score: number;
+      context: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): void {
+    queueMicrotask(() => {
+      void getGlobalBrainScope(tenant.userId)
+        .then((scope) =>
+          designBrain.ingestFeedback({
+            ...input,
+            organizationId: scope.organizationId,
+            projectId: tenant.projectId,
+          }),
+        )
+        .catch(() => undefined);
+    });
   }
 }

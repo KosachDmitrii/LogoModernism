@@ -2,6 +2,7 @@ import './preload-env';
 import './observability/telemetry';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { disconnect } from '@logo-platform/database';
 import { AppModule } from './app.module';
 
 function corsOrigins(): string[] {
@@ -41,7 +42,8 @@ async function bootstrap() {
   console.log(`Logo Platform API running on ${publicUrl}/api`);
 }
 
-void bootstrap().catch((error: unknown) => {
+void bootstrap().catch(async (error: unknown) => {
   console.error('Failed to start Logo Platform API', error);
-  process.exitCode = 1;
+  await disconnect().catch(() => undefined);
+  process.exit(1);
 });

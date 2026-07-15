@@ -47,6 +47,17 @@ function updateJob(
   return jobs.map((job) => (job.id === id ? { ...job, ...patch } : job));
 }
 
+function replaceJobId(
+  jobs: BrainIngestJob[],
+  currentId: string,
+  serverId: string,
+  patch: Partial<BrainIngestJob>,
+): BrainIngestJob[] {
+  return jobs.map((job) =>
+    job.id === currentId ? { ...job, ...patch, id: serverId } : job,
+  );
+}
+
 async function hashFile(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   const digest = await crypto.subtle.digest('SHA-256', buffer);
@@ -143,9 +154,10 @@ export const useBrainIngestStore = create<BrainIngestState>()(
           }));
 
           const queued = await ingestBrainPdf(file, trimmedTitle, id);
+          const serverJobId = queued.jobId;
 
           if (queued.status === 'skipped') {
-            const server = await getBrainPdfIngestProgress(id);
+            const server = await getBrainPdfIngestProgress(serverJobId);
             if (server) {
               const finished: Partial<BrainIngestJob> = {
                 status: 'skipped',
@@ -154,22 +166,35 @@ export const useBrainIngestStore = create<BrainIngestState>()(
                 result: server.result,
               };
               set((state) => ({
-                jobs: updateJob(state.jobs, id, finished),
+                jobs: replaceJobId(state.jobs, id, serverJobId, finished),
                 activeJobId: null,
               }));
-              return { ...job, ...finished, contentHash, check } as BrainIngestJob;
+              return {
+                ...job,
+                ...finished,
+                id: serverJobId,
+                contentHash,
+                check,
+              } as BrainIngestJob;
             }
           }
 
           set((state) => ({
-            jobs: updateJob(state.jobs, id, {
+            jobs: replaceJobId(state.jobs, id, serverJobId, {
               status: 'processing',
               message: queued.message,
               messageKey: queued.message ? undefined : 'brain.ingest.queued',
             }),
+            activeJobId: serverJobId,
           }));
 
-          return { ...job, contentHash, check, status: 'processing' } as BrainIngestJob;
+          return {
+            ...job,
+            id: serverJobId,
+            contentHash,
+            check,
+            status: 'processing',
+          } as BrainIngestJob;
         } catch (error) {
           const message = error instanceof ApiError
             ? undefined

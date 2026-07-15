@@ -3,14 +3,14 @@ import type {
   BrainResearchCandidate,
   BrainTenantScope,
 } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '../storage/database-types';
 import { embedText } from '../embedding/embedding.service';
 import { createExperience, upsertLearnedPrinciple } from '../storage/experience.repository';
 import { upsertExperienceEmbedding } from '../storage/pgvector';
 import { sanitizePostgresText } from '../storage/sanitize-text';
 
 export async function ingestWebResearch(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   candidate: BrainResearchCandidate,
   scope?: BrainTenantScope,
 ): Promise<BrainIngestResult> {
@@ -18,7 +18,7 @@ export async function ingestWebResearch(
   const content = sanitizePostgresText(candidate.extractedText) ?? '';
   const summary = sanitizePostgresText(candidate.summary) ?? undefined;
 
-  const experience = await createExperience(prisma, {
+  const experience = await createExperience(client, {
     sourceType: 'TEXT',
     title,
     content,
@@ -36,11 +36,11 @@ export async function ingestWebResearch(
   });
 
   const embedding = await embedText(`${title}\n${summary ?? ''}\n${content.slice(0, 800)}`);
-  await upsertExperienceEmbedding(prisma, experience.id, embedding);
+  await upsertExperienceEmbedding(client, experience.id, embedding);
 
   let principlesExtracted = 0;
   for (const principle of candidate.principles) {
-    await upsertLearnedPrinciple(prisma, {
+    await upsertLearnedPrinciple(client, {
       category: principle.category,
       ruleText: principle.ruleText,
       promptFragment: principle.promptFragment,

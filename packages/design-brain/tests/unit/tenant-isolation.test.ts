@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '@logo-platform/database';
 import {
   getResearchCandidate,
   updateResearchCandidate,
@@ -27,57 +27,71 @@ const candidate = {
   reviewedAt: null,
 };
 
-function fakePrisma(): PrismaClient {
+function fakeDatabase(): DatabaseClient {
   return {
-    brainResearchCandidate: {
-      findFirst: async ({ where }: { where: Record<string, unknown> }) =>
-        where.id === candidate.id && where.organizationId === candidate.organizationId
-          ? candidate
-          : null,
-      update: async () => candidate,
-    },
-    brainExperience: {
-      findMany: async ({ where }: { where: Record<string, unknown> }) =>
-        where.organizationId === 'org-b'
-          ? [
-              {
-                id: 'pdf-b',
-                metadata: {
-                  bookTitle: 'Logo Modernism',
-                  contentHash: 'same-hash',
-                  chunkIndex: 0,
-                  totalChunks: 1,
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      if (text.includes('FROM design_brain_experiences')) {
+        const rows =
+          values.includes('org-b')
+            ? [
+                {
+                  id: 'pdf-b',
+                  metadata: {
+                    bookTitle: 'Logo Modernism',
+                    contentHash: 'same-hash',
+                    chunkIndex: 0,
+                    totalChunks: 1,
+                  },
                 },
-              },
-            ]
-          : [],
+              ]
+            : [];
+        return { rows: rows as T[], rowCount: rows.length };
+      }
+      if (text.includes('FROM design_brain_taste_signals')) {
+        const rows =
+          values.includes('org-b')
+            ? [
+                {
+                  signalType: 'LIKE',
+                  score: 8,
+                  context: 'I like geometric grids',
+                  metadata: { companyName: 'Acme' },
+                  createdAt: new Date(),
+                },
+              ]
+            : [];
+        return { rows: rows as T[], rowCount: rows.length };
+      }
+      return { rows: [], rowCount: 0 };
     },
-    brainTasteSignal: {
-      findMany: async ({ where }: { where: Record<string, unknown> }) => {
-        if (where.organizationId !== 'org-b') return [];
-        return [
-          {
-            signalType: 'LIKE',
-            score: 8,
-            context: 'I like geometric grids',
-            metadata: { companyName: 'Acme' },
-            createdAt: new Date(),
-          },
-        ];
-      },
+    async one<T>() {
+      return candidate as T;
     },
-  } as unknown as PrismaClient;
+    async maybeOne<T>(text: string, values: readonly unknown[] = []) {
+      if (
+        text.includes('brain_research_candidates') &&
+        values.includes(candidate.id) &&
+        values.includes(candidate.organizationId)
+      ) {
+        return candidate as T;
+      }
+      return null;
+    },
+    async transaction<T>(fn: (tx: DatabaseClient) => Promise<T>) {
+      return fn(this);
+    },
+  };
 }
 
 describe('tenant isolation', () => {
   it('does not expose or update another organization research candidate', async () => {
-    const prisma = fakePrisma();
+    const database = fakeDatabase();
     await expect(
-      getResearchCandidate(prisma, candidate.id, { organizationId: 'org-a' }),
+      getResearchCandidate(database, candidate.id, { organizationId: 'org-a' }),
     ).resolves.toBeNull();
     await expect(
       updateResearchCandidate(
-        prisma,
+        database,
         candidate.id,
         { organizationId: 'org-a', userId: 'user-a' },
         { status: 'approved' },
@@ -86,16 +100,16 @@ describe('tenant isolation', () => {
   });
 
   it('scopes PDF deduplication to the active organization', async () => {
-    const prisma = fakePrisma();
+    const database = fakeDatabase();
     const orgA = await checkPdfIngestStatus(
-      prisma,
+      database,
       'Logo Modernism',
       'same-hash',
       { organizationId: 'org-a' },
       1,
     );
     const orgB = await checkPdfIngestStatus(
-      prisma,
+      database,
       'Logo Modernism',
       'same-hash',
       { organizationId: 'org-b' },
@@ -108,24 +122,24 @@ describe('tenant isolation', () => {
   });
 
   it('rejects unscoped research and PDF state access', async () => {
-    const prisma = fakePrisma();
-    await expect(getResearchCandidate(prisma, candidate.id, {})).rejects.toThrow(
+    const database = fakeDatabase();
+    await expect(getResearchCandidate(database, candidate.id, {})).rejects.toThrow(
       'Organization scope is required',
     );
     await expect(
-      checkPdfIngestStatus(prisma, 'Book', 'hash', {}),
+      checkPdfIngestStatus(database, 'Book', 'hash', {}),
     ).rejects.toThrow('Organization scope is required');
   });
 
   it('scopes project memory signals to the active organization', async () => {
-    const prisma = fakePrisma();
+    const database = fakeDatabase();
     await expect(
-      loadProjectMemory(prisma, 'Acme', { organizationId: 'org-a' }),
+      loadProjectMemory(database, 'Acme', { organizationId: 'org-a' }),
     ).resolves.toBeUndefined();
     await expect(
-      loadProjectMemory(prisma, 'Acme', { organizationId: 'org-b' }),
+      loadProjectMemory(database, 'Acme', { organizationId: 'org-b' }),
     ).resolves.toMatchObject({ signalCount: 1 });
-    await expect(loadProjectMemory(prisma, 'Acme')).rejects.toThrow(
+    await expect(loadProjectMemory(database, 'Acme')).rejects.toThrow(
       'Organization scope is required',
     );
   });

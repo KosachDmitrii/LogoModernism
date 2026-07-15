@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
-import { prisma } from '@logo-platform/database';
+import { db } from '@logo-platform/database';
 import type { PlatformRole } from '@logo-platform/shared';
 import { IS_PUBLIC_ROUTE } from './public.decorator';
 import { AUTHENTICATED_ONLY_ROUTE } from './authenticated.decorator';
@@ -83,24 +83,27 @@ export class TenantAuthGuard implements CanActivate {
       throw new UnauthorizedException('User and organization context are required');
     }
 
-    const member = await prisma.organizationMember.findUnique({
-      where: { organizationId_userId: { organizationId, userId } },
-      select: {
-        id: true,
-        role: true,
-        user: { select: { platformRole: true } },
-      },
-    });
+    const member = await db.maybeOne<{
+      id: string;
+      role: TenantRole;
+      platformRole: PlatformRole;
+    }>(
+      `SELECT om.id, om.role, u.platform_role
+       FROM organization_members om
+       JOIN users u ON u.id = om.user_id
+       WHERE om.organization_id = $1 AND om.user_id = $2`,
+      [organizationId, userId],
+    );
     if (!member) throw new UnauthorizedException('Organization membership is required');
     this.assertRoleAllowed(member.role, context);
-    request.auth.platformRole = member.user.platformRole;
-    this.assertPlatformRoleAllowed(member.user.platformRole, context);
+    request.auth.platformRole = member.platformRole;
+    this.assertPlatformRoleAllowed(member.platformRole, context);
 
     if (projectId) {
-      const project = await prisma.project.findFirst({
-        where: { id: projectId, organizationId },
-        select: { id: true },
-      });
+      const project = await db.maybeOne<{ id: string }>(
+        'SELECT id FROM projects WHERE id = $1 AND organization_id = $2',
+        [projectId, organizationId],
+      );
       if (!project) throw new UnauthorizedException('Project does not belong to organization');
     }
 

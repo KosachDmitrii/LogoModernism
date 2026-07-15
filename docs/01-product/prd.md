@@ -56,13 +56,13 @@
 
 ### Features
 - React dashboard with engine navigation
-- PostgreSQL + Prisma schema
+- PostgreSQL + versioned SQL migrations
 - Organization / Project / Brand / Logo models
 - OpenAPI specification
 
 ### Acceptance Criteria
 - [x] Multi-page web application
-- [x] Prisma schema with all entities
+- [x] SQL schema with all entities
 - [ ] Database persistence wired to API
 - [ ] Authentication (future)
 
@@ -70,6 +70,7 @@
 
 ### Features
 - OpenAI DALL-E / Flux / Ideogram integration
-- BullMQ job queue
+- Direct abortable image generation through the API
+- PostgreSQL-backed tasks for PDF/OCR and research
 - pgvector RAG search
 - Editable SVG output

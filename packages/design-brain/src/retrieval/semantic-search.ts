@@ -1,17 +1,17 @@
 import type { BrainSearchRequest, BrainSearchResult, BrainSourceType } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '../storage/database-types';
 import { embedText } from '../embedding/embedding.service';
 import { getExperienceById, toExperienceRecord } from '../storage/experience.repository';
 import { searchExperienceEmbeddings } from '../storage/pgvector';
 
 export async function semanticSearch(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   request: BrainSearchRequest,
 ): Promise<BrainSearchResult> {
   const limit = Math.min(request.limit ?? 10, 50);
   const queryEmbedding = await embedText(request.query);
   const rows = await searchExperienceEmbeddings(
-    prisma,
+    client,
     queryEmbedding,
     limit,
     request.sourceType,
@@ -25,13 +25,20 @@ export async function semanticSearch(
   for (const row of rows) {
     if (row.similarity < minSimilarity) continue;
 
-    const experience = await prisma.brainExperience.findUnique({
-      where: {
-        id: row.experience_id,
-        ...(request.organizationId ? { organizationId: request.organizationId } : {}),
-        ...(request.projectId ? { projectId: request.projectId } : {}),
-      },
-    });
+    const values: unknown[] = [row.experienceId];
+    const filters = ['id = $1'];
+    if (request.organizationId) {
+      values.push(request.organizationId);
+      filters.push(`organization_id = $${values.length}`);
+    }
+    if (request.projectId) {
+      values.push(request.projectId);
+      filters.push(`project_id = $${values.length}`);
+    }
+    const experience = await client.maybeOne<import('../storage/database-types').BrainExperienceRow>(
+      `SELECT * FROM design_brain_experiences WHERE ${filters.join(' AND ')}`,
+      values,
+    );
     if (!experience) continue;
 
     results.push(toExperienceRecord(experience, row.similarity));
@@ -45,11 +52,11 @@ export async function semanticSearch(
 }
 
 export async function getRelatedExperiences(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   experienceId: string,
   limit = 5,
 ): Promise<BrainSearchResult> {
-  const experience = await getExperienceById(prisma, experienceId);
+  const experience = await getExperienceById(client, experienceId);
   if (!experience) {
     return { query: experienceId, results: [], total: 0 };
   }
@@ -58,7 +65,7 @@ export async function getRelatedExperiences(
     .filter(Boolean)
     .join('\n');
 
-  const search = await semanticSearch(prisma, {
+  const search = await semanticSearch(client, {
     query,
     limit: limit + 1,
     sourceType: experience.sourceType as BrainSourceType,

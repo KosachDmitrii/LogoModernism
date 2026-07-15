@@ -1,5 +1,5 @@
 import type { BrainResearchRunResult, BrainTenantScope } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '../storage/database-types';
 import { computeTasteProfile } from './taste-profile';
 import { runWebResearch } from '../research/research.service';
 
@@ -27,7 +27,7 @@ function configuredTopics(): string[] {
 }
 
 async function pickResearchTopics(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   scope: BrainTenantScope,
 ): Promise<string[]> {
   const manual = configuredTopics();
@@ -35,7 +35,7 @@ async function pickResearchTopics(
     return manual.slice(0, 2);
   }
 
-  const taste = await computeTasteProfile(prisma, scope);
+  const taste = await computeTasteProfile(client, scope);
   const dynamic = [
     ...taste.preferredGeometry.slice(0, 2).map((item) => `${item} logo construction`),
     ...taste.preferredMarkTypes.slice(0, 1).map((item) => `${item} logo design`),
@@ -49,18 +49,14 @@ export async function runNightlyResearch(): Promise<{
   topics: string[];
   results: BrainResearchRunResult[];
 }> {
-  const { prisma } = await import('@logo-platform/database');
+  const { db } = await import('@logo-platform/database');
   if (!process.env.DATABASE_URL) {
     return { topics: [], results: [] };
   }
-  const organization = await prisma.organization.findUnique({
-    where: {
-      slug:
-        process.env.BRAIN_GLOBAL_ORGANIZATION_SLUG?.trim() ||
-        'logo-modernism',
-    },
-    select: { id: true },
-  });
+  const organization = await db.maybeOne<{ id: string }>(
+    'SELECT id FROM organizations WHERE slug = $1',
+    [process.env.BRAIN_GLOBAL_ORGANIZATION_SLUG?.trim() || 'logo-modernism'],
+  );
   if (!organization) {
     return { topics: [], results: [] };
   }
@@ -68,12 +64,12 @@ export async function runNightlyResearch(): Promise<{
     organizationId: organization.id,
   };
 
-  const topics = await pickResearchTopics(prisma, scope);
+  const topics = await pickResearchTopics(db, scope);
   const results: BrainResearchRunResult[] = [];
 
   for (const topic of topics) {
     try {
-      const result = await runWebResearch(prisma, topic, scope, nightlyMaxSources());
+      const result = await runWebResearch(db, topic, scope, nightlyMaxSources());
       results.push(result);
       console.info(
         `[design-brain] nightly research "${topic}": ${result.candidates.length} candidates, ${result.skippedUrls.length} skipped`,

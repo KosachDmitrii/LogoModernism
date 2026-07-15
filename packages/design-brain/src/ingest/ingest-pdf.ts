@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { BrainIngestResult, BrainPdfIngestCheck, BrainPdfIngestPhase } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '../storage/database-types';
 import { embedText } from '../embedding/embedding.service';
 import { createExperience, upsertLearnedPrinciple } from '../storage/experience.repository';
 import { upsertExperienceEmbedding } from '../storage/pgvector';
@@ -27,6 +27,7 @@ export interface IngestPdfOptions {
   savedPath?: string;
   organizationId: string;
   projectId?: string;
+  signal?: AbortSignal;
   onProgress?: (progress: {
     phase: BrainPdfIngestPhase;
     pageCount?: number;
@@ -85,7 +86,7 @@ function chunkText(pages: string[]): string[] {
 }
 
 export async function checkPdfIngest(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   title: string,
   contentHash: string,
   scope: Pick<IngestPdfOptions, 'organizationId' | 'projectId'>,
@@ -94,20 +95,21 @@ export async function checkPdfIngest(
   if (!bookTitle) {
     throw new Error('Title is required');
   }
-  return checkPdfIngestStatus(prisma, bookTitle, contentHash, scope);
+  return checkPdfIngestStatus(client, bookTitle, contentHash, scope);
 }
 
 export async function ingestPdf(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   options: IngestPdfOptions,
 ): Promise<BrainIngestResult> {
+  options.signal?.throwIfAborted();
   const title = options.title.trim();
   if (!title) {
     throw new Error('Title is required');
   }
 
   const contentHash = hashPdfContent(options.buffer);
-  const preCheck = await checkPdfIngestStatus(prisma, title, contentHash, options);
+  const preCheck = await checkPdfIngestStatus(client, title, contentHash, options);
 
   let savedPath: string;
   if (options.savedPath) {
@@ -124,9 +126,9 @@ export async function ingestPdf(
     message: 'Extracting text from PDF…',
   });
 
-  const { pages, pageCount, ocrUsed, ocrPages: ocrPageCount } = await extractPdfTextWithOcr(
-    options.buffer,
-  );
+  const { pages, pageCount, ocrUsed, ocrPages: ocrPageCount } =
+    await extractPdfTextWithOcr(options.buffer, options.signal);
+  options.signal?.throwIfAborted();
   const chunks = chunkText(pages);
 
   if (!chunks.length) {
@@ -134,7 +136,7 @@ export async function ingestPdf(
   }
 
   const ingestCheck = await checkPdfIngestStatus(
-    prisma,
+    client,
     title,
     contentHash,
     options,
@@ -163,7 +165,7 @@ export async function ingestPdf(
   }
 
   const existingIndexes = await getExistingChunkIndexesForBook(
-    prisma,
+    client,
     title,
     contentHash,
     options,
@@ -182,6 +184,7 @@ export async function ingestPdf(
   });
 
   for (let index = 0; index < chunks.length; index++) {
+    options.signal?.throwIfAborted();
     if (existingIndexes.has(index)) {
       skippedChunks += 1;
       reportProgress(options, {
@@ -196,9 +199,11 @@ export async function ingestPdf(
 
     const chunk = chunks[index]!;
     const summary = await summarizeText(chunk, `${title} (chunk ${index + 1})`);
+    options.signal?.throwIfAborted();
     const principles = await extractPrinciplesFromText(chunk, `PDF: ${title}`);
+    options.signal?.throwIfAborted();
 
-    const experience = await createExperience(prisma, {
+    const experience = await createExperience(client, {
       sourceType: 'PDF',
       title: `${title} — part ${index + 1}`,
       content: chunk,
@@ -224,10 +229,11 @@ export async function ingestPdf(
     }
 
     const embedding = await embedText(`${experience.title}\n${summary}\n${chunk}`);
-    await upsertExperienceEmbedding(prisma, experience.id, embedding);
+    options.signal?.throwIfAborted();
+    await upsertExperienceEmbedding(client, experience.id, embedding);
 
     for (const principle of principles) {
-      await upsertLearnedPrinciple(prisma, {
+      await upsertLearnedPrinciple(client, {
         category: principle.category,
         ruleText: principle.ruleText,
         promptFragment: principle.promptFragment,
@@ -294,20 +300,22 @@ export async function ingestPdf(
 }
 
 async function getExistingChunkIndexesForBook(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   bookTitle: string,
   contentHash: string,
   scope: Pick<IngestPdfOptions, 'organizationId' | 'projectId'>,
 ): Promise<Set<number>> {
   const normalizedTitle = normalizeBookTitle(bookTitle);
-  const rows = await prisma.brainExperience.findMany({
-    where: {
-      sourceType: 'PDF',
-      organizationId: scope.organizationId,
-      ...(scope.projectId ? { projectId: scope.projectId } : {}),
-    },
-    select: { metadata: true },
-  });
+  const values: unknown[] = [scope.organizationId];
+  const filters = [`source_type = 'PDF'::"BrainSourceType"`, 'organization_id = $1'];
+  if (scope.projectId) {
+    values.push(scope.projectId);
+    filters.push(`project_id = $${values.length}`);
+  }
+  const { rows } = await client.query<{ metadata: unknown }>(
+    `SELECT metadata FROM design_brain_experiences WHERE ${filters.join(' AND ')}`,
+    values,
+  );
 
   const indexes = new Set<number>();
   for (const row of rows) {

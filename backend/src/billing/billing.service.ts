@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, prisma } from '@logo-platform/database';
+import { db } from '@logo-platform/database';
 import type {
   BillingOverview,
   BillingSubscriptionStatus,
@@ -27,7 +27,6 @@ type LemonWebhook = {
   };
   data?: {
     id?: string;
-    type?: string;
     attributes?: {
       store_id?: number | string;
       customer_id?: number | string;
@@ -44,6 +43,18 @@ type LemonWebhook = {
 type CheckoutCustomData = NonNullable<
   NonNullable<LemonWebhook['meta']>['custom_data']
 >;
+type SubscriptionRow = {
+  organizationId: string;
+  providerCustomerId: string | null;
+  status: BillingSubscriptionStatus;
+  renewsAt: Date | null;
+  endsAt: Date | null;
+  providerUpdatedAt: Date | null;
+};
+type CheckoutRow = {
+  id: string;
+  organizationId: string;
+};
 
 function sha256(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
@@ -55,6 +66,14 @@ function asDate(value?: string | null): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    String((error as { code?: unknown }).code) === '23505'
+  );
+}
+
 @Injectable()
 export class BillingService {
   constructor(
@@ -64,30 +83,24 @@ export class BillingService {
 
   async overview(tenant: TenantScope): Promise<BillingOverview> {
     const [organization, membership, subscription, usage] = await Promise.all([
-      prisma.organization.findUnique({
-        where: { id: tenant.organizationId },
-        select: { plan: true },
-      }),
-      prisma.organizationMember.findUnique({
-        where: {
-          organizationId_userId: {
-            organizationId: tenant.organizationId,
-            userId: tenant.userId,
-          },
-        },
-        select: { role: true },
-      }),
-      prisma.billingSubscription.findUnique({
-        where: { organizationId: tenant.organizationId },
-      }),
+      db.maybeOne<{ plan: Plan }>('SELECT plan FROM organizations WHERE id = $1', [
+        tenant.organizationId,
+      ]),
+      db.maybeOne<{ role: string }>(
+        `SELECT role FROM organization_members
+         WHERE organization_id = $1 AND user_id = $2`,
+        [tenant.organizationId, tenant.userId],
+      ),
+      db.maybeOne<SubscriptionRow>(
+        'SELECT * FROM billing_subscriptions WHERE organization_id = $1',
+        [tenant.organizationId],
+      ),
       this.usage.summary(tenant.organizationId),
     ]);
     if (!organization || !membership) throw new NotFoundException('Organization not found');
-
     return {
-      plan: organization.plan as Plan,
-      subscriptionStatus:
-        (subscription?.status as BillingSubscriptionStatus | undefined) ?? 'INACTIVE',
+      plan: organization.plan,
+      subscriptionStatus: subscription?.status ?? 'INACTIVE',
       renewsAt: subscription?.renewsAt?.toISOString(),
       endsAt: subscription?.endsAt?.toISOString(),
       usage,
@@ -102,17 +115,21 @@ export class BillingService {
     }
     const variantId = this.variantForPlan(requestedPlan);
     const nonce = randomBytes(24).toString('base64url');
-    const session = await prisma.billingCheckoutSession.create({
-      data: {
-        organizationId: tenant.organizationId,
-        requestedBy: tenant.userId,
-        plan: requestedPlan,
+    const session = await db.one<{ id: string }>(
+      `INSERT INTO billing_checkout_sessions (
+         id, organization_id, requested_by, plan, variant_id, nonce_hash, expires_at
+       ) VALUES ($1, $2, $3, $4::"Plan", $5, $6, $7)
+       RETURNING id`,
+      [
+        randomUUID(),
+        tenant.organizationId,
+        tenant.userId,
+        requestedPlan,
         variantId,
-        nonceHash: sha256(nonce),
-        expiresAt: new Date(Date.now() + 30 * 60 * 1_000),
-      },
-    });
-
+        sha256(nonce),
+        new Date(Date.now() + 30 * 60_000),
+      ],
+    );
     try {
       const url = await this.lemon.createCheckout({
         variantId,
@@ -122,22 +139,22 @@ export class BillingService {
       });
       return { url };
     } catch (error) {
-      await prisma.billingCheckoutSession.delete({ where: { id: session.id } }).catch(() => undefined);
+      await db.query('DELETE FROM billing_checkout_sessions WHERE id = $1', [session.id])
+        .catch(() => undefined);
       throw error;
     }
   }
 
   async customerPortal(tenant: TenantScope) {
     await this.assertBillingManager(tenant);
-    const subscription = await prisma.billingSubscription.findUnique({
-      where: { organizationId: tenant.organizationId },
-    });
+    const subscription = await db.maybeOne<SubscriptionRow>(
+      'SELECT * FROM billing_subscriptions WHERE organization_id = $1',
+      [tenant.organizationId],
+    );
     if (!subscription?.providerCustomerId) {
       throw new NotFoundException('No billing customer exists for this organization');
     }
-    return {
-      url: await this.lemon.getCustomerPortalUrl(subscription.providerCustomerId),
-    };
+    return { url: await this.lemon.getCustomerPortalUrl(subscription.providerCustomerId) };
   }
 
   async processWebhook(
@@ -145,10 +162,14 @@ export class BillingService {
     eventHeader: string | undefined,
   ): Promise<{ status: 'processed' | 'ignored' | 'duplicate' }> {
     const payloadHash = sha256(rawBody);
-    const existingEvent = await prisma.billingWebhookEvent.findUnique({
-      where: { id: payloadHash },
-    });
-    if (existingEvent) return { status: 'duplicate' };
+    if (
+      await db.maybeOne<{ id: string }>(
+        'SELECT id FROM billing_webhook_events WHERE id = $1',
+        [payloadHash],
+      )
+    ) {
+      return { status: 'duplicate' };
+    }
 
     let payload: LemonWebhook;
     try {
@@ -156,7 +177,6 @@ export class BillingService {
     } catch {
       throw new BadRequestException('Malformed webhook payload');
     }
-
     const eventName = payload.meta?.event_name;
     if (!eventName || (eventHeader && eventHeader !== eventName)) {
       throw new BadRequestException('Webhook event name mismatch');
@@ -173,15 +193,13 @@ export class BillingService {
     }
 
     if (!eventName.startsWith('subscription_') || !resourceId || !attributes) {
-      await prisma.billingWebhookEvent.create({
-        data: {
-          id: payloadHash,
-          eventName,
-          resourceId,
-          status: 'IGNORED',
-          processedAt: new Date(),
-        },
-      });
+      await db.query(
+        `INSERT INTO billing_webhook_events (
+           id, event_name, resource_id, status, processed_at
+         ) VALUES ($1, $2, $3, 'IGNORED'::"BillingEventStatus", NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [payloadHash, eventName, resourceId ?? null],
+      );
       return { status: 'ignored' };
     }
 
@@ -192,129 +210,124 @@ export class BillingService {
     const providerUpdatedAt = asDate(attributes.updated_at) ?? new Date();
     const renewsAt = asDate(attributes.renews_at);
     const endsAt = asDate(attributes.ends_at);
-    const existingSubscription = await prisma.billingSubscription.findUnique({
-      where: { providerSubscriptionId: resourceId },
-    });
+    const existingSubscription = await db.maybeOne<SubscriptionRow>(
+      'SELECT * FROM billing_subscriptions WHERE provider_subscription_id = $1',
+      [resourceId],
+    );
     const checkout = existingSubscription
       ? null
       : await this.validCheckout(payload.meta?.custom_data, plan, variantId);
     const organizationId =
       existingSubscription?.organizationId ?? checkout?.organizationId;
     if (!organizationId) throw new ForbiddenException('Webhook is not linked to a checkout');
-    const effectivePlan = this.entitledPlan(
-      plan,
-      status,
-      endsAt,
-      providerUpdatedAt,
-    );
+    const effectivePlan = this.entitledPlan(plan, status, endsAt, providerUpdatedAt);
 
     try {
-      await prisma.$transaction(async (tx) => {
-        await tx.billingWebhookEvent.create({
-          data: {
-            id: payloadHash,
-            eventName,
-            resourceId,
-            status: 'RECEIVED',
-          },
-        });
-        const current = await tx.billingSubscription.findUnique({
-          where: { organizationId },
-        });
+      await db.transaction(async (tx) => {
+        await tx.query(
+          `INSERT INTO billing_webhook_events (id, event_name, resource_id, status)
+           VALUES ($1, $2, $3, 'RECEIVED'::"BillingEventStatus")`,
+          [payloadHash, eventName, resourceId],
+        );
+        const current = await tx.maybeOne<SubscriptionRow>(
+          `SELECT * FROM billing_subscriptions
+           WHERE organization_id = $1 FOR UPDATE`,
+          [organizationId],
+        );
         if (
           current?.providerUpdatedAt &&
           current.providerUpdatedAt.getTime() > providerUpdatedAt.getTime()
         ) {
-          await tx.billingWebhookEvent.update({
-            where: { id: payloadHash },
-            data: { status: 'IGNORED', processedAt: new Date() },
-          });
+          await tx.query(
+            `UPDATE billing_webhook_events
+             SET status = 'IGNORED'::"BillingEventStatus", processed_at = NOW()
+             WHERE id = $1`,
+            [payloadHash],
+          );
           return;
         }
-
-        await tx.billingSubscription.upsert({
-          where: { organizationId },
-          create: {
+        await tx.query(
+          `INSERT INTO billing_subscriptions (
+             id, organization_id, provider_subscription_id, provider_customer_id,
+             provider_order_id, product_id, variant_id, plan, status, renews_at,
+             ends_at, provider_updated_at, updated_at
+           ) VALUES (
+             $1, $2, $3, $4, $5, $6, $7, $8::"Plan",
+             $9::"BillingSubscriptionStatus", $10, $11, $12, NOW()
+           )
+           ON CONFLICT (organization_id) DO UPDATE SET
+             provider_subscription_id = EXCLUDED.provider_subscription_id,
+             provider_customer_id = EXCLUDED.provider_customer_id,
+             provider_order_id = EXCLUDED.provider_order_id,
+             product_id = EXCLUDED.product_id, variant_id = EXCLUDED.variant_id,
+             plan = EXCLUDED.plan, status = EXCLUDED.status,
+             renews_at = EXCLUDED.renews_at, ends_at = EXCLUDED.ends_at,
+             provider_updated_at = EXCLUDED.provider_updated_at, updated_at = NOW()`,
+          [
+            randomUUID(),
             organizationId,
-            providerSubscriptionId: resourceId,
-            providerCustomerId: String(attributes.customer_id ?? '') || null,
-            providerOrderId: String(attributes.order_id ?? '') || null,
-            productId: String(attributes.product_id ?? '') || null,
+            resourceId,
+            String(attributes.customer_id ?? '') || null,
+            String(attributes.order_id ?? '') || null,
+            String(attributes.product_id ?? '') || null,
             variantId,
             plan,
             status,
             renewsAt,
             endsAt,
             providerUpdatedAt,
-          },
-          update: {
-            providerSubscriptionId: resourceId,
-            providerCustomerId: String(attributes.customer_id ?? '') || null,
-            providerOrderId: String(attributes.order_id ?? '') || null,
-            productId: String(attributes.product_id ?? '') || null,
-            variantId,
-            plan,
-            status,
-            renewsAt,
-            endsAt,
-            providerUpdatedAt,
-          },
-        });
-        await tx.organization.update({
-          where: { id: organizationId },
-          data: { plan: effectivePlan },
-        });
+          ],
+        );
+        await tx.query(
+          'UPDATE organizations SET plan = $2::"Plan", updated_at = NOW() WHERE id = $1',
+          [organizationId, effectivePlan],
+        );
         if (checkout) {
-          await tx.billingCheckoutSession.update({
-            where: { id: checkout.id },
-            data: { consumedAt: new Date() },
-          });
+          await tx.query(
+            `UPDATE billing_checkout_sessions
+             SET consumed_at = NOW()
+             WHERE id = $1 AND consumed_at IS NULL`,
+            [checkout.id],
+          );
         }
-        await tx.billingWebhookEvent.update({
-          where: { id: payloadHash },
-          data: { status: 'PROCESSED', processedAt: new Date() },
-        });
-      });
+        await tx.query(
+          `UPDATE billing_webhook_events
+           SET status = 'PROCESSED'::"BillingEventStatus", processed_at = NOW()
+           WHERE id = $1`,
+          [payloadHash],
+        );
+      }, { isolationLevel: 'SERIALIZABLE' });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        return { status: 'duplicate' };
-      }
+      if (isUniqueViolation(error)) return { status: 'duplicate' };
       throw error;
     }
     return { status: 'processed' };
   }
 
-  private async validCheckout(
+  private validCheckout(
     custom: CheckoutCustomData | undefined,
     plan: Plan,
     variantId: string,
   ) {
-    if (
-      !custom?.organization_id ||
-      !custom.checkout_session_id ||
-      !custom.nonce
-    ) {
-      return null;
+    if (!custom?.organization_id || !custom.checkout_session_id || !custom.nonce) {
+      return Promise.resolve(null);
     }
-    const checkout = await prisma.billingCheckoutSession.findFirst({
-      where: {
-        id: custom.checkout_session_id,
-        organizationId: custom.organization_id,
+    return db.maybeOne<CheckoutRow>(
+      `SELECT id, organization_id FROM billing_checkout_sessions
+       WHERE id = $1 AND organization_id = $2 AND plan = $3::"Plan"
+         AND variant_id = $4 AND nonce_hash = $5
+         AND consumed_at IS NULL AND expires_at > NOW()`,
+      [
+        custom.checkout_session_id,
+        custom.organization_id,
         plan,
         variantId,
-        nonceHash: sha256(custom.nonce),
-        consumedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-    });
-    return checkout;
+        sha256(custom.nonce),
+      ],
+    );
   }
 
   private mapStatus(value?: string): BillingSubscriptionStatus {
-    const normalized = value?.toLowerCase();
     const statuses: Record<string, BillingSubscriptionStatus> = {
       on_trial: 'ON_TRIAL',
       active: 'ACTIVE',
@@ -324,7 +337,7 @@ export class BillingService {
       cancelled: 'CANCELLED',
       expired: 'EXPIRED',
     };
-    return statuses[normalized ?? ''] ?? 'INACTIVE';
+    return statuses[value?.toLowerCase() ?? ''] ?? 'INACTIVE';
   }
 
   private entitledPlan(
@@ -363,15 +376,11 @@ export class BillingService {
   }
 
   private async assertBillingManager(tenant: TenantScope): Promise<void> {
-    const membership = await prisma.organizationMember.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: tenant.organizationId,
-          userId: tenant.userId,
-        },
-      },
-      select: { role: true },
-    });
+    const membership = await db.maybeOne<{ role: string }>(
+      `SELECT role FROM organization_members
+       WHERE organization_id = $1 AND user_id = $2`,
+      [tenant.organizationId, tenant.userId],
+    );
     if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
       throw new ForbiddenException('Only organization owners can manage billing');
     }

@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '../storage/database-types';
 import type {
   BrainExperienceRecord,
   BrainGenerateRequest,
@@ -18,7 +18,7 @@ import { loadProjectMemory } from '../learning/project-memory';
 import { selectVisualReferences } from '../retrieval/visual-memory';
 
 export async function buildBrainArchitecture(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   request: BrainGenerateRequest,
   retrievedExperiences: BrainExperienceRecord[],
 ): Promise<BrainArchitecture> {
@@ -31,7 +31,7 @@ export async function buildBrainArchitecture(
     briefContext: request.briefContext,
   });
 
-  const projectMemory = await loadProjectMemory(prisma, request.companyName, {
+  const projectMemory = await loadProjectMemory(client, request.companyName, {
     organizationId: request.organizationId,
     projectId: request.projectId,
   });
@@ -71,7 +71,7 @@ export async function buildBrainArchitecture(
 }
 
 export async function runBriefInterview(
-  prisma: PrismaClient,
+  _client: DatabaseClient,
   input: {
     industry: string;
     companyName?: string;

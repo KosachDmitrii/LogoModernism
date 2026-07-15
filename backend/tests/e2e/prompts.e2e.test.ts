@@ -3,7 +3,7 @@ import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { createTestApp } from '../helpers/app';
 import { isE2eDbReady } from '../helpers/db';
-import { prisma } from '@logo-platform/database';
+import { db } from '@logo-platform/database';
 
 const describeE2e = isE2eDbReady() ? describe : describe.skip;
 
@@ -14,24 +14,28 @@ describeE2e('Prompts API (e2e)', () => {
   const organizationId = `${fixtureId}-org`;
 
   beforeAll(async () => {
-    await prisma.user.create({
-      data: { id: userId, email: `${userId}@example.test` },
-    });
-    await prisma.organization.create({
-      data: {
-        id: organizationId,
-        name: 'Prompts E2E',
-        slug: organizationId,
-        members: { create: { userId, role: 'OWNER' } },
-      },
-    });
+    await db.query(
+      'INSERT INTO users (id, email, updated_at) VALUES ($1, $2, NOW())',
+      [userId, `${userId}@example.test`],
+    );
+    await db.query(
+      `INSERT INTO organizations (id, name, slug, updated_at)
+       VALUES ($1, 'Prompts E2E', $1, NOW())`,
+      [organizationId],
+    );
+    await db.query(
+      `INSERT INTO organization_members (id, organization_id, user_id, role)
+       VALUES ($1, $2, $3, 'OWNER'::"Role")`,
+      [`${fixtureId}-membership`, organizationId, userId],
+    );
     app = await createTestApp();
   });
 
   afterAll(async () => {
     await app.close();
-    await prisma.organization.delete({ where: { id: organizationId } }).catch(() => undefined);
-    await prisma.user.delete({ where: { id: userId } }).catch(() => undefined);
+    await db.query('DELETE FROM organizations WHERE id = $1', [organizationId])
+      .catch(() => undefined);
+    await db.query('DELETE FROM users WHERE id = $1', [userId]).catch(() => undefined);
   });
 
   it('POST /api/prompts/generate with useBrain returns brainPowered pipeline', async () => {
@@ -91,27 +95,22 @@ describeE2e('Prompts API (e2e)', () => {
     const organizationB = `org-b-${suffix}`;
     const promptA = `prompt-a-${suffix}`;
     const promptB = `prompt-b-${suffix}`;
-    await prisma.organization.createMany({
-      data: [
-        { id: organizationA, name: 'Tenant A', slug: organizationA },
-        { id: organizationB, name: 'Tenant B', slug: organizationB },
-      ],
-    });
-    await prisma.composedPromptRecord.createMany({
-      data: [organizationA, organizationB].map((organizationId, index) => ({
-        id: index === 0 ? promptA : promptB,
-        organizationId,
-        industry: 'technology',
-        text: `Tenant prompt ${index}`,
-        scores: {},
-        dna: {},
-        metadata: {},
-        selectedPrinciples: [],
-        logos: [],
-        saved: true,
-        savedAt: new Date(),
-      })),
-    });
+    await db.query(
+      `INSERT INTO organizations (id, name, slug, updated_at)
+       VALUES ($1, 'Tenant A', $1, NOW()), ($2, 'Tenant B', $2, NOW())`,
+      [organizationA, organizationB],
+    );
+    await db.query(
+      `INSERT INTO generated_prompts (
+         id, organization_id, industry, text, scores, dna, metadata,
+         selected_principles, logos, saved, saved_at, updated_at
+       ) VALUES
+         ($1, $3, 'technology', 'Tenant prompt 0', '{}'::jsonb, '{}'::jsonb,
+          '{}'::jsonb, '[]'::jsonb, '[]'::jsonb, TRUE, NOW(), NOW()),
+         ($2, $4, 'technology', 'Tenant prompt 1', '{}'::jsonb, '{}'::jsonb,
+          '{}'::jsonb, '[]'::jsonb, '[]'::jsonb, TRUE, NOW(), NOW())`,
+      [promptA, promptB, organizationA, organizationB],
+    );
 
     try {
       const response = await request(app.getHttpServer())
@@ -124,12 +123,12 @@ describeE2e('Prompts API (e2e)', () => {
         promptB,
       );
     } finally {
-      await prisma.composedPromptRecord.deleteMany({
-        where: { id: { in: [promptA, promptB] } },
-      });
-      await prisma.organization.deleteMany({
-        where: { id: { in: [organizationA, organizationB] } },
-      });
+      await db.query('DELETE FROM generated_prompts WHERE id = ANY($1::text[])', [
+        [promptA, promptB],
+      ]);
+      await db.query('DELETE FROM organizations WHERE id = ANY($1::text[])', [
+        [organizationA, organizationB],
+      ]);
     }
   });
 });

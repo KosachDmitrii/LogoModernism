@@ -6,11 +6,11 @@
 - Prompt engine pipeline
 - 12 AI engines
 - React dashboard
-- Prisma schema
+- SQL migrations and typed database client
 - Enterprise documentation
 
 ## Phase 2 — Persistence
-- Wire Prisma to API services
+- Wire parameterized SQL to API services
 - Save PromptRuns and BrandDNA
 - Logo version history
 - Sync principles to database
@@ -23,7 +23,7 @@
 
 ## Phase 4 — Image Generation
 - OpenAI / Flux / Ideogram adapters
-- BullMQ job queue
+- Direct API generation with PostgreSQL-backed long tasks
 - Result storage in S3
 - pgvector semantic search
 

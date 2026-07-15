@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { describe, expect, it } from 'vitest';
 import { DesignBrainController } from '../../src/design-brain/design-brain.controller';
 import { PromptsController } from '../../src/prompts/prompts.controller';
-import { QueueController } from '../../src/queue/queue.controller';
+import { BackgroundTasksController } from '../../src/background-tasks/background-tasks.controller';
 import {
   ALL_MEMBERS,
   BRAIN_ADMINS,
@@ -33,7 +33,9 @@ function platformRolesFor(controller: object, method: string): string[] | undefi
 describe('RBAC endpoint metadata', () => {
   const brain = Object.create(DesignBrainController.prototype) as DesignBrainController;
   const prompts = Object.create(PromptsController.prototype) as PromptsController;
-  const jobs = Object.create(QueueController.prototype) as QueueController;
+  const tasks = Object.create(
+    BackgroundTasksController.prototype,
+  ) as BackgroundTasksController;
 
   it.each([
     'health',
@@ -76,17 +78,8 @@ describe('RBAC endpoint metadata', () => {
     expect(rolesFor(prompts, method)).toEqual(CONTRIBUTORS);
   });
 
-  it('does not expose direct queue submission methods', () => {
-    for (const method of [
-      'enqueueFeedback',
-      'enqueuePdf',
-      'enqueueImage',
-      'enqueueResearch',
-      'enqueueConsolidation',
-      'enqueuePrompt',
-    ]) {
-      expect(method in QueueController.prototype).toBe(false);
-    }
-    expect(rolesFor(jobs, 'getJobStatus')).toEqual(CONTRIBUTORS);
+  it('limits durable task status and cancellation to contributors', () => {
+    expect(rolesFor(tasks, 'get')).toEqual(CONTRIBUTORS);
+    expect(rolesFor(tasks, 'cancel')).toEqual(CONTRIBUTORS);
   });
 });

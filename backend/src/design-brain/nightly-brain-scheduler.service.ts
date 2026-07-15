@@ -4,8 +4,8 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { designBrain } from '@logo-platform/design-brain';
-import { isAsyncQueueEnabled } from '../queue/queue.config';
+import { BackgroundTasksService } from '../background-tasks/background-tasks.service';
+import { BACKGROUND_TASK_TYPES } from '../background-tasks/background-task.types';
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1_000;
 
@@ -18,11 +18,10 @@ export class NightlyBrainSchedulerService
   private lastRunDate?: string;
   private active = false;
 
+  constructor(private readonly tasks: BackgroundTasksService) {}
+
   onModuleInit(): void {
-    if (
-      process.env.BRAIN_NIGHTLY_RESEARCH !== 'true' ||
-      isAsyncQueueEnabled()
-    ) {
+    if (process.env.BRAIN_NIGHTLY_RESEARCH !== 'true') {
       return;
     }
     this.active = true;
@@ -37,10 +36,7 @@ export class NightlyBrainSchedulerService
   }
 
   isActive(): boolean {
-    return (
-      process.env.BRAIN_NIGHTLY_RESEARCH === 'true' &&
-      (this.active || isAsyncQueueEnabled())
-    );
+    return process.env.BRAIN_NIGHTLY_RESEARCH === 'true' && this.active;
   }
 
   private async tick(): Promise<void> {
@@ -51,10 +47,12 @@ export class NightlyBrainSchedulerService
 
     this.lastRunDate = date;
     try {
-      const result = await designBrain.runNightlyResearch();
-      this.logger.log(
-        `Nightly research completed: ${result.results.length} topic result(s)`,
-      );
+      const task = await this.tasks.create({
+        type: BACKGROUND_TASK_TYPES.NIGHTLY_RESEARCH,
+        idempotencyKey: `nightly-research:${date}`,
+        payload: {},
+      });
+      this.logger.log(`Nightly research task queued: ${task.id}`);
     } catch (error) {
       this.lastRunDate = undefined;
       this.logger.error(

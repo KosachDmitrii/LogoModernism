@@ -2,13 +2,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request, { type Test } from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { createTestApp } from '../helpers/app';
-import { createTestPrisma, isE2eDbReady, resetBrainTables } from '../helpers/db';
+import { getTestDatabase, isE2eDbReady, resetBrainTables } from '../helpers/db';
+import type { DatabaseClient } from '@logo-platform/database';
 
 const describeE2e = isE2eDbReady() ? describe : describe.skip;
 
 describeE2e('Brain API (e2e)', () => {
   let app: INestApplication;
-  let prisma: ReturnType<typeof createTestPrisma>;
+  let database: DatabaseClient;
   const fixtureId = `brain-e2e-${Date.now().toString(36)}`;
   const userId = `${fixtureId}-user`;
   const organizationId = `${fixtureId}-org`;
@@ -23,35 +24,35 @@ describeE2e('Brain API (e2e)', () => {
   }
 
   beforeAll(async () => {
-    prisma = createTestPrisma();
-    await prisma.$connect();
-    await prisma.user.create({
-      data: {
-        id: userId,
-        email: `${userId}@example.test`,
-        platformRole: 'PLATFORM_ADMIN',
-      },
-    });
-    await prisma.organization.create({
-      data: {
-        id: organizationId,
-        name: 'Brain E2E',
-        slug: organizationId,
-        members: { create: { userId, role: 'OWNER' } },
-      },
-    });
+    database = await getTestDatabase();
+    await database.query(
+      `INSERT INTO users (id, email, platform_role, updated_at)
+       VALUES ($1, $2, 'PLATFORM_ADMIN'::"PlatformRole", NOW())`,
+      [userId, `${userId}@example.test`],
+    );
+    await database.query(
+      `INSERT INTO organizations (id, name, slug, updated_at)
+       VALUES ($1, 'Brain E2E', $1, NOW())`,
+      [organizationId],
+    );
+    await database.query(
+      `INSERT INTO organization_members (id, organization_id, user_id, role)
+       VALUES ($1, $2, $3, 'OWNER'::"Role")`,
+      [`${fixtureId}-membership`, organizationId, userId],
+    );
     app = await createTestApp();
   });
 
   afterAll(async () => {
     await app.close();
-    await prisma.organization.delete({ where: { id: organizationId } }).catch(() => undefined);
-    await prisma.user.delete({ where: { id: userId } }).catch(() => undefined);
-    await prisma.$disconnect();
+    await database.query('DELETE FROM organizations WHERE id = $1', [organizationId])
+      .catch(() => undefined);
+    await database.query('DELETE FROM users WHERE id = $1', [userId])
+      .catch(() => undefined);
   });
 
   beforeEach(async () => {
-    await resetBrainTables(prisma);
+    await resetBrainTables(database);
   });
 
   it('GET /api/health responds ok', async () => {

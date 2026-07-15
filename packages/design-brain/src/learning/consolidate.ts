@@ -1,5 +1,10 @@
 import type { BrainConsolidateResult, BrainTenantScope } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
+import type {
+  BrainExperienceRow,
+  BrainTasteSignalRow,
+  DatabaseClient,
+  LearnedPrincipleRow,
+} from '../storage/database-types';
 import { embedText } from '../embedding/embedding.service';
 import { searchExperienceEmbeddings } from '../storage/pgvector';
 
@@ -8,7 +13,7 @@ function normalizeFragment(fragment: string): string {
 }
 
 export async function consolidateBrain(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   scope?: BrainTenantScope,
 ): Promise<BrainConsolidateResult> {
   let mergedPrinciples = 0;
@@ -16,13 +21,13 @@ export async function consolidateBrain(
   let deduplicatedExperiences = 0;
   let updatedWeights = 0;
 
-  const principles = await prisma.learnedPrinciple.findMany({
-    where: {
-      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
-      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
-    },
-    orderBy: [{ weight: 'desc' }, { confidence: 'desc' }],
-  });
+  const principleScope = scopedWhere(scope);
+  const { rows: principles } = await client.query<LearnedPrincipleRow>(
+    `SELECT * FROM learned_design_principles
+     ${principleScope.clause}
+     ORDER BY weight DESC, confidence DESC`,
+    principleScope.values,
+  );
 
   const fragmentIndex = new Map<string, string>();
 
@@ -31,21 +36,28 @@ export async function consolidateBrain(
     const existingId = fragmentIndex.get(key);
 
     if (existingId && existingId !== principle.id) {
-      const keeper = await prisma.learnedPrinciple.findUnique({ where: { id: existingId } });
+      const keeper = await client.maybeOne<LearnedPrincipleRow>(
+        'SELECT * FROM learned_design_principles WHERE id = $1',
+        [existingId],
+      );
       if (!keeper) continue;
 
-      await prisma.learnedPrinciple.update({
-        where: { id: keeper.id },
-        data: {
-          weight: Math.min(3, keeper.weight + principle.weight * 0.25),
-          confidence: Math.min(1, (keeper.confidence + principle.confidence) / 2),
-          sourceIds: [...new Set([...keeper.sourceIds, ...principle.sourceIds])],
-          antiPatterns: [...new Set([...keeper.antiPatterns, ...principle.antiPatterns])],
-          tags: [...new Set([...keeper.tags, ...principle.tags])],
-        },
-      });
+      await client.query(
+        `UPDATE learned_design_principles
+         SET weight = $2, confidence = $3, source_ids = $4, anti_patterns = $5,
+             tags = $6, updated_at = NOW()
+         WHERE id = $1`,
+        [
+          keeper.id,
+          Math.min(3, keeper.weight + principle.weight * 0.25),
+          Math.min(1, (keeper.confidence + principle.confidence) / 2),
+          [...new Set([...keeper.sourceIds, ...principle.sourceIds])],
+          [...new Set([...keeper.antiPatterns, ...principle.antiPatterns])],
+          [...new Set([...keeper.tags, ...principle.tags])],
+        ],
+      );
 
-      await prisma.learnedPrinciple.delete({ where: { id: principle.id } });
+      await client.query('DELETE FROM learned_design_principles WHERE id = $1', [principle.id]);
       mergedPrinciples += 1;
       updatedWeights += 1;
       continue;
@@ -54,28 +66,28 @@ export async function consolidateBrain(
     fragmentIndex.set(key, principle.id);
   }
 
-  const weak = await prisma.learnedPrinciple.findMany({
-    where: {
-      AND: [{ weight: { lt: 0.35 } }, { confidence: { lt: 0.25 } }],
-      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
-      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
-    },
-  });
+  const weakScope = scopedWhere(scope, 2);
+  const { rows: weak } = await client.query<LearnedPrincipleRow>(
+    `SELECT * FROM learned_design_principles
+     WHERE weight < $1 AND confidence < $2
+       ${weakScope.filters.length ? `AND ${weakScope.filters.join(' AND ')}` : ''}`,
+    [0.35, 0.25, ...weakScope.values],
+  );
 
   for (const principle of weak) {
     if (principle.sourceIds.length > 2) continue;
-    await prisma.learnedPrinciple.delete({ where: { id: principle.id } });
+    await client.query('DELETE FROM learned_design_principles WHERE id = $1', [principle.id]);
     prunedPrinciples += 1;
   }
 
-  const tasteSignals = await prisma.brainTasteSignal.findMany({
-    where: {
-      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
-      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 200,
-  });
+  const signalScope = scopedWhere(scope);
+  const { rows: tasteSignals } = await client.query<BrainTasteSignalRow>(
+    `SELECT * FROM design_brain_taste_signals
+     ${signalScope.clause}
+     ORDER BY created_at DESC
+     LIMIT 200`,
+    signalScope.values,
+  );
 
   for (const signal of tasteSignals) {
     const metadata = (signal.metadata ?? {}) as Record<string, unknown>;
@@ -91,40 +103,45 @@ export async function consolidateBrain(
           : signal.score * 0.02;
 
     for (const principleId of principleIds) {
-      const principle = await prisma.learnedPrinciple.findFirst({
-        where: {
-          OR: [{ id: principleId }, { promptFragment: principleId }],
-          ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
-          ...(scope?.projectId ? { projectId: scope.projectId } : {}),
-        },
-      });
+      const matchScope = scopedWhere(scope, 1);
+      const principle = await client.maybeOne<LearnedPrincipleRow>(
+        `SELECT * FROM learned_design_principles
+         WHERE (id = $1 OR prompt_fragment = $1)
+           ${matchScope.filters.length ? `AND ${matchScope.filters.join(' AND ')}` : ''}
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [principleId, ...matchScope.values],
+      );
       if (!principle) continue;
 
-      await prisma.learnedPrinciple.update({
-        where: { id: principle.id },
-        data: {
-          weight: Math.max(0.1, Math.min(3, principle.weight + delta)),
-          confidence: Math.max(0.1, Math.min(1, principle.confidence + delta * 0.5)),
-        },
-      });
+      await client.query(
+        `UPDATE learned_design_principles
+         SET weight = $2, confidence = $3, updated_at = NOW()
+         WHERE id = $1`,
+        [
+          principle.id,
+          Math.max(0.1, Math.min(3, principle.weight + delta)),
+          Math.max(0.1, Math.min(1, principle.confidence + delta * 0.5)),
+        ],
+      );
       updatedWeights += 1;
     }
   }
 
-  const experiences = await prisma.brainExperience.findMany({
-    where: {
-      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
-      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-  });
+  const experienceScope = scopedWhere(scope);
+  const { rows: experiences } = await client.query<BrainExperienceRow>(
+    `SELECT * FROM design_brain_experiences
+     ${experienceScope.clause}
+     ORDER BY created_at DESC
+     LIMIT 100`,
+    experienceScope.values,
+  );
 
   for (const experience of experiences) {
     try {
       const embedding = await embedText(`${experience.title ?? ''}\n${experience.summary ?? ''}\n${experience.content.slice(0, 400)}`);
       const matches = await searchExperienceEmbeddings(
-        prisma,
+        client,
         embedding,
         3,
         undefined,
@@ -132,11 +149,11 @@ export async function consolidateBrain(
         scope?.projectId,
       );
       const duplicate = matches.find(
-        (match) => match.experience_id !== experience.id && match.similarity > 0.97,
+        (match) => match.experienceId !== experience.id && match.similarity > 0.97,
       );
 
       if (duplicate) {
-        await prisma.brainExperience.delete({ where: { id: experience.id } });
+        await client.query('DELETE FROM design_brain_experiences WHERE id = $1', [experience.id]);
         deduplicatedExperiences += 1;
       }
     } catch {
@@ -150,6 +167,27 @@ export async function consolidateBrain(
     deduplicatedExperiences,
     updatedWeights,
     ranAt: new Date().toISOString(),
+  };
+}
+
+function scopedWhere(
+  scope?: BrainTenantScope,
+  parameterOffset = 0,
+): { clause: string; filters: string[]; values: unknown[] } {
+  const values: unknown[] = [];
+  const filters: string[] = [];
+  if (scope?.organizationId) {
+    values.push(scope.organizationId);
+    filters.push(`organization_id = $${parameterOffset + values.length}`);
+  }
+  if (scope?.projectId) {
+    values.push(scope.projectId);
+    filters.push(`project_id = $${parameterOffset + values.length}`);
+  }
+  return {
+    clause: filters.length ? `WHERE ${filters.join(' AND ')}` : '',
+    filters,
+    values,
   };
 }
 

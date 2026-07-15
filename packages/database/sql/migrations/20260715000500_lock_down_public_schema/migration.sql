@@ -23,7 +23,13 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   REVOKE ALL PRIVILEGES ON FUNCTIONS
   FROM PUBLIC, anon, authenticated, service_role;
 
-ALTER TABLE public._prisma_migrations ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
+    ALTER TABLE public._prisma_migrations ENABLE ROW LEVEL SECURITY;
+  END IF;
+END
+$$;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organization_members ENABLE ROW LEVEL SECURITY;

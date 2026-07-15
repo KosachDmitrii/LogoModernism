@@ -1,7 +1,5 @@
 import './load-env';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { db, disconnect } from '../src';
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -35,17 +33,19 @@ async function main(): Promise<void> {
   const supabaseUrl = required('SUPABASE_URL').replace(/\/+$/, '');
   const serviceRoleKey = required('SUPABASE_SERVICE_ROLE_KEY');
   const bucket = process.env.SUPABASE_GENERATED_LOGOS_BUCKET?.trim() || 'catalog-logos';
-  const logos = await prisma.logo.findMany({
-    where: { publicUrl: { startsWith: 'data:' } },
-    select: { id: true, publicUrl: true },
-  });
+  const { rows: logos } = await db.query<{ id: string; publicUrl: string }>(
+    `SELECT id, public_url
+     FROM generated_logos
+     WHERE public_url LIKE $1`,
+    ['data:%'],
+  );
 
   let completed = 0;
   const concurrency = 6;
   for (let offset = 0; offset < logos.length; offset += concurrency) {
     await Promise.all(
       logos.slice(offset, offset + concurrency).map(async (logo) => {
-        const { bytes, mimeType } = decodeDataUrl(logo.publicUrl!);
+        const { bytes, mimeType } = decodeDataUrl(logo.publicUrl);
         const key = `generated-logos/${logo.id}.${extensionFor(mimeType)}`;
         const response = await fetch(
           `${supabaseUrl}/storage/v1/object/${encodeURIComponent(bucket)}/${key
@@ -60,7 +60,10 @@ async function main(): Promise<void> {
               'Content-Type': mimeType,
               'x-upsert': 'true',
             },
-            body: bytes,
+            body: bytes.buffer.slice(
+              bytes.byteOffset,
+              bytes.byteOffset + bytes.byteLength,
+            ) as ArrayBuffer,
           },
         );
         if (!response.ok) {
@@ -74,10 +77,15 @@ async function main(): Promise<void> {
           .split('/')
           .map(encodeURIComponent)
           .join('/')}`;
-        await prisma.logo.update({
-          where: { id: logo.id },
-          data: { storageKey: key, publicUrl, mimeType },
-        });
+        const update = await db.query(
+          `UPDATE generated_logos
+           SET storage_key = $1, public_url = $2, mime_type = $3, updated_at = NOW()
+           WHERE id = $4`,
+          [key, publicUrl, mimeType, logo.id],
+        );
+        if (update.rowCount !== 1) {
+          throw new Error(`Logo disappeared during migration: ${logo.id}`);
+        }
         completed += 1;
         if (completed % 25 === 0 || completed === logos.length) {
           console.log(`Migrated ${completed}/${logos.length} inline logos`);
@@ -92,6 +100,4 @@ main()
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => disconnect());

@@ -30,50 +30,32 @@ import { apiFetch as fetch } from './lib/api-client';
 
 const API_BASE = getApiBase();
 
-type QueueJobStatus<Result = unknown> = {
+type BackgroundTask<Result = unknown> = {
   id: string;
-  state: 'active' | 'completed' | 'delayed' | 'failed' | 'waiting' | 'unknown';
-  progress: unknown;
+  status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+  progress: number;
+  phase?: string;
   result?: Result;
-  failedReason?: string;
-  createdAt: string;
-  finishedAt?: string;
+  error?: string;
 };
 
-export type BackgroundJobOptions = {
-  signal?: AbortSignal;
-  onJobQueued?: (jobId: string) => void;
-};
-
-export async function cancelBackgroundJob(jobId: string): Promise<void> {
-  const res = await fetch(
-    `${API_BASE}/jobs/${encodeURIComponent(jobId)}/cancel`,
-    { method: 'POST' },
-  );
-  if (!res.ok && res.status !== 404) {
-    await parseApiError(res, 'errors.api.progressCheckFailed');
-  }
-}
-
-async function getJobStatus<Result>(
-  jobId: string,
+async function waitForTask<Result>(
+  taskId: string,
   signal?: AbortSignal,
-): Promise<QueueJobStatus<Result>> {
-  const res = await fetch(`${API_BASE}/jobs/${encodeURIComponent(jobId)}`, { signal });
-  if (!res.ok) await parseApiError(res, 'errors.api.progressCheckFailed');
-  return res.json();
-}
-
-async function waitForJob<Result>(
-  jobId: string,
-  signal?: AbortSignal,
-): Promise<QueueJobStatus<Result>> {
+): Promise<BackgroundTask<Result>> {
   let delayMs = 1_000;
   while (true) {
-    const status = await getJobStatus<Result>(jobId, signal);
-    if (status.state === 'completed') return status;
-    if (status.state === 'failed') {
-      throw new Error(status.failedReason ?? 'Background job failed');
+    const response = await fetch(
+      `${API_BASE}/tasks/${encodeURIComponent(taskId)}`,
+      { signal },
+    );
+    if (!response.ok) {
+      await parseApiError(response, 'errors.api.progressCheckFailed');
+    }
+    const task = (await response.json()) as BackgroundTask<Result>;
+    if (task.status === 'SUCCEEDED') return task;
+    if (task.status === 'FAILED' || task.status === 'CANCELLED') {
+      throw new Error(task.error ?? 'Background task failed');
     }
     await new Promise<void>((resolve, reject) => {
       const timer = window.setTimeout(() => {
@@ -86,9 +68,13 @@ async function waitForJob<Result>(
       };
       signal?.addEventListener('abort', abort, { once: true });
     });
-    delayMs = Math.min(3_000, delayMs + 500);
+    delayMs = Math.min(5_000, delayMs + 500);
   }
 }
+
+export type BackgroundJobOptions = {
+  signal?: AbortSignal;
+};
 
 export async function generatePrompts(body: {
   industry: string;
@@ -123,16 +109,7 @@ export async function generatePrompts(body: {
     signal: options.signal,
   });
   if (!res.ok) await parseApiError(res, 'common.generationFailed');
-  const response = (await res.json()) as
-    | GenerateResponse
-    | { id: string; status: 'queued' };
-  if (!('id' in response && response.status === 'queued')) {
-    return response as GenerateResponse;
-  }
-  options.onJobQueued?.(response.id);
-  const job = await waitForJob<GenerateResponse>(response.id, options.signal);
-  if (!job.result) throw new Error('Prompt generation job returned no result');
-  return { ...job.result, meta: { intent } };
+  return res.json();
 }
 
 export async function getRecommendations(industry: string): Promise<RecommendResponse> {
@@ -320,16 +297,26 @@ export async function togglePromptSave(
   promptId: string,
   saved: boolean,
 ): Promise<{ promptId: string; saved: boolean }> {
-  const res = await fetch(`${API_BASE}/prompts/${encodeURIComponent(promptId)}/save`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Idempotency-Key': crypto.randomUUID(),
-    },
-    body: JSON.stringify({ saved }),
-  });
-  if (!res.ok) await parseApiError(res, 'common.failedToSavePrompt');
-  return res.json();
+  const idempotencyKey = crypto.randomUUID();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const res = await fetch(`${API_BASE}/prompts/${encodeURIComponent(promptId)}/save`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify({ saved }),
+    });
+    if (res.ok) return res.json();
+    if (res.status !== 503 || attempt === 1) {
+      await parseApiError(res, 'common.failedToSavePrompt');
+    }
+    const retryAfter = Number(res.headers.get('Retry-After'));
+    await new Promise((resolve) =>
+      window.setTimeout(resolve, Number.isFinite(retryAfter) ? retryAfter * 1_000 : 1_000),
+    );
+  }
+  throw new Error('Unable to save prompt');
 }
 
 export async function submitLogoFeedback(
@@ -413,23 +400,7 @@ export async function generatePromptLogo(
     signal: options.signal,
   });
   if (!res.ok) await parseApiError(res, 'common.imageGenerationFailed');
-  const response = (await res.json()) as
-    | { image: GeneratedImage; logos: GeneratedImage[]; remaining: number }
-    | { status: 'queued'; jobId: string; imageId: string; remaining: number };
-  if ('image' in response) return response;
-
-  options.onJobQueued?.(response.jobId);
-  await waitForJob(response.jobId, options.signal);
-  const promptResponse = await fetch(
-    `${API_BASE}/prompts/${encodeURIComponent(promptId)}`,
-    { signal: options.signal },
-  );
-  if (!promptResponse.ok) await parseApiError(promptResponse, 'common.imageGenerationFailed');
-  const prompt = (await promptResponse.json()) as ComposedPrompt & { logos?: GeneratedImage[] };
-  const logos = prompt.logos ?? [];
-  const image = logos.find((item) => item.id === response.imageId);
-  if (!image) throw new Error('Generated image was not persisted');
-  return { image, logos, remaining: response.remaining };
+  return res.json();
 }
 
 export async function generateImageFromPrompt(body: {
@@ -487,10 +458,10 @@ export async function consolidateBrain(): Promise<BrainConsolidateResult> {
   if (!res.ok) await parseApiError(res, 'errors.api.consolidateFailed');
   const submission = (await res.json()) as { id?: string } | BrainConsolidateResult;
   if ('ranAt' in submission) return submission;
-  if (!submission.id) throw new Error('Consolidation job was not created');
-  const job = await waitForJob<{ result: BrainConsolidateResult }>(submission.id);
-  if (!job.result?.result) throw new Error('Consolidation job returned no result');
-  return job.result.result;
+  if (!submission.id) throw new Error('Consolidation task was not created');
+  const task = await waitForTask<BrainConsolidateResult>(submission.id);
+  if (!task.result) throw new Error('Consolidation task returned no result');
+  return task.result;
 }
 
 export async function listBrainPrinciples(
@@ -535,32 +506,7 @@ export async function getBrainPdfIngestProgress(
     { signal },
   );
   if (!response.ok) await parseApiError(response, 'errors.api.progressCheckFailed');
-  const value = (await response.json()) as
-    | BrainPdfIngestProgress
-    | QueueJobStatus<{ result?: BrainIngestResult }>;
-  if ('status' in value) return value;
-  const job = value;
-  const status =
-    job.state === 'completed'
-      ? 'done'
-      : job.state === 'failed'
-        ? 'error'
-        : job.state === 'active'
-          ? 'processing'
-          : 'queued';
-  return {
-    jobId,
-    title: '',
-    fileName: '',
-    status,
-    phase: status === 'processing' ? 'processing' : status === 'done' ? 'done' : undefined,
-    message:
-      typeof job.progress === 'number' ? `${Math.round(job.progress)}%` : undefined,
-    result: job.result?.result,
-    error: job.failedReason,
-    startedAt: job.createdAt,
-    finishedAt: job.finishedAt,
-  };
+  return response.json();
 }
 
 export async function ingestBrainPdf(
@@ -589,12 +535,7 @@ export async function ingestBrainFeedback(body: {
     body: JSON.stringify(body),
   });
   if (!res.ok) await parseApiError(res, 'errors.api.feedbackFailed');
-  const submission = (await res.json()) as { id?: string } | BrainIngestResult;
-  if ('experienceId' in submission) return submission;
-  if (!submission.id) throw new Error('Feedback job was not created');
-  const job = await waitForJob<BrainIngestResult>(submission.id);
-  if (!job.result) throw new Error('Feedback job returned no result');
-  return job.result;
+  return res.json();
 }
 
 export async function runBrainResearch(body: { query: string; maxSources?: number }): Promise<BrainResearchRunResult> {
@@ -606,10 +547,10 @@ export async function runBrainResearch(body: { query: string; maxSources?: numbe
   if (!res.ok) await parseApiError(res, 'errors.api.researchRunFailed');
   const submission = (await res.json()) as { id?: string } | BrainResearchRunResult;
   if ('candidates' in submission) return submission;
-  if (!submission.id) throw new Error('Research job was not created');
-  const job = await waitForJob<{ result: BrainResearchRunResult }>(submission.id);
-  if (!job.result?.result) throw new Error('Research job returned no result');
-  return job.result.result;
+  if (!submission.id) throw new Error('Research task was not created');
+  const task = await waitForTask<BrainResearchRunResult>(submission.id);
+  if (!task.result) throw new Error('Research task returned no result');
+  return task.result;
 }
 
 export async function previewBrainResearch(body: { query: string; url: string }): Promise<BrainResearchCandidate> {

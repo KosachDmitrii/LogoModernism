@@ -18,7 +18,7 @@ import type {
   LearnedPrinciplesSort,
   TasteProfile,
 } from '@logo-platform/shared';
-import { prisma } from '@logo-platform/database';
+import { db } from '@logo-platform/database';
 import { EMBEDDING_DIMENSIONS } from './storage/paths';
 import { ensureBrainStorageLayout, touchStorageReadyMarker } from './storage/ensure-storage';
 import { ingestFeedback } from './ingest/ingest-feedback';
@@ -81,8 +81,8 @@ export class DesignBrainService {
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL is not configured. Set up PostgreSQL to use Design Brain.');
     }
-    await ensureBrainSchema(prisma);
-    return prisma;
+    await ensureBrainSchema(db);
+    return db;
   }
 
   async enqueuePdfIngest(options: IngestPdfOptions): Promise<BrainPdfIngestStartResult> {
@@ -318,9 +318,14 @@ export class DesignBrainService {
     return consolidateBrain(client, scope);
   }
 
-  async runResearch(query: string, maxSources: number | undefined, scope: BrainTenantScope) {
+  async runResearch(
+    query: string,
+    maxSources: number | undefined,
+    scope: BrainTenantScope,
+    signal?: AbortSignal,
+  ) {
     const client = await this.getClient();
-    return runWebResearch(client, query, scope, maxSources);
+    return runWebResearch(client, query, scope, maxSources, signal);
   }
 
   async previewResearch(query: string, url: string, scope: BrainTenantScope) {
@@ -373,19 +378,38 @@ export class DesignBrainService {
 
   async getStats(scope?: BrainTenantScope): Promise<BrainStats> {
     const client = await this.getClient();
-    const where = {
-      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
-      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
-    };
+    const values: unknown[] = [];
+    const filters: string[] = [];
+    if (scope?.organizationId) {
+      values.push(scope.organizationId);
+      filters.push(`organization_id = $${values.length}`);
+    }
+    if (scope?.projectId) {
+      values.push(scope.projectId);
+      filters.push(`project_id = $${values.length}`);
+    }
+    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
 
-    const experiences = await client.brainExperience.count({ where });
-    const tasteSignals = await client.brainTasteSignal.count({ where });
-    const learnedPrinciples = await client.learnedPrinciple.count({ where });
-    const grouped = await client.brainExperience.groupBy({
-      by: ['sourceType'],
-      where,
-      _count: { _all: true },
-    });
+    const [experienceCount, signalCount, principleCount, groupedResult] = await Promise.all([
+      client.one<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM design_brain_experiences ${where}`,
+        values,
+      ),
+      client.one<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM design_brain_taste_signals ${where}`,
+        values,
+      ),
+      client.one<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM learned_design_principles ${where}`,
+        values,
+      ),
+      client.query<{ sourceType: BrainSourceType; count: number }>(
+        `SELECT source_type, COUNT(*)::int AS count
+         FROM design_brain_experiences ${where}
+         GROUP BY source_type`,
+        values,
+      ),
+    ]);
 
     const bySourceType: Record<BrainSourceType, number> = {
       PDF: 0,
@@ -395,14 +419,14 @@ export class DesignBrainService {
       TEXT: 0,
     };
 
-    for (const row of grouped) {
-      bySourceType[row.sourceType as BrainSourceType] = row._count._all;
+    for (const row of groupedResult.rows) {
+      bySourceType[row.sourceType] = row.count;
     }
 
     return {
-      experiences,
-      tasteSignals,
-      learnedPrinciples,
+      experiences: experienceCount.count,
+      tasteSignals: signalCount.count,
+      learnedPrinciples: principleCount.count,
       bySourceType,
       embeddingDimensions: EMBEDDING_DIMENSIONS,
       pgvectorEnabled: await isPgvectorEnabled(client),
@@ -431,7 +455,7 @@ export class DesignBrainService {
   }
 
   stopNightlyConsolidation() {
-    // Scheduling is owned by the distributed BullMQ worker.
+    // Scheduling is owned by the backend PostgreSQL task runner.
   }
 }
 

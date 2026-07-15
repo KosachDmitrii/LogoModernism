@@ -1,11 +1,11 @@
-import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
-import type { PrismaClient } from '@logo-platform/database';
+import { describe, expect, it, beforeAll, beforeEach } from 'vitest';
+import type { DatabaseClient } from '@logo-platform/database';
 import { consolidateBrain } from '../../src/learning/consolidate';
 import { computeTasteProfile } from '../../src/learning/taste-profile';
 import { ingestFeedback } from '../../src/ingest/ingest-feedback';
 import { runBriefCompilerPipeline } from '../../src/reasoning/brain-compiler-pipeline';
 import {
-  createTestPrisma,
+  createTestDatabase,
   isBrainDbReady,
   resetBrainTables,
   seedExperienceWithEmbedding,
@@ -16,34 +16,29 @@ import { SAMPLE_MASCOT_TEXT, SAMPLE_SWISS_TEXT, sampleFeedback, sampleGenerateRe
 const describeIntegration = isBrainDbReady() ? describe : describe.skip;
 
 describeIntegration('learning loop (integration)', () => {
-  let prisma: PrismaClient;
+  let database: DatabaseClient;
 
   beforeAll(async () => {
-    prisma = createTestPrisma();
-    await prisma.$connect();
-  });
-
-  afterAll(async () => {
-    await prisma.$disconnect();
+    database = createTestDatabase();
   });
 
   beforeEach(async () => {
-    await resetBrainTables(prisma);
+    await resetBrainTables(database);
   });
 
   it('closes the full loop: ingest → feedback → consolidate → taste shift → brain-powered generation', async () => {
-    await seedExperienceWithEmbedding(prisma, {
+    await seedExperienceWithEmbedding(database, {
       title: 'Swiss Design Manual',
       content: SAMPLE_SWISS_TEXT,
       sourceType: 'PDF',
     });
-    await seedExperienceWithEmbedding(prisma, {
+    await seedExperienceWithEmbedding(database, {
       title: 'Mascot Design Guide',
       content: SAMPLE_MASCOT_TEXT,
       sourceType: 'PDF',
     });
 
-    await seedLearnedPrinciple(prisma, {
+    await seedLearnedPrinciple(database, {
       promptFragment: 'modular grid construction',
       weight: 1,
       confidence: 0.7,
@@ -52,7 +47,7 @@ describeIntegration('learning loop (integration)', () => {
 
     for (let i = 0; i < 4; i++) {
       await ingestFeedback(
-        prisma,
+        database,
         sampleFeedback({
           signalType: 'LIKE',
           score: 9,
@@ -64,7 +59,7 @@ describeIntegration('learning loop (integration)', () => {
 
     for (let i = 0; i < 3; i++) {
       await ingestFeedback(
-        prisma,
+        database,
         sampleFeedback({
           signalType: 'DISLIKE',
           score: 8,
@@ -74,16 +69,16 @@ describeIntegration('learning loop (integration)', () => {
       );
     }
 
-    const consolidateResult = await consolidateBrain(prisma);
+    const consolidateResult = await consolidateBrain(database);
     expect(consolidateResult.updatedWeights).toBeGreaterThanOrEqual(0);
 
-    const tasteBeforeGenerate = await computeTasteProfile(prisma);
+    const tasteBeforeGenerate = await computeTasteProfile(database);
     expect(tasteBeforeGenerate.signalCount).toBe(7);
     expect(tasteBeforeGenerate.preferredMarkTypes).toContain('lettermark');
     expect(tasteBeforeGenerate.avoidedPatterns.length).toBeGreaterThan(0);
 
     const pipeline = await runBriefCompilerPipeline(
-      prisma,
+      database,
       sampleGenerateRequest({ variationCount: 2 }),
     );
 
@@ -101,11 +96,11 @@ describeIntegration('learning loop (integration)', () => {
   });
 
   it('persists learned state across pipeline invocations', async () => {
-    await ingestFeedback(prisma, sampleFeedback({ signalType: 'LIKE', score: 10 }));
+    await ingestFeedback(database, sampleFeedback({ signalType: 'LIKE', score: 10 }));
 
-    const first = await computeTasteProfile(prisma);
+    const first = await computeTasteProfile(database);
     const secondPipeline = await runBriefCompilerPipeline(
-      prisma,
+      database,
       sampleGenerateRequest({ variationCount: 1 }),
     );
 

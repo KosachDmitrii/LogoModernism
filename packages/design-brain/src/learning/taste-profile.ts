@@ -1,5 +1,5 @@
 import type { BrainTenantScope, TasteProfile, TasteSignalType } from '@logo-platform/shared';
-import type { PrismaClient } from '@logo-platform/database';
+import type { DatabaseClient } from '../storage/database-types';
 
 const POSITIVE: TasteSignalType[] = ['LIKE', 'APPROVE'];
 const NEGATIVE: TasteSignalType[] = ['DISLIKE', 'REJECT'];
@@ -21,22 +21,31 @@ function extractTags(text: string, keywords: string[]): string[] {
 }
 
 export async function computeTasteProfile(
-  prisma: PrismaClient,
+  client: DatabaseClient,
   scope?: BrainTenantScope,
 ): Promise<TasteProfile> {
-  const signals = await prisma.brainTasteSignal.findMany({
-    where: {
-      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
-      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 200,
-    select: {
-      signalType: true,
-      score: true,
-      metadata: true,
-    },
-  });
+  const values: unknown[] = [];
+  const filters: string[] = [];
+  if (scope?.organizationId) {
+    values.push(scope.organizationId);
+    filters.push(`organization_id = $${values.length}`);
+  }
+  if (scope?.projectId) {
+    values.push(scope.projectId);
+    filters.push(`project_id = $${values.length}`);
+  }
+  const { rows: signals } = await client.query<{
+    signalType: TasteSignalType;
+    score: number;
+    metadata: unknown;
+  }>(
+    `SELECT signal_type, score, metadata
+     FROM design_brain_taste_signals
+     ${filters.length ? `WHERE ${filters.join(' AND ')}` : ''}
+     ORDER BY created_at DESC
+     LIMIT 200`,
+    values,
+  );
 
   if (!signals.length) {
     return { ...DEFAULT_TASTE_PROFILE };
