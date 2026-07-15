@@ -248,8 +248,15 @@ export class PromptRecordsService {
     return this.toClientRecord(updated, updated.generatedLogos);
   }
 
-  async setLogoFeedback(id: string, logoId: string, feedback: LogoFeedback) {
-    const record = await prisma.composedPromptRecord.findUnique({ where: { id } });
+  async setLogoFeedback(
+    id: string,
+    logoId: string,
+    feedback: LogoFeedback,
+    tenant: TenantScope,
+  ) {
+    const record = await prisma.composedPromptRecord.findUnique({
+      where: { id, organizationId: tenant.organizationId },
+    });
     if (!record) {
       throw new NotFoundException(`Prompt not found: ${id}`);
     }
@@ -263,11 +270,11 @@ export class PromptRecordsService {
     logos[index] = { ...logos[index]!, feedback };
     const [updated] = await prisma.$transaction([
       prisma.composedPromptRecord.update({
-        where: { id },
+        where: { id, organizationId: tenant.organizationId },
         data: { logos: logos as unknown as Prisma.InputJsonValue },
       }),
       prisma.logo.updateMany({
-        where: { id: logoId, promptId: id },
+        where: { id: logoId, promptId: id, organizationId: tenant.organizationId },
         data: { metadata: { feedback } as unknown as Prisma.InputJsonValue },
       }),
       prisma.outboxEvent.create({
@@ -295,8 +302,11 @@ export class PromptRecordsService {
     id: string,
     logoId: string,
     tags: { workedTags?: string[]; missedTags?: string[] },
+    tenant: TenantScope,
   ) {
-    const record = await prisma.composedPromptRecord.findUnique({ where: { id } });
+    const record = await prisma.composedPromptRecord.findUnique({
+      where: { id, organizationId: tenant.organizationId },
+    });
     if (!record) {
       throw new NotFoundException(`Prompt not found: ${id}`);
     }
@@ -322,11 +332,11 @@ export class PromptRecordsService {
 
     const [updated] = await prisma.$transaction([
       prisma.composedPromptRecord.update({
-        where: { id },
+        where: { id, organizationId: tenant.organizationId },
         data: { logos: logos as unknown as Prisma.InputJsonValue },
       }),
       prisma.logo.updateMany({
-        where: { id: logoId, promptId: id },
+        where: { id: logoId, promptId: id, organizationId: tenant.organizationId },
         data: {
           metadata: {
             feedback: logos[index]!.feedback,
@@ -355,15 +365,17 @@ export class PromptRecordsService {
   }
 
   /** @deprecated use setSaved */
-  async setFeedback(id: string, feedback: PromptFeedback) {
-    const record = await prisma.composedPromptRecord.findUnique({ where: { id } });
+  async setFeedback(id: string, feedback: PromptFeedback, tenant: TenantScope) {
+    const record = await prisma.composedPromptRecord.findUnique({
+      where: { id, organizationId: tenant.organizationId },
+    });
     if (!record) {
       throw new NotFoundException(`Prompt not found: ${id}`);
     }
 
     const updated = await prisma.$transaction(async (tx) => {
       const record = await tx.composedPromptRecord.update({
-        where: { id },
+        where: { id, organizationId: tenant.organizationId },
         data: { feedback },
       });
       await tx.outboxEvent.create({

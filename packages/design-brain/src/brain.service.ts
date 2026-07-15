@@ -96,6 +96,8 @@ export class DesignBrainService {
         title: options.title,
         fileName: options.originalName,
         buffer: options.buffer,
+        organizationId: options.organizationId,
+        projectId: options.projectId,
         preSkipped: {
           message: preCheck.message,
           result: {
@@ -122,6 +124,8 @@ export class DesignBrainService {
       title: options.title,
       fileName: options.originalName,
       buffer: options.buffer,
+      organizationId: options.organizationId,
+      projectId: options.projectId,
     });
   }
 
@@ -144,6 +148,8 @@ export class DesignBrainService {
         originalName: file.fileName,
         title: file.title,
         jobId,
+        organizationId: file.organizationId,
+        projectId: file.projectId,
       });
 
       finalizePdfIngestJob(jobId, {
@@ -191,8 +197,14 @@ export class DesignBrainService {
   }
 
   async checkPdfIngest(title: string, contentHash: string, scope: BrainTenantScope) {
+    if (!scope.organizationId) {
+      throw new Error('Organization scope is required for PDF ingest');
+    }
     const client = await this.getClient();
-    return checkPdfIngest(client, title, contentHash, scope);
+    return checkPdfIngest(client, title, contentHash, {
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+    });
   }
 
   async ingestImage(options: IngestImageOptions): Promise<BrainIngestResult> {

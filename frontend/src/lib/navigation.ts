@@ -3,13 +3,23 @@ import {
   BookOpen,
   Heart,
   LayoutDashboard,
+  LibraryBig,
   Settings,
   Sparkles,
+  WalletCards,
   type LucideIcon,
 } from 'lucide-react';
 import type { MessageKey } from '../i18n';
 
-export type AppNavId = 'home' | 'prompts' | 'saved' | 'brain' | 'catalog' | 'settings';
+export type AppNavId =
+  | 'home'
+  | 'prompts'
+  | 'saved'
+  | 'brain'
+  | 'catalog'
+  | 'principles'
+  | 'pricing'
+  | 'settings';
 
 export interface AppNavItem {
   id: AppNavId;
@@ -17,14 +27,42 @@ export interface AppNavItem {
   labelKey: MessageKey;
   icon: LucideIcon;
   end?: boolean;
+  guestVisible?: boolean;
 }
 
 export const APP_NAV: AppNavItem[] = [
-  { id: 'home', to: '/', labelKey: 'nav.home', icon: LayoutDashboard, end: true },
+  {
+    id: 'home',
+    to: '/',
+    labelKey: 'nav.home',
+    icon: LayoutDashboard,
+    end: true,
+    guestVisible: true,
+  },
   { id: 'prompts', to: '/prompts', labelKey: 'nav.prompts', icon: Sparkles },
-  { id: 'catalog', to: '/logo-catalog', labelKey: 'nav.catalog', icon: BookOpen },
+  {
+    id: 'catalog',
+    to: '/logo-catalog',
+    labelKey: 'nav.catalog',
+    icon: BookOpen,
+    guestVisible: true,
+  },
+  {
+    id: 'principles',
+    to: '/principles',
+    labelKey: 'nav.principles',
+    icon: LibraryBig,
+    guestVisible: true,
+  },
   { id: 'saved', to: '/saved', labelKey: 'nav.saved', icon: Heart },
-  { id: 'brain', to: '/brain', labelKey: 'nav.brain', icon: Brain },
+  { id: 'brain', to: '/brain', labelKey: 'nav.brain', icon: Brain, guestVisible: true },
+  {
+    id: 'pricing',
+    to: '/pricing',
+    labelKey: 'nav.pricing',
+    icon: WalletCards,
+    guestVisible: true,
+  },
   { id: 'settings', to: '/settings', labelKey: 'nav.settings', icon: Settings },
 ];
 

@@ -50,8 +50,12 @@ type Tab = 'overview' | 'principles' | 'learn' | 'research';
 
 export function DesignBrainPage() {
   const t = useT();
-  const { activeMembership } = useAuth();
-  const canManageBrain = hasPermission(activeMembership?.role, 'brain.manage');
+  const { activeMembership, profile } = useAuth();
+  const canManageBrain = hasPermission(
+    activeMembership?.role,
+    'brain.manage',
+    profile?.platformRole,
+  );
   const [tab, setTab] = useState<Tab>('overview');
   const [principlesPage, setPrinciplesPage] = useState(1);
   const [principlesCategory, setPrinciplesCategory] = useState('');

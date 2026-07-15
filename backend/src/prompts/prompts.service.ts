@@ -10,6 +10,7 @@ import { PromptRecordsService } from './prompt-records.service';
 import type { GeneratePromptLogoDto } from './dto/generate-prompt-logo.dto';
 import type { TenantScope } from '../auth/tenant-context';
 import { QueueService } from '../queue/queue.service';
+import { isAsyncQueueEnabled } from '../queue/queue.config';
 import type { BrainPipelineResult } from '@logo-platform/design-brain';
 import { slimPipelineResult } from './prompt-response';
 import { ObjectStorageService } from '../storage/object-storage.service';
@@ -137,6 +138,18 @@ export class PromptsService {
     };
   }
 
+  async generateEphemeral(request: PromptGenerationRequest) {
+    const result = await this.generate(
+      {
+        ...request,
+        useBrain: false,
+        variationCount: Math.min(3, Math.max(1, request.variationCount ?? 3)),
+      },
+      undefined,
+    );
+    return slimPipelineResult(result);
+  }
+
   async togglePromptSave(
     promptId: string,
     saved: boolean,
@@ -164,6 +177,7 @@ export class PromptsService {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store logo feedback');
     }
+    if (!tenant) throw new BadRequestException('Organization scope is required');
 
     const record = await this.promptRecords.getById(promptId, tenant);
     const logo = record.logos.find((item) => item.id === logoId);
@@ -179,7 +193,12 @@ export class PromptsService {
       submittedAt: new Date().toISOString(),
     };
 
-    const updated = await this.promptRecords.setLogoFeedback(promptId, logoId, feedback);
+    const updated = await this.promptRecords.setLogoFeedback(
+      promptId,
+      logoId,
+      feedback,
+      tenant,
+    );
 
     const savedLogo = updated.logos.find((item) => item.id === logoId);
     return {
@@ -202,6 +221,7 @@ export class PromptsService {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store logo tags');
     }
+    if (!tenant) throw new BadRequestException('Organization scope is required');
 
     const record = await this.promptRecords.getById(promptId, tenant);
     const logo = record.logos.find((item) => item.id === logoId);
@@ -209,7 +229,7 @@ export class PromptsService {
       throw new BadRequestException(`Logo not found: ${logoId}`);
     }
 
-    const updated = await this.promptRecords.setLogoTags(promptId, logoId, body);
+    const updated = await this.promptRecords.setLogoTags(promptId, logoId, body, tenant);
 
     const savedLogo = updated.logos.find((item) => item.id === logoId);
     return {
@@ -229,9 +249,10 @@ export class PromptsService {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store prompt feedback');
     }
+    if (!tenant) throw new BadRequestException('Organization scope is required');
 
     await this.promptRecords.getById(promptId, tenant);
-    const updated = await this.promptRecords.setFeedback(promptId, signalType);
+    const updated = await this.promptRecords.setFeedback(promptId, signalType, tenant);
 
     return {
       promptId,
@@ -243,6 +264,7 @@ export class PromptsService {
     promptId: string,
     body: GeneratePromptLogoDto,
     tenant?: TenantScope,
+    usageReservationId?: string,
   ) {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store prompt logos');
@@ -266,7 +288,7 @@ export class PromptsService {
       throw new BadRequestException('Maximum 3 logos per prompt');
     }
 
-    if (process.env.REDIS_URL) {
+    if (isAsyncQueueEnabled()) {
       const imageId = randomUUID();
       const reservation = await this.promptRecords.reserveLogo(
         promptId,
@@ -285,6 +307,7 @@ export class PromptsService {
         requestedAt: new Date().toISOString(),
         organizationId: tenant?.organizationId,
         projectId: tenant?.projectId,
+        usageReservationId,
         imageId,
         prompt: record.text,
         outputKey,

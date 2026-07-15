@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import request from 'supertest';
+import request, { type Test } from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { createTestApp } from '../helpers/app';
 import { createTestPrisma, isE2eDbReady, resetBrainTables } from '../helpers/db';
@@ -9,16 +9,45 @@ const describeE2e = isE2eDbReady() ? describe : describe.skip;
 describeE2e('Brain API (e2e)', () => {
   let app: INestApplication;
   let prisma: ReturnType<typeof createTestPrisma>;
+  const fixtureId = `brain-e2e-${Date.now().toString(36)}`;
+  const userId = `${fixtureId}-user`;
+  const organizationId = `${fixtureId}-org`;
+
+  function authenticated(test: Test, platformAdmin = false): Test {
+    const withTenant = test
+      .set('x-user-id', userId)
+      .set('x-organization-id', organizationId);
+    return platformAdmin
+      ? withTenant.set('x-platform-role', 'PLATFORM_ADMIN')
+      : withTenant;
+  }
 
   beforeAll(async () => {
-    app = await createTestApp();
     prisma = createTestPrisma();
     await prisma.$connect();
+    await prisma.user.create({
+      data: {
+        id: userId,
+        email: `${userId}@example.test`,
+        platformRole: 'PLATFORM_ADMIN',
+      },
+    });
+    await prisma.organization.create({
+      data: {
+        id: organizationId,
+        name: 'Brain E2E',
+        slug: organizationId,
+        members: { create: { userId, role: 'OWNER' } },
+      },
+    });
+    app = await createTestApp();
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
     await app.close();
+    await prisma.organization.delete({ where: { id: organizationId } }).catch(() => undefined);
+    await prisma.user.delete({ where: { id: userId } }).catch(() => undefined);
+    await prisma.$disconnect();
   });
 
   beforeEach(async () => {
@@ -31,7 +60,10 @@ describeE2e('Brain API (e2e)', () => {
   });
 
   it('GET /api/brain/health returns capabilities', async () => {
-    const res = await request(app.getHttpServer()).get('/api/brain/health').expect(200);
+    const res = await authenticated(
+      request(app.getHttpServer()).get('/api/brain/health'),
+      true,
+    ).expect(200);
 
     expect(res.body.databaseConfigured).toBe(true);
     expect(res.body.embeddingConfigured).toBe(true);
@@ -39,7 +71,9 @@ describeE2e('Brain API (e2e)', () => {
   });
 
   it('GET /api/brain/stats returns brain counters', async () => {
-    const res = await request(app.getHttpServer()).get('/api/brain/stats').expect(200);
+    const res = await authenticated(
+      request(app.getHttpServer()).get('/api/brain/stats'),
+    ).expect(200);
 
     expect(res.body).toMatchObject({
       experiences: expect.any(Number),
@@ -51,15 +85,18 @@ describeE2e('Brain API (e2e)', () => {
   });
 
   it('GET /api/brain/taste-profile returns defaults on empty brain', async () => {
-    const res = await request(app.getHttpServer()).get('/api/brain/taste-profile').expect(200);
+    const res = await authenticated(
+      request(app.getHttpServer()).get('/api/brain/taste-profile'),
+    ).expect(200);
 
     expect(res.body.signalCount).toBe(0);
     expect(res.body.preferredMarkTypes).toContain('wordmark');
   });
 
   it('POST /api/brain/ingest/feedback → consolidate → principles flow', async () => {
-    await request(app.getHttpServer())
-      .post('/api/brain/ingest/feedback')
+    await authenticated(
+      request(app.getHttpServer()).post('/api/brain/ingest/feedback'),
+    )
       .send({
         signalType: 'LIKE',
         score: 9,
@@ -68,24 +105,34 @@ describeE2e('Brain API (e2e)', () => {
       })
       .expect(202);
 
-    const statsAfterFeedback = await request(app.getHttpServer()).get('/api/brain/stats').expect(200);
+    const statsAfterFeedback = await authenticated(
+      request(app.getHttpServer()).get('/api/brain/stats'),
+    ).expect(200);
     expect(statsAfterFeedback.body.tasteSignals).toBeGreaterThanOrEqual(1);
     expect(statsAfterFeedback.body.experiences).toBeGreaterThanOrEqual(1);
 
-    const consolidate = await request(app.getHttpServer()).post('/api/brain/consolidate').expect(202);
+    const consolidate = await authenticated(
+      request(app.getHttpServer()).post('/api/brain/consolidate'),
+      true,
+    ).expect(202);
     expect(consolidate.body.ranAt).toBeTruthy();
 
-    const taste = await request(app.getHttpServer()).get('/api/brain/taste-profile').expect(200);
+    const taste = await authenticated(
+      request(app.getHttpServer()).get('/api/brain/taste-profile'),
+    ).expect(200);
     expect(taste.body.signalCount).toBeGreaterThanOrEqual(1);
 
-    const principles = await request(app.getHttpServer()).get('/api/brain/principles?limit=10').expect(200);
+    const principles = await authenticated(
+      request(app.getHttpServer()).get('/api/brain/principles?limit=10'),
+    ).expect(200);
     expect(Array.isArray(principles.body.items)).toBe(true);
     expect(typeof principles.body.total).toBe('number');
   });
 
   it('POST /api/brain/brief/interview returns interview questions', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/api/brain/brief/interview')
+    const res = await authenticated(
+      request(app.getHttpServer()).post('/api/brain/brief/interview'),
+    )
       .send({
         industry: 'fintech',
         companyName: 'NovaPay',
@@ -100,15 +147,17 @@ describeE2e('Brain API (e2e)', () => {
   });
 
   it('POST /api/brain/ingest/feedback validates required fields', async () => {
-    await request(app.getHttpServer())
-      .post('/api/brain/ingest/feedback')
+    await authenticated(
+      request(app.getHttpServer()).post('/api/brain/ingest/feedback'),
+    )
       .send({ signalType: 'LIKE' })
       .expect(400);
   });
 
   it('GET /api/brain/experiences lists ingested records', async () => {
-    await request(app.getHttpServer())
-      .post('/api/brain/ingest/feedback')
+    await authenticated(
+      request(app.getHttpServer()).post('/api/brain/ingest/feedback'),
+    )
       .send({
         signalType: 'APPROVE',
         score: 8,
@@ -116,7 +165,10 @@ describeE2e('Brain API (e2e)', () => {
       })
       .expect(202);
 
-    const res = await request(app.getHttpServer()).get('/api/brain/experiences?limit=5').expect(200);
+    const res = await authenticated(
+      request(app.getHttpServer()).get('/api/brain/experiences?limit=5'),
+      true,
+    ).expect(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toBeGreaterThan(0);
   });

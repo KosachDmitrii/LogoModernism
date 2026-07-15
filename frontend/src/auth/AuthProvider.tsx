@@ -35,6 +35,7 @@ export type AuthProfile = {
   id: string;
   email: string;
   name: string | null;
+  platformRole: 'USER' | 'PLATFORM_ADMIN';
   memberships: Membership[];
 };
 

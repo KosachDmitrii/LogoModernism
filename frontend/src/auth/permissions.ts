@@ -16,6 +16,10 @@ const ROLE_PERMISSIONS: Record<TenantRole, ReadonlySet<Permission>> = {
 export function hasPermission(
   role: TenantRole | null | undefined,
   permission: Permission,
+  platformRole: 'USER' | 'PLATFORM_ADMIN' = 'USER',
 ): boolean {
+  if (permission === 'brain.manage') {
+    return platformRole === 'PLATFORM_ADMIN' && (role === 'OWNER' || role === 'ADMIN');
+  }
   return role ? ROLE_PERMISSIONS[role].has(permission) : false;
 }

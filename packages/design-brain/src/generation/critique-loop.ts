@@ -34,6 +34,8 @@ export async function storeGenerationExperience(
     critiqueScore: number;
     principleIds: string[];
     imageUrl?: string;
+    organizationId: string;
+    projectId?: string;
   },
 ): Promise<string> {
   const content = [
@@ -57,6 +59,8 @@ export async function storeGenerationExperience(
       imageUrl: input.imageUrl,
       kind: 'generation_success',
     },
+    organizationId: input.organizationId,
+    projectId: input.projectId,
   });
 
   const embedding = await embedText(content);
@@ -68,6 +72,9 @@ export async function generateWithCritiqueLoop(
   prisma: PrismaClient,
   request: BrainCritiqueGenerateRequest,
 ): Promise<BrainCritiqueGenerateResult> {
+  if (!request.organizationId) {
+    throw new Error('Organization scope is required for critique generation');
+  }
   const maxRetries = Math.min(request.maxRetries ?? 3, 5);
   const qualityThreshold = request.qualityThreshold ?? 7;
   let currentRequest = { ...request };
@@ -85,6 +92,8 @@ export async function generateWithCritiqueLoop(
         promptText: lastPipeline.bestPrompt.text,
         critiqueScore: lastCritique.overallScore,
         principleIds: lastPipeline.bestPrompt.selectedPrinciples.map((p) => p.id),
+        organizationId: request.organizationId,
+        projectId: request.projectId,
       });
 
       await ingestFeedback(prisma, {
@@ -92,6 +101,8 @@ export async function generateWithCritiqueLoop(
         score: lastCritique.overallScore,
         context: `Successful generation: ${lastPipeline.bestPrompt.text.slice(0, 300)}`,
         experienceId: storedExperienceId,
+        organizationId: request.organizationId,
+        projectId: request.projectId,
         metadata: {
           principleIds: lastPipeline.bestPrompt.selectedPrinciples.map((p) => p.id),
           markType: lastPipeline.decision.markType,
@@ -146,6 +157,8 @@ export async function generateWithCritiqueLoop(
     signalType: 'REJECT',
     score: lastCritique.overallScore,
     context: `Failed quality threshold after ${maxRetries} attempts: ${lastCritique.feedback.join('; ')}`,
+    organizationId: request.organizationId,
+    projectId: request.projectId,
     metadata: {
       principleIds: lastPipeline.bestPrompt.selectedPrinciples.map((p) => p.id),
       markType: lastPipeline.decision.markType,

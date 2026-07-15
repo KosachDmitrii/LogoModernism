@@ -12,10 +12,16 @@ import { DatabaseShutdownService } from './common/database-shutdown.service';
 import { RequestTimingInterceptor } from './observability/request-timing.interceptor';
 import { AuthModule } from './auth/auth.module';
 import { QueueModule } from './queue/queue.module';
+import { UsageModule } from './usage/usage.module';
+import { BillingModule } from './billing/billing.module';
+import { GuestModule } from './guest/guest.module';
 
 @Module({
   imports: [
     AuthModule,
+    UsageModule,
+    BillingModule,
+    GuestModule,
     QueueModule,
     PromptsModule,
     PrinciplesModule,

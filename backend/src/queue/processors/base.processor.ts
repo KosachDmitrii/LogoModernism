@@ -11,12 +11,14 @@ import {
   getQueueConcurrency,
   getRedisConnectionOptions,
 } from '../queue.config';
+import { UsageService } from '../../usage/usage.service';
 
 export abstract class BaseQueueProcessor<Payload extends VersionedJobPayload>
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly config = getQueueRuntimeConfig();
   private readonly logger: Logger;
+  private readonly usage = new UsageService();
   private worker?: Worker<Payload>;
 
   protected constructor(
@@ -52,12 +54,31 @@ export abstract class BaseQueueProcessor<Payload extends VersionedJobPayload>
     if (!this.handler) {
       throw new Error(`No handler is registered for the ${this.queueName} queue`);
     }
-    return this.handler.process(job.data, {
-      jobId: job.id ?? '',
-      attempt: job.attemptsMade + 1,
-      updateProgress: async (progress) => {
-        await job.updateProgress(progress);
-      },
-    });
+    const reservationId = job.data.usageReservationId;
+    if (reservationId) {
+      await this.usage.markProcessing(reservationId, job.id);
+    }
+    try {
+      const result = await this.handler.process(job.data, {
+        jobId: job.id ?? '',
+        attempt: job.attemptsMade + 1,
+        updateProgress: async (progress) => {
+          await job.updateProgress(progress);
+        },
+      });
+      if (reservationId) await this.usage.commit(reservationId);
+      return result;
+    } catch (error) {
+      const attempts = job.opts.attempts ?? 1;
+      const finalAttempt = job.attemptsMade + 1 >= attempts;
+      if (reservationId && finalAttempt) {
+        await this.usage.release(reservationId).catch((releaseError) => {
+          this.logger.error(
+            `Failed to release usage reservation ${reservationId}: ${String(releaseError)}`,
+          );
+        });
+      }
+      throw error;
+    }
   }
 }

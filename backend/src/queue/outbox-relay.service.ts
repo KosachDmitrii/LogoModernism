@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { prisma } from '@logo-platform/database';
 import { JOB_PAYLOAD_VERSION, QUEUE_NAMES } from '@logo-platform/shared';
 import { QueueService } from './queue.service';
+import { isAsyncQueueEnabled } from './queue.config';
 
 type ClaimedEvent = {
   id: string;
@@ -20,7 +21,7 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly queues: QueueService) {}
 
   onModuleInit(): void {
-    if (!process.env.REDIS_URL) return;
+    if (!isAsyncQueueEnabled()) return;
     this.timer = setInterval(() => void this.flush(), 1_000);
     this.timer.unref();
     void this.flush();

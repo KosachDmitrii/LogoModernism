@@ -20,10 +20,10 @@ export async function apiFetch(
     } = await getSupabaseClient().auth.getSession();
     const organizationId =
       window.localStorage.getItem('logo-platform.organization-id') ??
-      import.meta.env.VITE_ORGANIZATION_ID;
+      (import.meta.env.DEV ? import.meta.env.VITE_ORGANIZATION_ID : undefined);
     const projectId =
       window.localStorage.getItem('logo-platform.project-id') ??
-      import.meta.env.VITE_PROJECT_ID;
+      (import.meta.env.DEV ? import.meta.env.VITE_PROJECT_ID : undefined);
     if (session?.access_token && !authHeaders.has('Authorization')) {
       authHeaders.set('Authorization', `Bearer ${session.access_token}`);
     }

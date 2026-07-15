@@ -1,9 +1,159 @@
 import { gunzipSync } from 'node:zlib';
+import { lookup } from 'node:dns/promises';
+import { BlockList, isIP } from 'node:net';
+import { Agent, fetch as undiciFetch } from 'undici';
 import { fetchWithDeadline } from '@logo-platform/shared';
 import { sanitizePostgresText } from '../storage/sanitize-text';
 import { archiveIdentifierFromUrl, isArchiveUrl } from './archive-search';
 
 const FETCH_TIMEOUT_MS = 60_000;
+const MAX_PAGE_BYTES = 2 * 1024 * 1024;
+const MAX_REDIRECTS = 3;
+const blockedAddresses = new BlockList();
+
+for (const [network, prefix] of [
+  ['0.0.0.0', 8],
+  ['10.0.0.0', 8],
+  ['100.64.0.0', 10],
+  ['127.0.0.0', 8],
+  ['169.254.0.0', 16],
+  ['172.16.0.0', 12],
+  ['192.0.0.0', 24],
+  ['192.0.2.0', 24],
+  ['192.168.0.0', 16],
+  ['198.18.0.0', 15],
+  ['198.51.100.0', 24],
+  ['203.0.113.0', 24],
+  ['224.0.0.0', 4],
+] as const) {
+  blockedAddresses.addSubnet(network, prefix, 'ipv4');
+}
+for (const [network, prefix] of [
+  ['::', 128],
+  ['::1', 128],
+  ['::ffff:0:0', 96],
+  ['fc00::', 7],
+  ['fe80::', 10],
+  ['ff00::', 8],
+  ['2001:db8::', 32],
+] as const) {
+  blockedAddresses.addSubnet(network, prefix, 'ipv6');
+}
+
+async function resolvePublicAddress(hostname: string): Promise<{
+  address: string;
+  family: 4 | 6;
+}> {
+  const normalizedHostname = hostname.replace(/^\[|\]$/g, '');
+  if (
+    normalizedHostname === 'localhost' ||
+    normalizedHostname.endsWith('.localhost')
+  ) {
+    throw new Error('Local network URLs are not allowed');
+  }
+  const literalFamily = isIP(normalizedHostname);
+  const addresses = literalFamily
+    ? [{ address: normalizedHostname, family: literalFamily }]
+    : await lookup(normalizedHostname, { all: true, verbatim: true });
+  if (!addresses.length) throw new Error('URL hostname could not be resolved');
+  for (const address of addresses) {
+    const family = address.family === 6 ? 'ipv6' : 'ipv4';
+    if (blockedAddresses.check(address.address, family)) {
+      throw new Error('Private or non-routable network URLs are not allowed');
+    }
+  }
+  return {
+    address: addresses[0]!.address,
+    family: addresses[0]!.family === 6 ? 6 : 4,
+  };
+}
+
+async function readLimitedText(
+  response: Awaited<ReturnType<typeof undiciFetch>>,
+  maxBytes = MAX_PAGE_BYTES,
+): Promise<string> {
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new Error('Research page exceeds the maximum response size');
+  }
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        throw new Error('Research page exceeds the maximum response size');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
+}
+
+async function fetchPublicPage(
+  initialUrl: URL,
+): Promise<{ raw: string; contentType: string; finalUrl: URL }> {
+  let current = initialUrl;
+  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
+    if (!['http:', 'https:'].includes(current.protocol) || current.username || current.password) {
+      throw new Error('Only credential-free HTTP(S) URLs are supported');
+    }
+    const pinned = await resolvePublicAddress(current.hostname);
+    const dispatcher = new Agent({
+      connect: {
+        lookup: (_hostname, _options, callback) =>
+          callback(null, pinned.address, pinned.family),
+      },
+    });
+    try {
+      const response = await undiciFetch(current, {
+        dispatcher,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        headers: {
+          'User-Agent': 'LogoModernism-DesignBrain/1.0 (research; +https://github.com)',
+          Accept: 'text/html,application/xhtml+xml,text/plain',
+        },
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        await response.body?.cancel();
+        if (!location) throw new Error('Research URL redirect has no location');
+        if (redirectCount === MAX_REDIRECTS) {
+          throw new Error('Research URL exceeded the redirect limit');
+        }
+        current = new URL(location, current);
+        continue;
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status} for ${current}`);
+      const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+      if (
+        contentType &&
+        !contentType.includes('text/html') &&
+        !contentType.includes('application/xhtml+xml') &&
+        !contentType.includes('text/plain')
+      ) {
+        await response.body?.cancel();
+        throw new Error('Research URL returned an unsupported content type');
+      }
+      return {
+        raw: await readLimitedText(response),
+        contentType,
+        finalUrl: current,
+      };
+    } finally {
+      await dispatcher.close();
+    }
+  }
+  throw new Error('Research URL exceeded the redirect limit');
+}
 
 function stripHtml(html: string): string {
   const withoutScripts = html
@@ -208,8 +358,11 @@ export async function fetchUrlText(url: string): Promise<{ title: string; text: 
   if (!['http:', 'https:'].includes(parsed.protocol)) {
     throw new Error('Only HTTP(S) URLs are supported');
   }
+  if (parsed.username || parsed.password) {
+    throw new Error('URLs containing credentials are not supported');
+  }
 
-  if (parsed.hostname.includes('wikipedia.org')) {
+  if (parsed.hostname === 'wikipedia.org' || parsed.hostname.endsWith('.wikipedia.org')) {
     const text = await fetchWikipediaArticleText(url);
     if (!text) {
       throw new Error('Could not extract Wikipedia article text');
@@ -224,38 +377,15 @@ export async function fetchUrlText(url: string): Promise<{ title: string; text: 
     return fetchArchiveText(url);
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const { raw, contentType, finalUrl } = await fetchPublicPage(parsed);
+  const titleMatch = raw.match(/<title[^>]*>([^<]+)<\/title>/i);
+  const title = sanitizePostgresText(titleMatch?.[1]?.trim()) ?? finalUrl.hostname;
+  const text = contentType.includes('text/html') || contentType.includes('xhtml')
+    ? stripHtml(raw)
+    : raw.replace(/\s+/g, ' ').trim();
 
-  try {
-    const response = await fetchWithDeadline(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'LogoModernism-DesignBrain/1.0 (research; +https://github.com)',
-        Accept: 'text/html,application/xhtml+xml,text/plain',
-      },
-      redirect: 'follow',
-    }, { timeoutMs: FETCH_TIMEOUT_MS });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} for ${url}`);
-    }
-
-    const contentType = response.headers.get('content-type') ?? '';
-    const raw = await response.text();
-    const titleMatch = raw.match(/<title[^>]*>([^<]+)<\/title>/i);
-    const title = sanitizePostgresText(titleMatch?.[1]?.trim()) ?? parsed.hostname;
-
-    const text = contentType.includes('text/html')
-      ? stripHtml(raw)
-      : raw.replace(/\s+/g, ' ').trim();
-
-    if (text.length < 120) {
-      throw new Error('Not enough readable text on this page');
-    }
-
-    return { title, text };
-  } finally {
-    clearTimeout(timer);
+  if (text.length < 120) {
+    throw new Error('Not enough readable text on this page');
   }
+  return { title, text };
 }

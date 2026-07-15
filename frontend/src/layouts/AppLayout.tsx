@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { APP_NAV } from '../lib/navigation';
 import { useT } from '../i18n';
 import { useAuth } from '../auth/AuthProvider';
@@ -7,8 +7,9 @@ import { hasPermission } from '../auth/permissions';
 export function AppLayout() {
   const t = useT();
   const { profile, activeMembership } = useAuth();
+  const authenticated = Boolean(profile);
   const canUseProduct = hasPermission(activeMembership?.role, 'product.use');
-  const initials = (profile?.name || profile?.email || 'U')
+  const initials = (profile?.name || profile?.email || 'G')
     .split(/\s+/)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
@@ -25,17 +26,21 @@ export function AppLayout() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-zinc-300">
-                {profile?.name || profile?.email}
+                {profile?.name || profile?.email || t('layout.guest')}
               </p>
               <p className="mt-0.5 truncate text-[10px] font-medium tracking-wider text-violet-400">
-                {activeMembership?.role}
+                {activeMembership?.role || t('layout.explore')}
               </p>
             </div>
           </div>
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5">
-          {APP_NAV.filter((item) => item.id !== 'prompts' || canUseProduct).map(({ to, labelKey, icon: Icon, end }) => (
+          {APP_NAV.filter((item) =>
+            authenticated
+              ? item.id !== 'prompts' || canUseProduct
+              : item.guestVisible,
+          ).map(({ to, labelKey, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -53,6 +58,23 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
+
+        {!authenticated && (
+          <div className="grid gap-2 border-t border-zinc-800 px-4 py-4">
+            <Link
+              to="/login"
+              className="rounded-lg border border-zinc-700 px-3 py-2 text-center text-sm text-zinc-300 hover:bg-zinc-900"
+            >
+              {t('auth.signIn')}
+            </Link>
+            <Link
+              to="/register"
+              className="rounded-lg bg-violet-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-violet-500"
+            >
+              {t('auth.createAccount')}
+            </Link>
+          </div>
+        )}
 
         <div className="px-5 py-3 border-t border-zinc-800/80">
           <p className="text-[10px] font-mono text-zinc-700 tracking-wider">{t('layout.version')}</p>

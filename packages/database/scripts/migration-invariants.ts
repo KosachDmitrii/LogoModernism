@@ -32,6 +32,14 @@ const logicalTables = [
   ['BrainExperience', 'design_brain_experiences'],
   ['BrainTasteSignal', 'design_brain_taste_signals'],
   ['LearnedPrinciple', 'learned_design_principles'],
+  ['BrainResearchCandidate', 'brain_research_candidates'],
+  ['OutboxEvent', 'outbox_events'],
+  ['BillingSubscription', 'billing_subscriptions'],
+  ['BillingCheckoutSession', 'billing_checkout_sessions'],
+  ['BillingWebhookEvent', 'billing_webhook_events'],
+  ['UsageBucket', 'usage_buckets'],
+  ['UsageOperation', 'usage_operations'],
+  ['CreditBalance', 'credit_balances'],
 ] as const;
 
 function quoteIdentifier(value: string): string {

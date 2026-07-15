@@ -45,13 +45,17 @@ export const en = {
   'nav.home': 'Home',
   'nav.prompts': 'Prompts',
   'nav.catalog': 'Logo Catalog',
+  'nav.principles': 'Principles',
   'nav.saved': 'Saved',
   'nav.brain': 'Brain',
+  'nav.pricing': 'Pricing',
   'nav.settings': 'Settings',
 
   // layout
   'layout.appTitle': 'Logo Design Platform',
   'layout.adminLabel': 'Admin',
+  'layout.guest': 'Guest',
+  'layout.explore': 'Explore',
   'layout.version': 'v1.0',
 
   // settings
@@ -63,7 +67,7 @@ export const en = {
 
   // auth
   'auth.title': 'Sign in',
-  'auth.subtitle': 'Use your Logo Modernism administrator account.',
+  'auth.subtitle': 'Sign in to continue your Logo Modernism workspace.',
   'auth.email': 'Email',
   'auth.password': 'Password',
   'auth.signIn': 'Sign in',
@@ -86,7 +90,61 @@ export const en = {
   'auth.backToLogin': 'Back to sign in',
 
   // home
-  'home.subtitle': 'Use the sidebar to open admin tools.',
+  'home.subtitle': 'Explore modernist logo intelligence and start creating.',
+  'home.title': 'Design logos with principles, not generic prompts.',
+  'home.description':
+    'Study proven visual systems, build a precise brief, and generate logo directions with a design-aware AI workflow.',
+  'home.startCreating': 'Start creating',
+  'home.exploreCatalog': 'Explore catalog',
+  'home.catalogTitle': 'Logo catalog',
+  'home.catalogDescription': 'Browse references, designers, eras, and construction systems.',
+  'home.principlesTitle': 'Design principles',
+  'home.principlesDescription': 'Learn the rules behind durable modernist identities.',
+  'home.brainTitle': 'Design Brain',
+  'home.brainDescription': 'See how references and principles become design reasoning.',
+
+  // public principles and Brain preview
+  'principles.subtitle': 'A public library of modernist logo design rules.',
+  'principles.searchPlaceholder': 'Search principles…',
+  'principles.allCategories': 'All categories',
+  'principles.empty': 'No principles match these filters.',
+  'brain.preview.subtitle': 'A limited public view of the Logo Modernism Design Brain.',
+  'brain.preview.howItWorks': 'How the Brain works',
+  'brain.preview.catalogStage': 'Finds relevant references from the logo catalog.',
+  'brain.preview.principlesStage': 'Selects applicable construction and typography principles.',
+  'brain.preview.reasoningStage': 'Turns the brief into explainable prompt directions.',
+  'brain.preview.publicPrinciples': 'public principles',
+  'guest.signInToContinue': 'Sign in to use this reference',
+
+  // pricing, usage, billing
+  'pricing.subtitle': 'Start free and upgrade when you need more AI capacity.',
+  'pricing.freeDescription': 'Explore the system and create a limited number of directions.',
+  'pricing.proDescription': 'For regular logo exploration and client project work.',
+  'pricing.enterpriseDescription': 'Custom capacity and support for larger teams.',
+  'pricing.freeCredits': '100 AI credits per month',
+  'pricing.proCredits': '2,000 AI credits per month',
+  'pricing.publicCatalog': 'Full public catalog',
+  'pricing.savedPrompts': 'Saved prompts and projects',
+  'pricing.advancedBrain': 'Advanced Brain assistance',
+  'pricing.priorityGeneration': 'More image and prompt generations',
+  'pricing.customLimits': 'Custom usage limits',
+  'pricing.teamWorkspaces': 'Team workspaces',
+  'pricing.support': 'Priority support',
+  'pricing.perMonth': '/ month',
+  'pricing.startFree': 'Start free',
+  'pricing.upgrade': 'Upgrade to Pro',
+  'pricing.askOwner': 'Ask the workspace owner to upgrade',
+  'pricing.checkoutLoading': 'Opening checkout…',
+  'pricing.checkoutFailed': 'Unable to open checkout',
+  'pricing.custom': 'Custom',
+  'pricing.contactSales': 'Contact sales',
+  'billing.title': 'Plan and billing',
+  'billing.manageSubscription': 'Manage subscription',
+  'usage.unlimited': 'Unlimited credits',
+  'usage.creditsRemaining': '{count} credits remaining',
+  'errors.api.billingOverviewFailed': 'Unable to load billing',
+  'errors.api.checkoutFailed': 'Unable to create checkout',
+  'errors.api.portalFailed': 'Unable to open billing portal',
 
   // prompts wizard
   'prompts.step.project': 'Project',

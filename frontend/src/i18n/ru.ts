@@ -47,13 +47,17 @@ export const ru: Record<MessageKey, string> = {
   'nav.home': 'Главная',
   'nav.prompts': 'Промпты',
   'nav.catalog': 'Каталог лого',
+  'nav.principles': 'Принципы',
   'nav.saved': 'Избранное',
   'nav.brain': 'Brain',
+  'nav.pricing': 'Тарифы',
   'nav.settings': 'Настройки',
 
   // layout
   'layout.appTitle': 'Logo Design Platform',
   'layout.adminLabel': 'Админ',
+  'layout.guest': 'Гость',
+  'layout.explore': 'Просмотр',
   'layout.version': 'v1.0',
 
   // settings
@@ -65,7 +69,7 @@ export const ru: Record<MessageKey, string> = {
 
   // auth
   'auth.title': 'Вход',
-  'auth.subtitle': 'Войдите с учётной записью администратора Logo Modernism.',
+  'auth.subtitle': 'Войдите, чтобы продолжить работу в Logo Modernism.',
   'auth.email': 'Email',
   'auth.password': 'Пароль',
   'auth.signIn': 'Войти',
@@ -88,7 +92,61 @@ export const ru: Record<MessageKey, string> = {
   'auth.backToLogin': 'Вернуться ко входу',
 
   // home
-  'home.subtitle': 'Откройте инструменты в боковой панели.',
+  'home.subtitle': 'Изучайте модернистские логотипы и создавайте свои.',
+  'home.title': 'Создавайте логотипы на основе принципов, а не общих промптов.',
+  'home.description':
+    'Изучайте проверенные визуальные системы, собирайте точный бриф и создавайте направления логотипа с помощью дизайн-ориентированного AI.',
+  'home.startCreating': 'Начать создавать',
+  'home.exploreCatalog': 'Открыть каталог',
+  'home.catalogTitle': 'Каталог логотипов',
+  'home.catalogDescription': 'Референсы, дизайнеры, эпохи и системы построения.',
+  'home.principlesTitle': 'Принципы дизайна',
+  'home.principlesDescription': 'Правила, лежащие в основе сильных модернистских айдентик.',
+  'home.brainTitle': 'Design Brain',
+  'home.brainDescription': 'Как референсы и принципы превращаются в дизайн-решения.',
+
+  // public principles and Brain preview
+  'principles.subtitle': 'Публичная библиотека принципов модернистского логодизайна.',
+  'principles.searchPlaceholder': 'Поиск принципов…',
+  'principles.allCategories': 'Все категории',
+  'principles.empty': 'По этим фильтрам ничего не найдено.',
+  'brain.preview.subtitle': 'Ограниченный публичный режим Logo Modernism Design Brain.',
+  'brain.preview.howItWorks': 'Как работает Brain',
+  'brain.preview.catalogStage': 'Находит подходящие референсы в каталоге логотипов.',
+  'brain.preview.principlesStage': 'Выбирает принципы построения и типографики.',
+  'brain.preview.reasoningStage': 'Превращает бриф в объяснимые направления промптов.',
+  'brain.preview.publicPrinciples': 'публичных принципов',
+  'guest.signInToContinue': 'Войдите, чтобы использовать референс',
+
+  // pricing, usage, billing
+  'pricing.subtitle': 'Начните бесплатно и подключите больше AI-возможностей при необходимости.',
+  'pricing.freeDescription': 'Изучайте систему и создавайте ограниченное число направлений.',
+  'pricing.proDescription': 'Для регулярной работы над логотипами и клиентскими проектами.',
+  'pricing.enterpriseDescription': 'Индивидуальные лимиты и поддержка для команд.',
+  'pricing.freeCredits': '100 AI-кредитов в месяц',
+  'pricing.proCredits': '2 000 AI-кредитов в месяц',
+  'pricing.publicCatalog': 'Полный публичный каталог',
+  'pricing.savedPrompts': 'Сохранённые промпты и проекты',
+  'pricing.advancedBrain': 'Расширенная помощь Brain',
+  'pricing.priorityGeneration': 'Больше генераций промптов и изображений',
+  'pricing.customLimits': 'Индивидуальные лимиты',
+  'pricing.teamWorkspaces': 'Командные пространства',
+  'pricing.support': 'Приоритетная поддержка',
+  'pricing.perMonth': '/ месяц',
+  'pricing.startFree': 'Начать бесплатно',
+  'pricing.upgrade': 'Перейти на Pro',
+  'pricing.askOwner': 'Попросите владельца пространства повысить тариф',
+  'pricing.checkoutLoading': 'Открываем оплату…',
+  'pricing.checkoutFailed': 'Не удалось открыть оплату',
+  'pricing.custom': 'Индивидуально',
+  'pricing.contactSales': 'Связаться',
+  'billing.title': 'Тариф и оплата',
+  'billing.manageSubscription': 'Управлять подпиской',
+  'usage.unlimited': 'Безлимитные кредиты',
+  'usage.creditsRemaining': 'Осталось кредитов: {count}',
+  'errors.api.billingOverviewFailed': 'Не удалось загрузить данные тарифа',
+  'errors.api.checkoutFailed': 'Не удалось создать оплату',
+  'errors.api.portalFailed': 'Не удалось открыть управление подпиской',
 
   // prompts wizard
   'prompts.step.project': 'Проект',

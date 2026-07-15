@@ -19,6 +19,7 @@ import { Job, Queue } from 'bullmq';
 import {
   getQueueRuntimeConfig,
   getRedisConnectionOptions,
+  isAsyncQueueEnabled,
 } from './queue.config';
 
 type AnyJobPayload = QueueJobPayloadMap[QueueName];
@@ -50,7 +51,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
-    if (!process.env.REDIS_URL) return;
+    if (!isAsyncQueueEnabled()) return;
     if (process.env.BRAIN_NIGHTLY_RESEARCH === 'true') {
       await this.getQueue(QUEUE_NAMES.research).upsertJobScheduler(
         'nightly-research',

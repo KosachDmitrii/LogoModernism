@@ -22,6 +22,9 @@ export async function searchProjectMemory(
   prisma: PrismaClient,
   opts: { companyName?: string; industry?: string; limit?: number } & BrainTenantScope,
 ): Promise<BrainExperienceRecord[]> {
+  if (!opts.organizationId) {
+    throw new Error('Organization scope is required for project memory search');
+  }
   const limit = opts.limit ?? 8;
   const companyName = opts.companyName?.trim();
   const industry = opts.industry?.trim();
@@ -39,7 +42,7 @@ export async function searchProjectMemory(
     prisma.brainExperience.findMany({
       where: {
         sourceType: 'FEEDBACK',
-        ...(opts.organizationId ? { organizationId: opts.organizationId } : {}),
+        organizationId: opts.organizationId,
         ...(opts.projectId ? { projectId: opts.projectId } : {}),
         OR: [
           companyName ? { content: { contains: companyName, mode: 'insensitive' } } : undefined,

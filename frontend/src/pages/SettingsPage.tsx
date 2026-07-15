@@ -1,4 +1,6 @@
-import { Languages, LogOut, Palette, UserRound } from 'lucide-react';
+import { CreditCard, Languages, LogOut, Palette, UserRound } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { createBillingPortal, getBillingOverview } from '../api';
 import { useAuth } from '../auth/AuthProvider';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { PageContainer } from '../components/PageContainer';
@@ -9,6 +11,16 @@ import { useT } from '../i18n';
 export function SettingsPage() {
   const t = useT();
   const { profile, activeMembership, signOut } = useAuth();
+  const billing = useQuery({
+    queryKey: ['billing-overview', activeMembership?.organization.id],
+    queryFn: getBillingOverview,
+    enabled: Boolean(activeMembership),
+  });
+
+  async function openPortal() {
+    const { url } = await createBillingPortal();
+    window.location.assign(url);
+  }
 
   return (
     <PageContainer>
@@ -42,6 +54,54 @@ export function SettingsPage() {
               {t('auth.signOut')}
             </button>
           </div>
+        </section>
+
+        <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <CreditCard size={20} className="mt-0.5 shrink-0 text-violet-400" />
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-200">{t('billing.title')}</h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  {billing.data?.plan ?? activeMembership?.organization.plan} ·{' '}
+                  {billing.data?.usage.remainingCredits == null
+                    ? t('usage.unlimited')
+                    : t('usage.creditsRemaining', {
+                        count: billing.data?.usage.remainingCredits ?? 0,
+                      })}
+                </p>
+              </div>
+            </div>
+            {billing.data?.canManageBilling && billing.data.plan !== 'FREE' && (
+              <button
+                type="button"
+                onClick={() => void openPortal()}
+                className="rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
+              >
+                {t('billing.manageSubscription')}
+              </button>
+            )}
+          </div>
+          {billing.data?.usage.includedCredits != null && (
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="h-full bg-violet-500"
+                style={{
+                  width: `${Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      ((billing.data.usage.includedCredits -
+                        billing.data.usage.committedCredits -
+                        billing.data.usage.reservedCredits) /
+                        billing.data.usage.includedCredits) *
+                        100,
+                    ),
+                  )}%`,
+                }}
+              />
+            </div>
+          )}
         </section>
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">

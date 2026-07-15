@@ -8,6 +8,10 @@ export interface QueueRuntimeConfig {
   defaultJobOptions: JobsOptions;
 }
 
+export function isAsyncQueueEnabled(): boolean {
+  return process.env.QUEUE_ASYNC_ENABLED === 'true' && Boolean(process.env.REDIS_URL);
+}
+
 function positiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;

@@ -3,8 +3,14 @@ import './observability/telemetry';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { WorkerModule } from './worker.module';
+import { isAsyncQueueEnabled } from './queue/queue.config';
 
 async function bootstrap(): Promise<void> {
+  if (!isAsyncQueueEnabled()) {
+    throw new Error(
+      'Queue worker requires QUEUE_ASYNC_ENABLED=true and REDIS_URL',
+    );
+  }
   const app = await NestFactory.createApplicationContext(WorkerModule);
   app.enableShutdownHooks();
   Logger.log('Queue workers started', 'Worker');

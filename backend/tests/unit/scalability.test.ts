@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getQueueConcurrency, getRedisConnectionOptions } from '../../src/queue/queue.config';
+import {
+  getQueueConcurrency,
+  getRedisConnectionOptions,
+  isAsyncQueueEnabled,
+} from '../../src/queue/queue.config';
 import { isPrismaPoolTimeout } from '../../src/common/prisma-pool-timeout.filter';
 import { TenantAuthGuard } from '../../src/auth/tenant-auth.guard';
 import { AUTHENTICATED_ONLY_ROUTE } from '../../src/auth/authenticated.decorator';
@@ -41,6 +45,25 @@ describe('scalability guardrails', () => {
       });
     } finally {
       process.env.REDIS_URL = previous;
+    }
+  });
+
+  it('does not enqueue jobs merely because Redis is configured', () => {
+    const previousRedis = process.env.REDIS_URL;
+    const previousQueueFlag = process.env.QUEUE_ASYNC_ENABLED;
+    try {
+      process.env.REDIS_URL = 'redis://localhost:6379';
+      delete process.env.QUEUE_ASYNC_ENABLED;
+      expect(isAsyncQueueEnabled()).toBe(false);
+      process.env.QUEUE_ASYNC_ENABLED = 'true';
+      expect(isAsyncQueueEnabled()).toBe(true);
+      delete process.env.REDIS_URL;
+      expect(isAsyncQueueEnabled()).toBe(false);
+    } finally {
+      if (previousRedis === undefined) delete process.env.REDIS_URL;
+      else process.env.REDIS_URL = previousRedis;
+      if (previousQueueFlag === undefined) delete process.env.QUEUE_ASYNC_ENABLED;
+      else process.env.QUEUE_ASYNC_ENABLED = previousQueueFlag;
     }
   });
 

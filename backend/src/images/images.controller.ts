@@ -2,20 +2,28 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   NotFoundException,
   Param,
   Post,
   Res,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { USAGE_OPERATION_COSTS, USAGE_OPERATIONS } from '@logo-platform/shared';
 import type { Response } from 'express';
 import { ImagesService } from './images.service';
 import { GenerateFromComposedPromptDto, GenerateImageDto } from './dto/generate-image.dto';
 import { resolveGeneratedFile } from './image-storage';
 import { ALL_MEMBERS, CONTRIBUTORS, Roles } from '../auth/roles.decorator';
+import { Tenant, type TenantScope } from '../auth/tenant-context';
+import { UsageService } from '../usage/usage.service';
 
 @Controller('images')
 export class ImagesController {
-  constructor(private readonly imagesService: ImagesService) {}
+  constructor(
+    private readonly imagesService: ImagesService,
+    private readonly usage: UsageService,
+  ) {}
 
   @Get('providers')
   @Roles(...ALL_MEMBERS)
@@ -39,13 +47,59 @@ export class ImagesController {
 
   @Post('generate')
   @Roles(...CONTRIBUTORS)
-  async generate(@Body() dto: GenerateImageDto) {
-    return this.imagesService.generate(dto);
+  async generate(
+    @Body() dto: GenerateImageDto,
+    @Tenant() tenant?: TenantScope,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.withUsage(
+      dto.provider,
+      tenant!,
+      idempotencyKey,
+      (dto.count ?? 1) * USAGE_OPERATION_COSTS[USAGE_OPERATIONS.imageGenerate],
+      () => this.imagesService.generate(dto),
+    );
   }
 
   @Post('generate-from-prompt')
   @Roles(...CONTRIBUTORS)
-  async generateFromPrompt(@Body() dto: GenerateFromComposedPromptDto) {
-    return this.imagesService.generateFromComposedPrompt(dto);
+  async generateFromPrompt(
+    @Body() dto: GenerateFromComposedPromptDto,
+    @Tenant() tenant?: TenantScope,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.withUsage(
+      dto.provider,
+      tenant!,
+      idempotencyKey,
+      USAGE_OPERATION_COSTS[USAGE_OPERATIONS.imageGenerate],
+      () => this.imagesService.generateFromComposedPrompt(dto),
+    );
+  }
+
+  private async withUsage<T>(
+    provider: string | undefined,
+    tenant: TenantScope,
+    idempotencyKey: string | undefined,
+    credits: number,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    if (provider === 'mock') return action();
+    const reservation = await this.usage.reserve({
+      tenant,
+      operationKey: USAGE_OPERATIONS.imageGenerate,
+      credits,
+      idempotencyKey:
+        idempotencyKey ??
+        `image:${tenant.organizationId}:${randomUUID()}`,
+    });
+    try {
+      const result = await action();
+      await this.usage.commit(reservation.id);
+      return result;
+    } catch (error) {
+      await this.usage.release(reservation.id).catch(() => undefined);
+      throw error;
+    }
   }
 }

@@ -10,14 +10,14 @@ import {
 } from '@logo-platform/shared';
 import { QueueService } from './queue.service';
 import { Tenant, type TenantScope } from '../auth/tenant-context';
-import { BRAIN_ADMINS, CONTRIBUTORS, Roles } from '../auth/roles.decorator';
+import { BrainAdmin, CONTRIBUTORS, Roles } from '../auth/roles.decorator';
 
 @Controller('jobs')
 export class QueueController {
   constructor(private readonly queueService: QueueService) {}
 
   @Get('metrics/summary')
-  @Roles(...BRAIN_ADMINS)
+  @BrainAdmin()
   metrics() {
     return this.queueService.getMetrics();
   }

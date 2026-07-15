@@ -97,8 +97,8 @@ async function main(): Promise<void> {
 
       const user = await tx.user.upsert({
         where: { id: authUser.id },
-        create: { id: authUser.id, email, name },
-        update: { email, name },
+        create: { id: authUser.id, email, name, platformRole: 'PLATFORM_ADMIN' },
+        update: { email, name, platformRole: 'PLATFORM_ADMIN' },
       });
       const organization =
         existingOrganization ??
@@ -133,6 +133,7 @@ async function main(): Promise<void> {
         organizationId: result.organization.id,
         organizationSlug: result.organization.slug,
         role: result.membership.role,
+        platformRole: result.user.platformRole,
         temporaryPassword: generatedPassword,
         passwordChanged: Boolean(generatedPassword),
       },

@@ -5,6 +5,7 @@ import {
   updateResearchCandidate,
 } from '../../src/research/candidates';
 import { checkPdfIngestStatus } from '../../src/ingest/pdf-dedup';
+import { loadProjectMemory } from '../../src/learning/project-memory';
 
 const candidate = {
   id: 'candidate-b',
@@ -50,6 +51,20 @@ function fakePrisma(): PrismaClient {
               },
             ]
           : [],
+    },
+    brainTasteSignal: {
+      findMany: async ({ where }: { where: Record<string, unknown> }) => {
+        if (where.organizationId !== 'org-b') return [];
+        return [
+          {
+            signalType: 'LIKE',
+            score: 8,
+            context: 'I like geometric grids',
+            metadata: { companyName: 'Acme' },
+            createdAt: new Date(),
+          },
+        ];
+      },
     },
   } as unknown as PrismaClient;
 }
@@ -100,5 +115,18 @@ describe('tenant isolation', () => {
     await expect(
       checkPdfIngestStatus(prisma, 'Book', 'hash', {}),
     ).rejects.toThrow('Organization scope is required');
+  });
+
+  it('scopes project memory signals to the active organization', async () => {
+    const prisma = fakePrisma();
+    await expect(
+      loadProjectMemory(prisma, 'Acme', { organizationId: 'org-a' }),
+    ).resolves.toBeUndefined();
+    await expect(
+      loadProjectMemory(prisma, 'Acme', { organizationId: 'org-b' }),
+    ).resolves.toMatchObject({ signalCount: 1 });
+    await expect(loadProjectMemory(prisma, 'Acme')).rejects.toThrow(
+      'Organization scope is required',
+    );
   });
 });

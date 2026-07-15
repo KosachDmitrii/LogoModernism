@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@logo-platform/database';
+import type { BrainTenantScope } from '@logo-platform/shared';
 
 export interface ProjectMemory {
   companyName: string;
@@ -31,12 +32,18 @@ function extractMotifs(text: string): string[] {
 export async function loadProjectMemory(
   prisma: PrismaClient,
   companyName?: string,
+  scope?: BrainTenantScope,
 ): Promise<ProjectMemory | undefined> {
+  if (!scope?.organizationId) {
+    throw new Error('Organization scope is required for project memory');
+  }
   const name = companyName?.trim();
   if (!name) return undefined;
 
   const signals = await prisma.brainTasteSignal.findMany({
     where: {
+      organizationId: scope.organizationId,
+      ...(scope.projectId ? { projectId: scope.projectId } : {}),
       OR: [
         { context: { contains: name, mode: 'insensitive' } },
         { metadata: { path: ['companyName'], equals: name } },

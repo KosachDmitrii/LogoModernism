@@ -1,20 +1,34 @@
-import { IsArray, IsBoolean, IsIn, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { PROMPT_GENERATE_INTENTS } from '@logo-platform/shared';
 import { BriefContextDto } from '../../design-brain/dto/brain.dto';
 
 export class GeneratePromptDto {
   @IsString()
+  @MaxLength(120)
   industry!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   companyName?: string;
 
   @IsOptional()
   @IsNumber()
   @Min(1)
-  @Max(100)
+  @Max(5)
   variationCount?: number;
 
   @IsOptional()
@@ -34,11 +48,13 @@ export class GeneratePromptDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(24)
   @IsString({ each: true })
   analysisPrincipleIds?: string[];
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(8)
   @IsString({ each: true })
   catalogReferenceIds?: string[];
 
@@ -52,6 +68,7 @@ export class GeneratePromptDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(4000)
   catalogNarrative?: string;
 
   @IsOptional()

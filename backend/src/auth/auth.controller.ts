@@ -90,6 +90,7 @@ export class AuthController {
         id: true,
         email: true,
         name: true,
+        platformRole: true,
         organizations: {
           select: {
             role: true,
@@ -109,6 +110,7 @@ export class AuthController {
       id: user.id,
       email: user.email,
       name: user.name,
+      platformRole: user.platformRole,
       memberships: user.organizations.map(({ role, organization }) => ({
         role,
         organization,

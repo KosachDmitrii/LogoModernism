@@ -1,12 +1,25 @@
-import { IsArray, IsBoolean, IsString, IsOptional, IsNumber, IsIn, Min, Max } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsIn,
+  Min,
+  Max,
+  MaxLength,
+} from 'class-validator';
 import type { ImageProvider, ImageSize } from '@logo-platform/shared';
 
 export class GenerateImageDto {
   @IsString()
+  @MaxLength(4000)
   prompt!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   companyName?: string;
 
   @IsOptional()
@@ -26,14 +39,17 @@ export class GenerateImageDto {
 
 export class GenerateFromComposedPromptDto {
   @IsString()
+  @MaxLength(4000)
   text!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   industry?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   companyName?: string;
 
   @IsOptional()
@@ -68,6 +84,7 @@ export class GenerateFromComposedPromptDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(12)
   @IsString({ each: true })
   colorSelections?: string[];
 

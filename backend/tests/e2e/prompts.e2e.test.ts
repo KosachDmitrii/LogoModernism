@@ -9,18 +9,36 @@ const describeE2e = isE2eDbReady() ? describe : describe.skip;
 
 describeE2e('Prompts API (e2e)', () => {
   let app: INestApplication;
+  const fixtureId = `prompts-e2e-${Date.now().toString(36)}`;
+  const userId = `${fixtureId}-user`;
+  const organizationId = `${fixtureId}-org`;
 
   beforeAll(async () => {
+    await prisma.user.create({
+      data: { id: userId, email: `${userId}@example.test` },
+    });
+    await prisma.organization.create({
+      data: {
+        id: organizationId,
+        name: 'Prompts E2E',
+        slug: organizationId,
+        members: { create: { userId, role: 'OWNER' } },
+      },
+    });
     app = await createTestApp();
   });
 
   afterAll(async () => {
     await app.close();
+    await prisma.organization.delete({ where: { id: organizationId } }).catch(() => undefined);
+    await prisma.user.delete({ where: { id: userId } }).catch(() => undefined);
   });
 
   it('POST /api/prompts/generate with useBrain returns brainPowered pipeline', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/prompts/generate')
+      .set('x-user-id', userId)
+      .set('x-organization-id', organizationId)
       .send({
         industry: 'fintech',
         companyName: 'NovaPay',
@@ -50,12 +68,18 @@ describeE2e('Prompts API (e2e)', () => {
   it('POST /api/prompts/generate validates industry', async () => {
     await request(app.getHttpServer())
       .post('/api/prompts/generate')
+      .set('x-user-id', userId)
+      .set('x-organization-id', organizationId)
       .send({ companyName: 'NovaPay' })
       .expect(400);
   });
 
   it('GET /api/prompts/recommend/:industry returns suggestions', async () => {
-    const res = await request(app.getHttpServer()).get('/api/prompts/recommend/fintech').expect(200);
+    const res = await request(app.getHttpServer())
+      .get('/api/prompts/recommend/fintech')
+      .set('x-user-id', userId)
+      .set('x-organization-id', organizationId)
+      .expect(200);
 
     expect(res.body.industry).toBe('fintech');
     expect(Array.isArray(res.body.recommendations)).toBe(true);

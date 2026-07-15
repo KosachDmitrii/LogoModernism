@@ -1,4 +1,4 @@
-import type { TypographyStyle } from '@logo-platform/shared';
+import type { BillingOverview, TypographyStyle } from '@logo-platform/shared';
 import type {
   GenerateResponse,
   RecommendResponse,
@@ -130,6 +130,46 @@ export async function getRecommendations(industry: string): Promise<RecommendRes
 export async function getPrinciplesOverview(): Promise<{ total: number; categories: string[] }> {
   const res = await fetch(`${API_BASE}/principles`);
   if (!res.ok) await parseApiError(res, 'errors.api.principlesLoadFailed');
+  return res.json();
+}
+
+export async function searchPrinciples(params: {
+  query?: string;
+  category?: string;
+}, signal?: AbortSignal): Promise<Array<{
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  tags?: string[];
+}>> {
+  const query = new URLSearchParams();
+  if (params.query) query.set('q', params.query);
+  if (params.category) query.set('category', params.category);
+  const res = await fetch(`${API_BASE}/principles/search?${query}`, { signal });
+  if (!res.ok) await parseApiError(res, 'errors.api.principlesLoadFailed');
+  return res.json();
+}
+
+export async function getBillingOverview(): Promise<BillingOverview> {
+  const res = await fetch(`${API_BASE}/billing/current`);
+  if (!res.ok) await parseApiError(res, 'errors.api.billingOverviewFailed');
+  return res.json();
+}
+
+export async function createBillingCheckout(plan: 'PRO'): Promise<{ url: string }> {
+  const res = await fetch(`${API_BASE}/billing/checkout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan }),
+  });
+  if (!res.ok) await parseApiError(res, 'errors.api.checkoutFailed');
+  return res.json();
+}
+
+export async function createBillingPortal(): Promise<{ url: string }> {
+  const res = await fetch(`${API_BASE}/billing/portal`, { method: 'POST' });
+  if (!res.ok) await parseApiError(res, 'errors.api.portalFailed');
   return res.json();
 }
 

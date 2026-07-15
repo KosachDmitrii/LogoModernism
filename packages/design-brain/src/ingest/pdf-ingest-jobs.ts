@@ -27,6 +27,8 @@ type JobProgressPatch = {
 
 type JobRecord = BrainPdfIngestProgress & {
   savedPath?: string;
+  organizationId: string;
+  projectId?: string;
 };
 
 type JobEntry = {
@@ -93,7 +95,14 @@ export function clearPdfIngestProgress(jobId: string): void {
 
 export function getPdfIngestJobFile(
   jobId: string,
-): { savedPath: string; title: string; fileName: string; contentHash: string } | null {
+): {
+  savedPath: string;
+  title: string;
+  fileName: string;
+  contentHash: string;
+  organizationId: string;
+  projectId?: string;
+} | null {
   const entry = jobs.get(jobId);
   if (!entry?.record.savedPath) return null;
   return {
@@ -101,6 +110,8 @@ export function getPdfIngestJobFile(
     title: entry.record.title,
     fileName: entry.record.fileName,
     contentHash: entry.record.contentHash ?? '',
+    organizationId: entry.record.organizationId,
+    projectId: entry.record.projectId,
   };
 }
 
@@ -125,6 +136,8 @@ export function enqueuePdfIngest(params: {
   title: string;
   fileName: string;
   buffer: Buffer;
+  organizationId: string;
+  projectId?: string;
   preSkipped?: { message: string; result: BrainIngestResult };
 }): BrainPdfIngestStartResult {
   const contentHash = hashPdfContent(params.buffer);
@@ -136,6 +149,8 @@ export function enqueuePdfIngest(params: {
       title: params.title,
       fileName: params.fileName,
       contentHash,
+      organizationId: params.organizationId,
+      projectId: params.projectId,
       status: 'skipped',
       phase: 'done',
       message: params.preSkipped.message,
@@ -158,6 +173,8 @@ export function enqueuePdfIngest(params: {
     title: params.title,
     fileName: params.fileName,
     contentHash,
+    organizationId: params.organizationId,
+    projectId: params.projectId,
     savedPath,
     status: 'queued',
     message: 'Queued for background processing…',

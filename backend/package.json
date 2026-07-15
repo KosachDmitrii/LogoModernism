@@ -21,9 +21,9 @@
     "@logo-platform/knowledge-base": "*",
     "@logo-platform/prompt-engine": "*",
     "@logo-platform/shared": "*",
-    "@nestjs/common": "^11.0.7",
-    "@nestjs/core": "^11.0.7",
-    "@nestjs/platform-express": "^11.0.7",
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/core": "^11.1.28",
+    "@nestjs/platform-express": "^11.1.28",
     "@opentelemetry/auto-instrumentations-node": "^0.78.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.220.0",
     "@opentelemetry/sdk-node": "^0.220.0",
@@ -37,14 +37,14 @@
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.2",
-    "@nestjs/testing": "^11.0.7",
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/testing": "^11.1.28",
     "@types/express": "^5.0.0",
     "@types/multer": "^2.2.0",
     "@types/node": "^22.10.5",
     "@types/supertest": "^6.0.3",
     "supertest": "^7.1.4",
-    "testcontainers": "^10.28.0",
+    "testcontainers": "^12.0.4",
     "typescript": "^5.7.3",
     "vitest": "^3.2.4"
   }

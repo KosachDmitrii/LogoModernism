@@ -30,10 +30,12 @@ export interface VersionedJobPayload {
   correlationId?: string;
   organizationId?: string;
   projectId?: string;
+  usageReservationId?: string;
 }
 
 export interface FeedbackJobPayload extends VersionedJobPayload {
   promptRecordId?: string;
+  experienceId?: string;
   signalType?: 'LIKE' | 'DISLIKE' | 'APPROVE' | 'REJECT' | 'RATING';
   score?: number;
   context?: string;

@@ -27,6 +27,22 @@ export async function ingestFeedback(
   prisma: PrismaClient,
   input: BrainFeedbackInput,
 ): Promise<BrainIngestResult> {
+  if (!input.organizationId) {
+    throw new Error('Organization scope is required for feedback ingest');
+  }
+  const linked = input.experienceId
+    ? await prisma.brainExperience.findFirst({
+        where: {
+          id: input.experienceId,
+          organizationId: input.organizationId,
+          ...(input.projectId ? { projectId: input.projectId } : {}),
+        },
+      })
+    : null;
+  if (input.experienceId && !linked) {
+    throw new Error('Experience not found in the active organization');
+  }
+
   const structured = normalizeStructuredFeedback(input);
   const normalizedMetadata = structuredFeedbackMetadata(
     structured,
@@ -64,11 +80,7 @@ export async function ingestFeedback(
   const embedding = await embedText(`${input.signalType}: ${input.context}`);
   await upsertExperienceEmbedding(prisma, experience.id, embedding);
 
-  if (input.experienceId) {
-    const linked = await prisma.brainExperience.findUnique({
-      where: { id: input.experienceId },
-    });
-
+  if (linked) {
     const principleIds = Array.isArray((linked?.metadata as Record<string, unknown>)?.principleIds)
       ? ((linked?.metadata as Record<string, unknown>).principleIds as string[])
       : [];
@@ -77,6 +89,8 @@ export async function ingestFeedback(
     for (const principleId of principleIds) {
       const principle = await prisma.learnedPrinciple.findFirst({
         where: {
+          organizationId: input.organizationId,
+          ...(input.projectId ? { projectId: input.projectId } : {}),
           OR: [{ id: principleId }, { promptFragment: principleId }],
         },
       });

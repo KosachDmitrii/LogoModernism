@@ -39,6 +39,9 @@ export class PromptJobHandlerService implements QueueJobHandler<PromptJobPayload
 @Injectable()
 export class FeedbackJobHandlerService implements QueueJobHandler<FeedbackJobPayload> {
   async process(payload: FeedbackJobPayload, context: QueueJobContext) {
+    if (!payload.organizationId) {
+      throw new Error('Organization scope is required for feedback jobs');
+    }
     const prompt = payload.promptRecordId
       ? await prisma.composedPromptRecord.findUnique({
           where: {
@@ -63,6 +66,7 @@ export class FeedbackJobHandlerService implements QueueJobHandler<FeedbackJobPay
             ? 'REJECT'
             : 'APPROVE'),
       score,
+      experienceId: payload.experienceId,
       context: [
         payload.context,
         payload.comments,
@@ -93,6 +97,9 @@ export class PdfJobHandlerService implements QueueJobHandler<PdfJobPayload> {
   constructor(private readonly storage: ObjectStorageService) {}
 
   async process(payload: PdfJobPayload, context: QueueJobContext) {
+    if (!payload.organizationId) {
+      throw new Error('Organization scope is required for PDF jobs');
+    }
     const buffer = await this.storage.get(payload.sourceKey);
     await context.updateProgress(20);
     const result = await designBrain.ingestPdf({

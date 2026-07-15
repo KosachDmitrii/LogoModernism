@@ -25,7 +25,7 @@ export interface IngestPdfOptions {
   title: string;
   jobId?: string;
   savedPath?: string;
-  organizationId?: string;
+  organizationId: string;
   projectId?: string;
   onProgress?: (progress: {
     phase: BrainPdfIngestPhase;
@@ -162,7 +162,12 @@ export async function ingestPdf(
     };
   }
 
-  const existingIndexes = await getExistingChunkIndexesForBook(prisma, title, contentHash);
+  const existingIndexes = await getExistingChunkIndexesForBook(
+    prisma,
+    title,
+    contentHash,
+    options,
+  );
   let principlesExtracted = 0;
   let chunksStored = 0;
   let skippedChunks = 0;
@@ -292,10 +297,15 @@ async function getExistingChunkIndexesForBook(
   prisma: PrismaClient,
   bookTitle: string,
   contentHash: string,
+  scope: Pick<IngestPdfOptions, 'organizationId' | 'projectId'>,
 ): Promise<Set<number>> {
   const normalizedTitle = normalizeBookTitle(bookTitle);
   const rows = await prisma.brainExperience.findMany({
-    where: { sourceType: 'PDF' },
+    where: {
+      sourceType: 'PDF',
+      organizationId: scope.organizationId,
+      ...(scope.projectId ? { projectId: scope.projectId } : {}),
+    },
     select: { metadata: true },
   });
 

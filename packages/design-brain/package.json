@@ -23,11 +23,12 @@
     "@logo-platform/prompt-engine": "*",
     "@logo-platform/shared": "*",
     "dotenv": "^16.4.7",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "^1.1.1",
+    "undici": "^8.7.0"
   },
   "devDependencies": {
     "@types/pdf-parse": "^1.1.4",
-    "testcontainers": "^10.28.0",
+    "testcontainers": "^12.0.4",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^3.2.4"

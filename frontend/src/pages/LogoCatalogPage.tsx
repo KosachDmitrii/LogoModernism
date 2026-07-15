@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Filter, Search, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -18,6 +19,7 @@ import { PageHeader } from '../components/PageHeader';
 import { useT, type MessageKey } from '../i18n';
 import { industryLabel, markTypeLabel } from '../lib/translate-labels';
 import { sanitizeCatalogTagList, sanitizeBriefTagField } from '@logo-platform/shared';
+import { useAuth } from '../auth/AuthProvider';
 
 interface CatalogEntry {
   id: string;
@@ -62,6 +64,10 @@ const ERA_LABEL_KEYS: Record<(typeof ERA_OPTIONS)[number], MessageKey> = {
 
 export function LogoCatalogPage() {
   const t = useT();
+  const { profile, activeMembership } = useAuth();
+  const canApply = Boolean(
+    profile && activeMembership && activeMembership.role !== 'VIEWER',
+  );
   const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
   const designBrief = useAppStore((s) => s.designBrief);
   const projectIndustry = useAppStore((s) => s.industry);
@@ -501,7 +507,7 @@ export function LogoCatalogPage() {
                 </div>
               </div>
 
-              {selectedIsApplied ? (
+              {selectedIsApplied && canApply ? (
                 <button
                   type="button"
                   onClick={() => removeApplied(selected.id)}
@@ -510,8 +516,15 @@ export function LogoCatalogPage() {
                   {t('catalog.removeFromBrief')}
                   <X size={16} />
                 </button>
-              ) : (
+              ) : canApply ? (
                 <ApplyToPromptsButton onApply={applySelected} />
+              ) : (
+                <Link
+                  to={profile ? '/pricing' : '/login'}
+                  className="inline-flex rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500"
+                >
+                  {profile ? t('nav.pricing') : t('guest.signInToContinue')}
+                </Link>
               )}
             </div>
           ) : (

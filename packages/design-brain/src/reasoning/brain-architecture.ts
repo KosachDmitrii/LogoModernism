@@ -22,13 +22,19 @@ export async function buildBrainArchitecture(
   request: BrainGenerateRequest,
   retrievedExperiences: BrainExperienceRecord[],
 ): Promise<BrainArchitecture> {
+  if (!request.organizationId) {
+    throw new Error('Organization scope is required for Brain architecture');
+  }
   let clientIntent = await analyzeClientIntent({
     industry: request.industry,
     companyName: request.companyName,
     briefContext: request.briefContext,
   });
 
-  const projectMemory = await loadProjectMemory(prisma, request.companyName);
+  const projectMemory = await loadProjectMemory(prisma, request.companyName, {
+    organizationId: request.organizationId,
+    projectId: request.projectId,
+  });
   if (projectMemory) {
     clientIntent = {
       ...clientIntent,

@@ -9,10 +9,12 @@ import {
 import { Reflector } from '@nestjs/core';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import { prisma } from '@logo-platform/database';
+import type { PlatformRole } from '@logo-platform/shared';
 import { IS_PUBLIC_ROUTE } from './public.decorator';
 import { AUTHENTICATED_ONLY_ROUTE } from './authenticated.decorator';
 import type { AuthenticatedRequest } from './tenant-context';
 import { REQUIRED_ROLES, type TenantRole } from './roles.decorator';
+import { REQUIRED_PLATFORM_ROLES } from './platform-roles.decorator';
 
 @Injectable()
 export class TenantAuthGuard implements CanActivate {
@@ -55,6 +57,12 @@ export class TenantAuthGuard implements CanActivate {
         (this.readHeader(request, 'x-role', false)?.toUpperCase() as TenantRole | undefined) ??
         'OWNER';
       this.assertRoleAllowed(developmentRole, context);
+      const platformRole =
+        (this.readHeader(request, 'x-platform-role', false)?.toUpperCase() as
+          | PlatformRole
+          | undefined) ?? 'USER';
+      request.auth.platformRole = platformRole;
+      this.assertPlatformRoleAllowed(platformRole, context);
       return true;
     }
 
@@ -77,10 +85,16 @@ export class TenantAuthGuard implements CanActivate {
 
     const member = await prisma.organizationMember.findUnique({
       where: { organizationId_userId: { organizationId, userId } },
-      select: { id: true, role: true },
+      select: {
+        id: true,
+        role: true,
+        user: { select: { platformRole: true } },
+      },
     });
     if (!member) throw new UnauthorizedException('Organization membership is required');
     this.assertRoleAllowed(member.role, context);
+    request.auth.platformRole = member.user.platformRole;
+    this.assertPlatformRoleAllowed(member.user.platformRole, context);
 
     if (projectId) {
       const project = await prisma.project.findFirst({
@@ -112,6 +126,17 @@ export class TenantAuthGuard implements CanActivate {
     const requiredRoles = Array.isArray(metadata) ? metadata : [];
     if (requiredRoles.length && !requiredRoles.includes(role)) {
       throw new ForbiddenException('Organization role is not permitted');
+    }
+  }
+
+  private assertPlatformRoleAllowed(role: PlatformRole, context: ExecutionContext): void {
+    const metadata = this.reflector.getAllAndOverride<PlatformRole[]>(
+      REQUIRED_PLATFORM_ROLES,
+      [context.getHandler(), context.getClass()],
+    );
+    const requiredRoles = Array.isArray(metadata) ? metadata : [];
+    if (requiredRoles.length && !requiredRoles.includes(role)) {
+      throw new ForbiddenException('Platform role is not permitted');
     }
   }
 

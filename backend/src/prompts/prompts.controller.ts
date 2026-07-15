@@ -24,10 +24,14 @@ import {
   normalizeBrandName,
   QUEUE_NAMES,
   resolvePromptGenerateIntent,
+  USAGE_OPERATION_COSTS,
+  USAGE_OPERATIONS,
 } from '@logo-platform/shared';
 import { Tenant, type TenantScope } from '../auth/tenant-context';
 import { QueueService } from '../queue/queue.service';
+import { isAsyncQueueEnabled } from '../queue/queue.config';
 import { ALL_MEMBERS, CONTRIBUTORS, Roles } from '../auth/roles.decorator';
+import { UsageService } from '../usage/usage.service';
 
 type PipelineOutput = Awaited<ReturnType<PromptsService['generate']>>;
 
@@ -39,6 +43,7 @@ export class PromptsController {
   constructor(
     private readonly promptsService: PromptsService,
     private readonly queues: QueueService,
+    private readonly usage: UsageService,
   ) {}
 
   @Post('generate')
@@ -54,7 +59,7 @@ export class PromptsController {
     const request: PromptGenerationRequest = {
       industry: dto.industry,
       companyName: normalizeBrandName(dto.companyName),
-      variationCount: dto.variationCount ?? 10,
+      variationCount: dto.variationCount ?? 5,
       inspirationMode: dto.inspirationMode as PromptGenerationRequest['inspirationMode'],
       preferredEra: dto.preferredEra as PromptGenerationRequest['preferredEra'],
       minimalismLevel: dto.minimalismLevel,
@@ -72,6 +77,9 @@ export class PromptsController {
     };
 
     const startedAt = Date.now();
+    const operationIdempotencyKey =
+      idempotencyKey ??
+      `prompt:${tenant?.organizationId ?? 'unscoped'}:${randomUUID()}`;
     this.logger.log(
       JSON.stringify({
         event: 'prompt.generate.start',
@@ -83,19 +91,28 @@ export class PromptsController {
       }),
     );
 
+    let reservation:
+      | Awaited<ReturnType<UsageService['reserve']>>
+      | undefined;
     try {
-      if (process.env.REDIS_URL) {
+      reservation = await this.usage.reserve({
+        tenant: tenant!,
+        operationKey: USAGE_OPERATIONS.promptCompose,
+        credits: USAGE_OPERATION_COSTS[USAGE_OPERATIONS.promptCompose],
+        idempotencyKey: operationIdempotencyKey,
+      });
+      if (isAsyncQueueEnabled()) {
         const submission = await this.queues.enqueue(QUEUE_NAMES.prompt, {
           version: JOB_PAYLOAD_VERSION,
-          idempotencyKey:
-            idempotencyKey ??
-            `prompt:${tenant?.organizationId ?? 'unscoped'}:${randomUUID()}`,
+          idempotencyKey: operationIdempotencyKey,
           requestedAt: new Date().toISOString(),
           organizationId: tenant?.organizationId,
           projectId: tenant?.projectId,
           requestedBy: tenant?.userId,
+          usageReservationId: reservation.id,
           request,
         });
+        reservation = undefined;
         this.logger.log(
           JSON.stringify({
             event: 'prompt.generate.queued',
@@ -109,6 +126,8 @@ export class PromptsController {
       }
 
       const response = await this.promptsService.generateResponse(request, tenant);
+      await this.usage.commit(reservation.id);
+      reservation = undefined;
       this.logger.log(
         JSON.stringify({
           event: 'prompt.generate.complete',
@@ -121,6 +140,9 @@ export class PromptsController {
       );
       return { ...response, meta: { intent } };
     } catch (error) {
+      if (reservation) {
+        await this.usage.release(reservation.id).catch(() => undefined);
+      }
       this.logger.error(
         JSON.stringify({
           event: 'prompt.generate.error',
@@ -137,20 +159,35 @@ export class PromptsController {
   @Get('recommend/:industry')
   @Roles(...CONTRIBUTORS)
   async recommend(@Param('industry') industry: string, @Tenant() tenant?: TenantScope) {
-    const result = await this.promptsService.generate({
-      industry,
-      variationCount: 1,
-    }, tenant);
-    return {
-      industry,
-      recommendations: result.recommendations,
-      suggestedPrinciples: result.bestPrompt.selectedPrinciples.map((p) => ({
-        id: p.id,
-        name: p.name,
-        category: p.category,
-      })),
-      dna: result.bestPrompt.dna,
-    };
+    const reservation = await this.usage.reserve({
+      tenant: tenant!,
+      operationKey: USAGE_OPERATIONS.promptRecommend,
+      credits: USAGE_OPERATION_COSTS[USAGE_OPERATIONS.promptRecommend],
+      idempotencyKey: `recommend:${tenant!.organizationId}:${randomUUID()}`,
+    });
+    try {
+      const result = await this.promptsService.generate(
+        {
+          industry,
+          variationCount: 1,
+        },
+        tenant,
+      );
+      await this.usage.commit(reservation.id);
+      return {
+        industry,
+        recommendations: result.recommendations,
+        suggestedPrinciples: result.bestPrompt.selectedPrinciples.map((p) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+        })),
+        dna: result.bestPrompt.dna,
+      };
+    } catch (error) {
+      await this.usage.release(reservation.id).catch(() => undefined);
+      throw error;
+    }
   }
 
   @Get('saved')
@@ -210,12 +247,45 @@ export class PromptsController {
   @Post(':id/logos/generate')
   @Roles(...CONTRIBUTORS)
   @HttpCode(HttpStatus.ACCEPTED)
-  generateLogo(
+  async generateLogo(
     @Param('id') id: string,
     @Body() body: GeneratePromptLogoDto,
     @Tenant() tenant?: TenantScope,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.promptsService.generateLogoForPrompt(id, body, tenant);
+    if (body.provider === 'mock') {
+      return this.promptsService.generateLogoForPrompt(id, body, tenant);
+    }
+    let reservation:
+      | Awaited<ReturnType<UsageService['reserve']>>
+      | undefined = await this.usage.reserve({
+      tenant: tenant!,
+      operationKey: USAGE_OPERATIONS.imageGenerate,
+      credits: USAGE_OPERATION_COSTS[USAGE_OPERATIONS.imageGenerate],
+      idempotencyKey:
+        idempotencyKey ??
+        `prompt-logo:${tenant!.organizationId}:${id}:${randomUUID()}`,
+    });
+    try {
+      const result = await this.promptsService.generateLogoForPrompt(
+        id,
+        body,
+        tenant,
+        reservation.id,
+      );
+      if ('status' in result && result.status === 'queued') {
+        reservation = undefined;
+      } else {
+        await this.usage.commit(reservation.id);
+        reservation = undefined;
+      }
+      return result;
+    } catch (error) {
+      if (reservation) {
+        await this.usage.release(reservation.id).catch(() => undefined);
+      }
+      throw error;
+    }
   }
 
   @Post(':id/feedback')

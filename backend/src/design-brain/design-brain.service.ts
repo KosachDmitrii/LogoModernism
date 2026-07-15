@@ -101,12 +101,15 @@ export class DesignBrainApiService {
     if (!jobId?.trim()) {
       throw new BadRequestException('jobId is required');
     }
+    if (!scope?.organizationId) {
+      throw new BadRequestException('Organization scope is required');
+    }
     return designBrain.enqueuePdfIngest({
       buffer,
       originalName,
       title: trimmed,
       jobId: jobId.trim(),
-      organizationId: scope?.organizationId,
+      organizationId: scope.organizationId,
       projectId: scope?.projectId,
     }).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);

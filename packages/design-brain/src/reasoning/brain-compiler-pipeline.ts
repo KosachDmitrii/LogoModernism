@@ -132,6 +132,9 @@ export async function runBriefCompilerPipeline(
   prisma: PrismaClient,
   request: BrainGenerateRequest,
 ): Promise<BrainPipelineResult> {
+  if (!request.organizationId) {
+    throw new Error('Organization scope is required for Brain prompt generation');
+  }
   const retrievalQuery = [
     request.industry,
     request.companyName,
@@ -202,6 +205,8 @@ export async function runBriefCompilerPipeline(
       signalType: 'APPROVE',
       score: Math.round(scoreCompiledPrompt(compiled.positive, compile, catalogRequest).promptQuality),
       context: `Brief compiler generated: ${experience.positive.slice(0, 200)}`,
+      organizationId: request.organizationId,
+      projectId: request.projectId,
       metadata: {
         briefCompiler: true,
         briefHash: experience.briefHash,

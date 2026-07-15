@@ -9,14 +9,17 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String?
+  platformRole PlatformRole @default(USER) @map("platform_role")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
 
-  organizations OrganizationMember[]
-  projects      Project[]
+  organizations   OrganizationMember[]
+  projects        Project[]
+  usageOperations UsageOperation[]
+  checkoutSessions BillingCheckoutSession[]
 
   @@map("users")
 }
@@ -38,6 +41,11 @@ model Organization {
   tasteSignals      BrainTasteSignal[]
   learnedPrinciples LearnedPrinciple[]
   researchCandidates BrainResearchCandidate[]
+  billingSubscription BillingSubscription?
+  billingCheckoutSessions BillingCheckoutSession[]
+  usageBuckets      UsageBucket[]
+  usageOperations   UsageOperation[]
+  creditBalance     CreditBalance?
 
   @@map("organizations")
 }
@@ -328,6 +336,155 @@ model OutboxEvent {
 
   @@index([status, availableAt], map: "outbox_events_status_available_at_idx")
   @@map("outbox_events")
+}
+
+model BillingSubscription {
+  id                     String                    @id @default(cuid())
+  organizationId         String                    @unique(map: "billing_subscriptions_organization_id_key") @map("organization_id")
+  provider               BillingProvider           @default(LEMON_SQUEEZY)
+  providerCustomerId     String?                   @map("provider_customer_id")
+  providerSubscriptionId String?                   @unique(map: "billing_subscriptions_provider_subscription_id_key") @map("provider_subscription_id")
+  providerOrderId        String?                   @map("provider_order_id")
+  productId              String?                   @map("product_id")
+  variantId              String?                   @map("variant_id")
+  plan                   Plan                      @default(FREE)
+  status                 BillingSubscriptionStatus @default(INACTIVE)
+  renewsAt               DateTime?                 @map("renews_at")
+  endsAt                 DateTime?                 @map("ends_at")
+  providerUpdatedAt      DateTime?                 @map("provider_updated_at")
+  createdAt              DateTime                  @default(now()) @map("created_at")
+  updatedAt              DateTime                  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "billing_subscriptions_organization_id_fkey")
+
+  @@index([status, providerUpdatedAt], map: "billing_subscriptions_status_updated_idx")
+  @@map("billing_subscriptions")
+}
+
+model BillingCheckoutSession {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  requestedBy    String   @map("requested_by")
+  plan           Plan
+  variantId      String   @map("variant_id")
+  nonceHash      String   @unique(map: "billing_checkout_sessions_nonce_hash_key") @map("nonce_hash")
+  expiresAt      DateTime @map("expires_at")
+  consumedAt     DateTime? @map("consumed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "billing_checkout_sessions_organization_id_fkey")
+  requester    User         @relation(fields: [requestedBy], references: [id], onDelete: Cascade, map: "billing_checkout_sessions_requested_by_fkey")
+
+  @@index([organizationId, expiresAt], map: "billing_checkout_sessions_org_expires_idx")
+  @@map("billing_checkout_sessions")
+}
+
+model BillingWebhookEvent {
+  id          String             @id
+  provider    BillingProvider    @default(LEMON_SQUEEZY)
+  eventName   String             @map("event_name")
+  resourceId  String?            @map("resource_id")
+  status      BillingEventStatus @default(RECEIVED)
+  error       String?            @db.Text
+  receivedAt  DateTime           @default(now()) @map("received_at")
+  processedAt DateTime?          @map("processed_at")
+
+  @@index([status, receivedAt], map: "billing_webhook_events_status_received_idx")
+  @@map("billing_webhook_events")
+}
+
+model UsageBucket {
+  id                String   @id @default(cuid())
+  organizationId    String   @map("organization_id")
+  periodStart       DateTime @map("period_start")
+  periodEnd         DateTime @map("period_end")
+  plan              Plan
+  includedCredits   Int      @map("included_credits")
+  reservedCredits   Int      @default(0) @map("reserved_credits")
+  committedCredits  Int      @default(0) @map("committed_credits")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "usage_buckets_organization_id_fkey")
+  operations   UsageOperation[]
+
+  @@unique([organizationId, periodStart], map: "usage_buckets_organization_period_key")
+  @@index([periodEnd], map: "usage_buckets_period_end_idx")
+  @@map("usage_buckets")
+}
+
+model UsageOperation {
+  id                       String                 @id @default(cuid())
+  organizationId           String                 @map("organization_id")
+  userId                   String?                @map("user_id")
+  projectId                String?                @map("project_id")
+  bucketId                 String                 @map("bucket_id")
+  operationKey             String                 @map("operation_key")
+  idempotencyKey           String                 @map("idempotency_key")
+  status                   UsageReservationStatus @default(RESERVED)
+  reservedCredits          Int                    @map("reserved_credits")
+  includedReservedCredits  Int                    @default(0) @map("included_reserved_credits")
+  purchasedReservedCredits Int                    @default(0) @map("purchased_reserved_credits")
+  actualCredits            Int?                   @map("actual_credits")
+  jobId                    String?                @map("job_id")
+  metadata                 Json                   @default("{}")
+  expiresAt                DateTime               @map("expires_at")
+  createdAt                DateTime               @default(now()) @map("created_at")
+  updatedAt                DateTime               @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "usage_operations_organization_id_fkey")
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull, map: "usage_operations_user_id_fkey")
+  bucket       UsageBucket  @relation(fields: [bucketId], references: [id], onDelete: Cascade, map: "usage_operations_bucket_id_fkey")
+
+  @@unique([organizationId, idempotencyKey], map: "usage_operations_org_idempotency_key")
+  @@index([status, expiresAt], map: "usage_operations_status_expires_idx")
+  @@index([organizationId, operationKey, createdAt], map: "usage_operations_org_key_created_idx")
+  @@map("usage_operations")
+}
+
+model CreditBalance {
+  organizationId  String   @id @map("organization_id")
+  availableCredits Int     @default(0) @map("available_credits")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "credit_balances_organization_id_fkey")
+
+  @@map("credit_balances")
+}
+
+enum PlatformRole {
+  USER
+  PLATFORM_ADMIN
+}
+
+enum BillingProvider {
+  LEMON_SQUEEZY
+}
+
+enum BillingSubscriptionStatus {
+  INACTIVE
+  ON_TRIAL
+  ACTIVE
+  PAUSED
+  PAST_DUE
+  UNPAID
+  CANCELLED
+  EXPIRED
+}
+
+enum BillingEventStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+enum UsageReservationStatus {
+  RESERVED
+  PROCESSING
+  COMMITTED
+  RELEASED
+  EXPIRED
 }
 
 enum BrainSourceType {
