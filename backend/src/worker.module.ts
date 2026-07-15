@@ -25,9 +25,10 @@ import {
 import { DatabaseShutdownService } from './common/database-shutdown.service';
 import { PromptProcessor } from './queue/processors/prompt.processor';
 import { PromptsModule } from './prompts/prompts.module';
+import { UsageModule } from './usage/usage.module';
 
 @Module({
-  imports: [QueueModule, StorageModule, PromptsModule],
+  imports: [UsageModule, QueueModule, StorageModule, PromptsModule],
   providers: [
     FeedbackProcessor,
     PdfProcessor,

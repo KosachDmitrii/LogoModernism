@@ -6,34 +6,53 @@ import type {
   BrainTenantScope,
 } from '@logo-platform/shared';
 import { designBrain } from '@logo-platform/design-brain';
+import { getGlobalBrainScope } from './global-brain-scope';
+import { NightlyBrainSchedulerService } from './nightly-brain-scheduler.service';
 
 @Injectable()
 export class DesignBrainApiService {
+  constructor(
+    private readonly nightlyScheduler: NightlyBrainSchedulerService,
+  ) {}
+
   getCapabilities() {
-    return designBrain.getCapabilities();
+    return {
+      ...designBrain.getCapabilities(),
+      nightlyResearchConfigured:
+        process.env.BRAIN_NIGHTLY_RESEARCH === 'true',
+      nightlyResearchActive: this.nightlyScheduler.isActive(),
+    };
   }
 
-  getStats(scope?: BrainTenantScope) {
-    return designBrain.getStats(scope);
+  async getStats(scope?: BrainTenantScope) {
+    return designBrain.getStats(await getGlobalBrainScope(scope?.userId));
   }
 
-  getTasteProfile(scope?: BrainTenantScope) {
-    return designBrain.getTasteProfile(scope);
+  async getTasteProfile(scope?: BrainTenantScope) {
+    return designBrain.getTasteProfile(await getGlobalBrainScope(scope?.userId));
   }
 
-  consolidate(scope?: BrainTenantScope) {
-    return designBrain.consolidate(scope);
+  async consolidate(scope?: BrainTenantScope) {
+    return designBrain.consolidate(await getGlobalBrainScope(scope?.userId));
   }
 
-  listExperiences(sourceType?: BrainSourceType, limit?: number, scope?: BrainTenantScope) {
-    return designBrain.listExperiences({ sourceType, limit, ...scope });
+  async listExperiences(
+    sourceType?: BrainSourceType,
+    limit?: number,
+    scope?: BrainTenantScope,
+  ) {
+    const globalScope = await getGlobalBrainScope(scope?.userId);
+    return designBrain.listExperiences({ sourceType, limit, ...globalScope });
   }
 
-  getExperience(id: string, scope?: BrainTenantScope) {
-    return designBrain.getExperience(id, scope);
+  async getExperience(id: string, scope?: BrainTenantScope) {
+    return designBrain.getExperience(
+      id,
+      await getGlobalBrainScope(scope?.userId),
+    );
   }
 
-  listPrinciples(
+  async listPrinciples(
     limit?: number,
     offset?: number,
     options?: {
@@ -41,14 +60,21 @@ export class DesignBrainApiService {
       sort?: import('@logo-platform/shared').LearnedPrinciplesSort;
     } & BrainTenantScope,
   ) {
-    return designBrain.listPrinciples(limit, offset, options);
+    const globalScope = await getGlobalBrainScope(options?.userId);
+    return designBrain.listPrinciples(limit, offset, {
+      category: options?.category,
+      sort: options?.sort,
+      ...globalScope,
+    });
   }
 
-  listPrincipleCategories(scope?: BrainTenantScope) {
-    return designBrain.listPrincipleCategories(scope);
+  async listPrincipleCategories(scope?: BrainTenantScope) {
+    return designBrain.listPrincipleCategories(
+      await getGlobalBrainScope(scope?.userId),
+    );
   }
 
-  previewResearch(query: string, url: string, scope?: BrainTenantScope) {
+  async previewResearch(query: string, url: string, scope?: BrainTenantScope) {
     const trimmedQuery = query?.trim();
     const trimmedUrl = url?.trim();
     if (!trimmedQuery) {
@@ -57,37 +83,57 @@ export class DesignBrainApiService {
     if (!trimmedUrl) {
       throw new BadRequestException('url is required');
     }
-    return designBrain.previewResearch(trimmedQuery, trimmedUrl, scope ?? {}).catch((error) => {
+    const globalScope = await getGlobalBrainScope(scope?.userId);
+    return designBrain.previewResearch(trimmedQuery, trimmedUrl, globalScope).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       throw new BadRequestException(message);
     });
   }
 
-  runResearch(query: string, maxSources?: number, scope?: BrainTenantScope) {
+  async runResearch(query: string, maxSources?: number, scope?: BrainTenantScope) {
     const trimmed = query?.trim();
     if (!trimmed) {
       throw new BadRequestException('query is required');
     }
-    return designBrain.runResearch(trimmed, maxSources, scope ?? {});
+    return designBrain.runResearch(
+      trimmed,
+      maxSources,
+      await getGlobalBrainScope(scope?.userId),
+    );
   }
 
-  listResearchCandidates(status?: BrainResearchCandidateStatus, scope?: BrainTenantScope) {
-    return designBrain.listResearchCandidates(status, scope ?? {});
+  async listResearchCandidates(
+    status?: BrainResearchCandidateStatus,
+    scope?: BrainTenantScope,
+  ) {
+    return designBrain.listResearchCandidates(
+      status,
+      await getGlobalBrainScope(scope?.userId),
+    );
   }
 
-  getResearchCandidate(id: string, scope?: BrainTenantScope) {
-    return designBrain.getResearchCandidate(id, scope ?? {});
+  async getResearchCandidate(id: string, scope?: BrainTenantScope) {
+    return designBrain.getResearchCandidate(
+      id,
+      await getGlobalBrainScope(scope?.userId),
+    );
   }
 
-  approveResearch(id: string, scope?: BrainTenantScope) {
-    return designBrain.approveResearch(id, scope);
+  async approveResearch(id: string, scope?: BrainTenantScope) {
+    return designBrain.approveResearch(
+      id,
+      await getGlobalBrainScope(scope?.userId),
+    );
   }
 
-  rejectResearch(id: string, scope?: BrainTenantScope) {
-    return designBrain.rejectResearch(id, scope ?? {});
+  async rejectResearch(id: string, scope?: BrainTenantScope) {
+    return designBrain.rejectResearch(
+      id,
+      await getGlobalBrainScope(scope?.userId),
+    );
   }
 
-  enqueuePdfIngest(
+  async enqueuePdfIngest(
     buffer: Buffer,
     originalName: string,
     title: string,
@@ -101,16 +147,13 @@ export class DesignBrainApiService {
     if (!jobId?.trim()) {
       throw new BadRequestException('jobId is required');
     }
-    if (!scope?.organizationId) {
-      throw new BadRequestException('Organization scope is required');
-    }
+    const globalScope = await getGlobalBrainScope(scope?.userId);
     return designBrain.enqueuePdfIngest({
       buffer,
       originalName,
       title: trimmed,
       jobId: jobId.trim(),
-      organizationId: scope.organizationId,
-      projectId: scope?.projectId,
+      organizationId: globalScope.organizationId!,
     }).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       if (
@@ -131,7 +174,7 @@ export class DesignBrainApiService {
     });
   }
 
-  checkPdfIngest(title: string, contentHash: string, scope?: BrainTenantScope) {
+  async checkPdfIngest(title: string, contentHash: string, scope?: BrainTenantScope) {
     const trimmed = title?.trim();
     if (!trimmed) {
       throw new BadRequestException('Title is required');
@@ -139,25 +182,38 @@ export class DesignBrainApiService {
     if (!contentHash?.trim()) {
       throw new BadRequestException('contentHash is required');
     }
-    return designBrain.checkPdfIngest(trimmed, contentHash.trim(), scope ?? {});
+    return designBrain.checkPdfIngest(
+      trimmed,
+      contentHash.trim(),
+      await getGlobalBrainScope(scope?.userId),
+    );
   }
 
   getPdfIngestProgress(jobId: string) {
     return designBrain.getPdfIngestProgress(jobId);
   }
 
-  ingestImage(
+  async ingestImage(
     buffer: Buffer,
     originalName: string,
     title?: string,
     mimeType?: string,
     scope?: BrainTenantScope,
   ) {
-    return designBrain.ingestImage({ buffer, originalName, title, mimeType, ...scope });
+    return designBrain.ingestImage({
+      buffer,
+      originalName,
+      title,
+      mimeType,
+      ...(await getGlobalBrainScope(scope?.userId)),
+    });
   }
 
-  ingestFeedback(input: BrainFeedbackInput) {
-    return designBrain.ingestFeedback(input);
+  async ingestFeedback(input: BrainFeedbackInput) {
+    return designBrain.ingestFeedback({
+      ...input,
+      ...(await getGlobalBrainScope()),
+    });
   }
 
   runBriefInterview(body: {

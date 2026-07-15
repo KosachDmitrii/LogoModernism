@@ -53,13 +53,19 @@ export async function runNightlyResearch(): Promise<{
   if (!process.env.DATABASE_URL) {
     return { topics: [], results: [] };
   }
-  const organizationId = process.env.BRAIN_NIGHTLY_ORGANIZATION_ID?.trim();
-  if (!organizationId) {
+  const organization = await prisma.organization.findUnique({
+    where: {
+      slug:
+        process.env.BRAIN_GLOBAL_ORGANIZATION_SLUG?.trim() ||
+        'logo-modernism',
+    },
+    select: { id: true },
+  });
+  if (!organization) {
     return { topics: [], results: [] };
   }
   const scope: BrainTenantScope = {
-    organizationId,
-    projectId: process.env.BRAIN_NIGHTLY_PROJECT_ID?.trim() || undefined,
+    organizationId: organization.id,
   };
 
   const topics = await pickResearchTopics(prisma, scope);

@@ -11,6 +11,7 @@
 #           CORS_ORIGINS=https://<frontend-host>,http://localhost:5173
 #
 # API env: DATABASE_POOLER_URL=:6543, DIRECT_URL=:5432, REDIS_URL,
+# QUEUE_ASYNC_ENABLED=true,
 # AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE, OBJECT_STORAGE_*,
 # OTEL_EXPORTER_OTLP_ENDPOINT.
 # Configure a second service with railway.worker.toml for BullMQ workers.

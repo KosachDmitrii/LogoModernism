@@ -10,6 +10,7 @@ import { AUTHENTICATED_ONLY_ROUTE } from '../../src/auth/authenticated.decorator
 import { REQUIRED_ROLES } from '../../src/auth/roles.decorator';
 import type { ExecutionContext } from '@nestjs/common';
 import type { Reflector } from '@nestjs/core';
+import { NightlyBrainSchedulerService } from '../../src/design-brain/nightly-brain-scheduler.service';
 
 function authContext(headers: Record<string, string>) {
   const request = { headers };
@@ -62,6 +63,30 @@ describe('scalability guardrails', () => {
     } finally {
       if (previousRedis === undefined) delete process.env.REDIS_URL;
       else process.env.REDIS_URL = previousRedis;
+      if (previousQueueFlag === undefined) delete process.env.QUEUE_ASYNC_ENABLED;
+      else process.env.QUEUE_ASYNC_ENABLED = previousQueueFlag;
+    }
+  });
+
+  it('activates the in-process nightly scheduler when queues are disabled', () => {
+    const previousEnabled = process.env.BRAIN_NIGHTLY_RESEARCH;
+    const previousHour = process.env.BRAIN_NIGHTLY_RESEARCH_HOUR_UTC;
+    const previousQueueFlag = process.env.QUEUE_ASYNC_ENABLED;
+    const scheduler = new NightlyBrainSchedulerService();
+    try {
+      process.env.BRAIN_NIGHTLY_RESEARCH = 'true';
+      process.env.BRAIN_NIGHTLY_RESEARCH_HOUR_UTC = String(
+        (new Date().getUTCHours() + 1) % 24,
+      );
+      process.env.QUEUE_ASYNC_ENABLED = 'false';
+      scheduler.onModuleInit();
+      expect(scheduler.isActive()).toBe(true);
+    } finally {
+      scheduler.onModuleDestroy();
+      if (previousEnabled === undefined) delete process.env.BRAIN_NIGHTLY_RESEARCH;
+      else process.env.BRAIN_NIGHTLY_RESEARCH = previousEnabled;
+      if (previousHour === undefined) delete process.env.BRAIN_NIGHTLY_RESEARCH_HOUR_UTC;
+      else process.env.BRAIN_NIGHTLY_RESEARCH_HOUR_UTC = previousHour;
       if (previousQueueFlag === undefined) delete process.env.QUEUE_ASYNC_ENABLED;
       else process.env.QUEUE_ASYNC_ENABLED = previousQueueFlag;
     }

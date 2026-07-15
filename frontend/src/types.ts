@@ -423,6 +423,8 @@ export interface BrainCapabilities {
   databaseConfigured: boolean;
   nightlyConsolidate?: boolean;
   nightlyResearch?: boolean;
+  nightlyResearchConfigured?: boolean;
+  nightlyResearchActive?: boolean;
   tavilyConfigured?: boolean;
   braveConfigured?: boolean;
   ocrConfigured?: boolean;

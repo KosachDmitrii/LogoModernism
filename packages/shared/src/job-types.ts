@@ -28,6 +28,7 @@ export interface VersionedJobPayload {
   idempotencyKey: string;
   requestedAt: string;
   correlationId?: string;
+  requestedBy?: string;
   organizationId?: string;
   projectId?: string;
   usageReservationId?: string;
@@ -70,7 +71,6 @@ export interface ImageJobPayload extends VersionedJobPayload {
 
 export interface ResearchJobPayload extends VersionedJobPayload {
   researchId: string;
-  requestedBy?: string;
   query: string;
   sources?: string[];
   depth?: 'quick' | 'standard' | 'deep';
@@ -86,7 +86,6 @@ export interface ConsolidationJobPayload extends VersionedJobPayload {
 
 export interface PromptJobPayload extends VersionedJobPayload {
   request: PromptGenerationRequest;
-  requestedBy?: string;
 }
 
 export interface QueueJobPayloadMap {

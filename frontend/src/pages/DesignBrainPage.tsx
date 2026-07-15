@@ -276,10 +276,11 @@ export function DesignBrainPage() {
             <StatusPill ok={health?.tavilyConfigured} label={t('brain.status.tavily')} optional />
             <StatusPill ok={health?.braveConfigured} label={t('brain.status.brave')} optional />
             <StatusPill ok={health?.ocrConfigured} label={t('brain.status.ocr')} optional />
-            {health?.nightlyResearch && (
-              <span className="px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-300 text-xs">
-                {t('brain.status.nightlyResearch')}
-              </span>
+            {health?.nightlyResearchConfigured && (
+              <StatusPill
+                ok={health.nightlyResearchActive}
+                label={t('brain.status.nightlyResearch')}
+              />
             )}
           </div>
         )}

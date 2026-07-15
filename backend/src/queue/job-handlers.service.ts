@@ -14,6 +14,7 @@ import {
 import { ObjectStorageService } from '../storage/object-storage.service';
 import type { QueueJobContext, QueueJobHandler } from './queue.constants';
 import { PromptsService } from '../prompts/prompts.service';
+import { getGlobalBrainScope } from '../design-brain/global-brain-scope';
 
 @Injectable()
 export class PromptJobHandlerService implements QueueJobHandler<PromptJobPayload> {
@@ -39,9 +40,7 @@ export class PromptJobHandlerService implements QueueJobHandler<PromptJobPayload
 @Injectable()
 export class FeedbackJobHandlerService implements QueueJobHandler<FeedbackJobPayload> {
   async process(payload: FeedbackJobPayload, context: QueueJobContext) {
-    if (!payload.organizationId) {
-      throw new Error('Organization scope is required for feedback jobs');
-    }
+    const brainScope = await getGlobalBrainScope(payload.actorId);
     const prompt = payload.promptRecordId
       ? await prisma.composedPromptRecord.findUnique({
           where: {
@@ -84,8 +83,7 @@ export class FeedbackJobHandlerService implements QueueJobHandler<FeedbackJobPay
         actorId: payload.actorId,
         scores: prompt?.scores,
       },
-      organizationId: payload.organizationId,
-      projectId: payload.projectId,
+      organizationId: brainScope.organizationId,
     });
     await context.updateProgress(100);
     return result;
@@ -97,9 +95,7 @@ export class PdfJobHandlerService implements QueueJobHandler<PdfJobPayload> {
   constructor(private readonly storage: ObjectStorageService) {}
 
   async process(payload: PdfJobPayload, context: QueueJobContext) {
-    if (!payload.organizationId) {
-      throw new Error('Organization scope is required for PDF jobs');
-    }
+    const brainScope = await getGlobalBrainScope(payload.requestedBy);
     const buffer = await this.storage.get(payload.sourceKey);
     await context.updateProgress(20);
     const result = await designBrain.ingestPdf({
@@ -107,8 +103,7 @@ export class PdfJobHandlerService implements QueueJobHandler<PdfJobPayload> {
       originalName: payload.sourceKey.split('/').at(-1) ?? `${payload.documentId}.pdf`,
       title: payload.documentId,
       jobId: context.jobId,
-      organizationId: payload.organizationId,
-      projectId: payload.projectId,
+      organizationId: brainScope.organizationId!,
     });
     await this.storage.put(payload.outputKey, Buffer.from(JSON.stringify(result)), {
       contentType: 'application/json',
@@ -175,13 +170,13 @@ export class ResearchJobHandlerService implements QueueJobHandler<ResearchJobPay
   constructor(private readonly storage: ObjectStorageService) {}
 
   async process(payload: ResearchJobPayload, context: QueueJobContext) {
+    const brainScope = await getGlobalBrainScope(payload.requestedBy);
     await context.updateProgress(10);
     const result = await designBrain.runResearch(
       payload.query,
       payload.depth === 'deep' ? 20 : payload.depth === 'quick' ? 5 : 10,
       {
-        organizationId: payload.organizationId,
-        projectId: payload.projectId,
+        organizationId: brainScope.organizationId,
         userId: payload.requestedBy,
       },
     );
@@ -203,12 +198,8 @@ export class ConsolidationJobHandlerService
 
   async process(payload: ConsolidationJobPayload, context: QueueJobContext) {
     await context.updateProgress(10);
-    const result = payload.organizationId
-      ? await designBrain.consolidate({
-          organizationId: payload.organizationId,
-          projectId: payload.projectId,
-        })
-      : await this.consolidateAllOrganizations(context);
+    const brainScope = await getGlobalBrainScope(payload.requestedBy);
+    const result = await designBrain.consolidate(brainScope);
     if (payload.outputKey) {
       await this.storage.put(payload.outputKey, Buffer.from(JSON.stringify(result)), {
         contentType: 'application/json',
@@ -218,17 +209,4 @@ export class ConsolidationJobHandlerService
     return { consolidationId: payload.consolidationId, outputKey: payload.outputKey, result };
   }
 
-  private async consolidateAllOrganizations(context: QueueJobContext) {
-    const organizations = await prisma.organization.findMany({ select: { id: true } });
-    const results = [];
-    for (const [index, organization] of organizations.entries()) {
-      results.push(
-        await designBrain.consolidate({ organizationId: organization.id }),
-      );
-      await context.updateProgress(
-        Math.max(10, Math.round(((index + 1) / Math.max(1, organizations.length)) * 95)),
-      );
-    }
-    return results;
-  }
 }

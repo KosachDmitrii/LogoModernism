@@ -422,6 +422,10 @@ export class DesignBrainService {
     };
   }
 
+  runNightlyResearch() {
+    return runNightlyResearch();
+  }
+
   private scopeKey(scope?: BrainTenantScope): string {
     return `${scope?.organizationId ?? 'global'}:${scope?.projectId ?? '*'}`;
   }

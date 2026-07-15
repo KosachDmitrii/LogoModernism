@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run build:packages && concurrently -n backend,frontend -c blue,green \"npm run dev -w @logo-platform/backend\" \"wait-on http://localhost:3001/api/health -t 60000 && npm run dev -w @logo-platform/frontend\"",
+    "dev": "npm run build:packages && concurrently -k -n backend,worker,frontend -c blue,magenta,green \"npm run dev -w @logo-platform/backend\" \"wait-on tcp:127.0.0.1:6379 http://localhost:3001/api/health -t 60000 && npm run dev:worker -w @logo-platform/backend\" \"wait-on http://localhost:3001/api/health -t 60000 && npm run dev -w @logo-platform/frontend\"",
     "build:packages": "npm run build -w @logo-platform/shared && npm run build -w @logo-platform/database && npm run build -w @logo-platform/knowledge-base && npm run build -w @logo-platform/brief-compiler && npm run build -w @logo-platform/prompt-engine && npm run build -w @logo-platform/ai-engines && npm run build -w @logo-platform/image-generator && npm run build -w @logo-platform/design-brain",
     "build": "npm run build:packages && npm run build -w @logo-platform/catalog-importer && npm run build -w @logo-platform/backend && npm run build -w @logo-platform/frontend",
     "catalog:extract": "python3 scripts/catalog-pipeline/extract_pages.py",
@@ -36,6 +36,7 @@
     "test:backend:unit": "npm run test:unit -w @logo-platform/backend",
     "test:load": "k6 run tests/load/scalable-api.k6.js",
     "dev:backend": "npm run dev -w @logo-platform/backend",
+    "dev:worker": "npm run dev:worker -w @logo-platform/backend",
     "dev:frontend": "npm run dev -w @logo-platform/frontend",
     "start:backend": "npm run start -w @logo-platform/backend"
   },

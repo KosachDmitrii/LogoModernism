@@ -14,7 +14,12 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import type { LearnedPrinciplesSort, BrainResearchCandidateStatus, BrainSourceType } from '@logo-platform/shared';
+import type {
+  BrainResearchCandidateStatus,
+  BrainSourceType,
+  BrainTenantScope,
+  LearnedPrinciplesSort,
+} from '@logo-platform/shared';
 import { JOB_PAYLOAD_VERSION, LEARNED_PRINCIPLES_SORTS, QUEUE_NAMES } from '@logo-platform/shared';
 import { DesignBrainApiService } from './design-brain.service';
 import {
@@ -29,6 +34,7 @@ import { isAsyncQueueEnabled } from '../queue/queue.config';
 import { ObjectStorageService } from '../storage/object-storage.service';
 import { Tenant, type TenantScope } from '../auth/tenant-context';
 import { ALL_MEMBERS, BrainAdmin, CONTRIBUTORS, Roles } from '../auth/roles.decorator';
+import { getGlobalBrainScope } from './global-brain-scope';
 
 type UploadedFile = {
   buffer: Buffer;
@@ -36,7 +42,7 @@ type UploadedFile = {
   mimetype: string;
 };
 
-function tenantPdfJobId(jobId: string, tenant?: TenantScope): string {
+function tenantPdfJobId(jobId: string, tenant?: BrainTenantScope): string {
   if (!tenant?.organizationId) {
     throw new BadRequestException('Organization scope is required');
   }
@@ -72,15 +78,16 @@ export class DesignBrainController {
   @Post('consolidate')
   @BrainAdmin()
   @HttpCode(HttpStatus.ACCEPTED)
-  consolidate(@Tenant() tenant?: TenantScope) {
+  async consolidate(@Tenant() tenant?: TenantScope) {
     if (!isAsyncQueueEnabled()) return this.service.consolidate(tenant);
+    const brainScope = await getGlobalBrainScope(tenant?.userId);
     const id = `consolidation:${Date.now()}`;
     return this.queues.enqueue(QUEUE_NAMES.consolidation, {
       version: JOB_PAYLOAD_VERSION,
       idempotencyKey: id,
       requestedAt: new Date().toISOString(),
-      organizationId: tenant?.organizationId,
-      projectId: tenant?.projectId,
+      organizationId: brainScope.organizationId,
+      requestedBy: tenant?.userId,
       consolidationId: id,
       researchJobIds: [],
       strategy: 'synthesis',
@@ -140,17 +147,17 @@ export class DesignBrainController {
   @Post('research/run')
   @BrainAdmin()
   @HttpCode(HttpStatus.ACCEPTED)
-  runResearch(@Body() body: BrainResearchRunDto, @Tenant() tenant?: TenantScope) {
+  async runResearch(@Body() body: BrainResearchRunDto, @Tenant() tenant?: TenantScope) {
     if (!isAsyncQueueEnabled()) {
       return this.service.runResearch(body.query, body.maxSources, tenant);
     }
+    const brainScope = await getGlobalBrainScope(tenant?.userId);
     const id = `research:${Date.now()}`;
     return this.queues.enqueue(QUEUE_NAMES.research, {
       version: JOB_PAYLOAD_VERSION,
       idempotencyKey: id,
       requestedAt: new Date().toISOString(),
-      organizationId: tenant?.organizationId,
-      projectId: tenant?.projectId,
+      organizationId: brainScope.organizationId,
       requestedBy: tenant?.userId,
       researchId: id,
       query: body.query,
@@ -200,9 +207,10 @@ export class DesignBrainController {
   @Get('ingest/pdf/progress/:jobId')
   @BrainAdmin()
   async pdfIngestProgress(@Param('jobId') jobId: string, @Tenant() tenant?: TenantScope) {
+    const brainScope = await getGlobalBrainScope(tenant?.userId);
     const progress = isAsyncQueueEnabled()
-      ? await this.queues.findStatus(jobId, tenant?.organizationId)
-      : this.service.getPdfIngestProgress(tenantPdfJobId(jobId, tenant));
+      ? await this.queues.findStatus(jobId, brainScope.organizationId)
+      : this.service.getPdfIngestProgress(tenantPdfJobId(jobId, brainScope));
     if (!progress) {
       throw new NotFoundException('Progress not found');
     }
@@ -233,23 +241,24 @@ export class DesignBrainController {
     if (!jobId?.trim()) {
       throw new BadRequestException('jobId is required');
     }
+    const brainScope = await getGlobalBrainScope(tenant?.userId);
     if (!isAsyncQueueEnabled()) {
       return this.service.enqueuePdfIngest(
         file.buffer,
         file.originalname,
         title,
-        tenantPdfJobId(jobId.trim(), tenant),
-        tenant,
+        tenantPdfJobId(jobId.trim(), brainScope),
+        brainScope,
       );
     }
     const sourceKey = [
       'brain-inputs',
-      tenant?.organizationId ?? 'unscoped',
+      brainScope.organizationId!,
       `${jobId.trim()}-${file.originalname.replace(/[^A-Za-z0-9._-]/g, '_')}`,
     ].join('/');
     const outputKey = [
       'brain-results',
-      tenant?.organizationId ?? 'unscoped',
+      brainScope.organizationId!,
       `${jobId.trim()}.json`,
     ].join('/');
     await this.storage.put(sourceKey, file.buffer, { contentType: file.mimetype });
@@ -257,8 +266,8 @@ export class DesignBrainController {
       version: JOB_PAYLOAD_VERSION,
       idempotencyKey: jobId.trim(),
       requestedAt: new Date().toISOString(),
-      organizationId: tenant?.organizationId,
-      projectId: tenant?.projectId,
+      organizationId: brainScope.organizationId,
+      requestedBy: tenant?.userId,
       documentId: title.trim(),
       sourceKey,
       outputKey,
@@ -298,20 +307,19 @@ export class DesignBrainController {
   @Post('ingest/feedback')
   @Roles(...CONTRIBUTORS)
   @HttpCode(HttpStatus.ACCEPTED)
-  ingestFeedback(@Body() body: BrainFeedbackDto, @Tenant() tenant?: TenantScope) {
+  async ingestFeedback(@Body() body: BrainFeedbackDto, @Tenant() tenant?: TenantScope) {
+    const brainScope = await getGlobalBrainScope(tenant?.userId);
     if (!isAsyncQueueEnabled()) {
       return this.service.ingestFeedback({
         ...body,
-        organizationId: tenant?.organizationId,
-        projectId: tenant?.projectId,
+        organizationId: brainScope.organizationId,
       });
     }
     return this.queues.enqueue(QUEUE_NAMES.feedback, {
       version: JOB_PAYLOAD_VERSION,
       idempotencyKey: `brain-feedback:${Date.now()}`,
       requestedAt: new Date().toISOString(),
-      organizationId: tenant?.organizationId,
-      projectId: tenant?.projectId,
+      organizationId: brainScope.organizationId,
       signalType: body.signalType,
       score: body.score,
       experienceId: body.experienceId,

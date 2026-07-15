@@ -14,6 +14,7 @@ import { isAsyncQueueEnabled } from '../queue/queue.config';
 import type { BrainPipelineResult } from '@logo-platform/design-brain';
 import { slimPipelineResult } from './prompt-response';
 import { ObjectStorageService } from '../storage/object-storage.service';
+import { getGlobalBrainScope } from '../design-brain/global-brain-scope';
 
 @Injectable()
 export class PromptsService {
@@ -30,6 +31,7 @@ export class PromptsService {
 
     if (preferBrain) {
       try {
+        const brainScope = await getGlobalBrainScope(tenant?.userId);
         return await designBrain.generate({
           industry: request.industry,
           companyName: normalizeBrandName(request.companyName),
@@ -47,8 +49,7 @@ export class PromptsService {
           briefContext: request.briefContext,
           useBrain: true,
           preferredTerritoryId: request.preferredTerritoryId,
-          organizationId: tenant?.organizationId,
-          projectId: tenant?.projectId,
+          organizationId: brainScope.organizationId,
         });
       } catch (error) {
         if (request.useBrain === true) throw error;
