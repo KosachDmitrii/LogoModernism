@@ -88,7 +88,7 @@ export class DesignBrainService {
   async enqueuePdfIngest(options: IngestPdfOptions): Promise<BrainPdfIngestStartResult> {
     const client = await this.getClient();
     const contentHash = hashPdfContent(options.buffer);
-    const preCheck = await checkPdfIngest(client, options.title, contentHash);
+    const preCheck = await checkPdfIngest(client, options.title, contentHash, options);
 
     if (preCheck.alreadyIngested) {
       return enqueuePdfIngest({
@@ -190,9 +190,9 @@ export class DesignBrainService {
     return getPdfIngestProgress(jobId);
   }
 
-  async checkPdfIngest(title: string, contentHash: string) {
+  async checkPdfIngest(title: string, contentHash: string, scope: BrainTenantScope) {
     const client = await this.getClient();
-    return checkPdfIngest(client, title, contentHash);
+    return checkPdfIngest(client, title, contentHash, scope);
   }
 
   async ingestImage(options: IngestImageOptions): Promise<BrainIngestResult> {
@@ -306,20 +306,27 @@ export class DesignBrainService {
     return consolidateBrain(client, scope);
   }
 
-  async runResearch(query: string, maxSources?: number) {
-    return runWebResearch(query, maxSources);
+  async runResearch(query: string, maxSources: number | undefined, scope: BrainTenantScope) {
+    const client = await this.getClient();
+    return runWebResearch(client, query, scope, maxSources);
   }
 
-  async previewResearch(query: string, url: string) {
-    return previewWebResearch(query, url);
+  async previewResearch(query: string, url: string, scope: BrainTenantScope) {
+    const client = await this.getClient();
+    return previewWebResearch(client, query, url, scope);
   }
 
-  listResearchCandidates(status?: import('@logo-platform/shared').BrainResearchCandidateStatus) {
-    return listCandidates(status);
+  async listResearchCandidates(
+    status: import('@logo-platform/shared').BrainResearchCandidateStatus | undefined,
+    scope: BrainTenantScope,
+  ) {
+    const client = await this.getClient();
+    return listCandidates(client, scope, status);
   }
 
-  getResearchCandidate(id: string) {
-    return getCandidate(id);
+  async getResearchCandidate(id: string, scope: BrainTenantScope) {
+    const client = await this.getClient();
+    return getCandidate(client, id, scope);
   }
 
   async approveResearch(id: string, scope?: BrainTenantScope) {
@@ -327,8 +334,9 @@ export class DesignBrainService {
     return approveResearchCandidate(client, id, scope);
   }
 
-  rejectResearch(id: string) {
-    return rejectResearchCandidate(id);
+  async rejectResearch(id: string, scope: BrainTenantScope) {
+    const client = await this.getClient();
+    return rejectResearchCandidate(client, id, scope);
   }
 
   async generate(request: BrainGenerateRequest): Promise<BrainPipelineResult> {

@@ -8,6 +8,13 @@ type Snapshot = {
   tables: Record<string, number>;
   foreignKeys: number;
   indexes: number;
+  security: {
+    publicTables: number;
+    rlsEnabledTables: number;
+    apiRoleTableGrants: number;
+    policies: number;
+    apiRoleDefaultPrivileges: number;
+  };
 };
 
 const prisma = new PrismaClient();
@@ -52,7 +59,7 @@ async function capture(): Promise<Snapshot> {
     tables[after] = Number(rows[0]?.count ?? 0);
   }
 
-  const [foreignKeys, indexes] = await Promise.all([
+  const [foreignKeys, indexes, rls, apiGrants, policies, defaultPrivileges] = await Promise.all([
     prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::bigint AS count
       FROM pg_constraint c
@@ -64,6 +71,40 @@ async function capture(): Promise<Snapshot> {
       FROM pg_indexes
       WHERE schemaname = 'public'
     `,
+    prisma.$queryRaw<Array<{ total: bigint; enabled: bigint }>>`
+      SELECT
+        COUNT(*)::bigint AS total,
+        COUNT(*) FILTER (WHERE c.relrowsecurity)::bigint AS enabled
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relkind IN ('r', 'p')
+    `,
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM information_schema.table_privileges
+      WHERE table_schema = 'public'
+        AND grantee IN ('PUBLIC', 'anon', 'authenticated', 'service_role')
+    `,
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM pg_policies
+      WHERE schemaname = 'public'
+    `,
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM pg_default_acl d
+      JOIN pg_roles owner ON owner.oid = d.defaclrole
+      LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
+      CROSS JOIN LATERAL aclexplode(d.defaclacl) acl
+      LEFT JOIN pg_roles grantee ON grantee.oid = acl.grantee
+      WHERE n.nspname = 'public'
+        AND owner.rolname = 'postgres'
+        AND (
+          acl.grantee = 0
+          OR grantee.rolname IN ('anon', 'authenticated', 'service_role')
+        )
+    `,
   ]);
 
   return {
@@ -71,6 +112,13 @@ async function capture(): Promise<Snapshot> {
     tables,
     foreignKeys: Number(foreignKeys[0]?.count ?? 0),
     indexes: Number(indexes[0]?.count ?? 0),
+    security: {
+      publicTables: Number(rls[0]?.total ?? 0),
+      rlsEnabledTables: Number(rls[0]?.enabled ?? 0),
+      apiRoleTableGrants: Number(apiGrants[0]?.count ?? 0),
+      policies: Number(policies[0]?.count ?? 0),
+      apiRoleDefaultPrivileges: Number(defaultPrivileges[0]?.count ?? 0),
+    },
   };
 }
 
@@ -104,6 +152,29 @@ async function main(): Promise<void> {
   if (snapshot.foreignKeys < expected.foreignKeys) {
     throw new Error(
       `Foreign-key invariant failed: expected at least ${expected.foreignKeys}, got ${snapshot.foreignKeys}`,
+    );
+  }
+  if (
+    snapshot.security.publicTables === 0 ||
+    snapshot.security.rlsEnabledTables !== snapshot.security.publicTables
+  ) {
+    throw new Error(
+      `RLS invariant failed: ${snapshot.security.rlsEnabledTables}/${snapshot.security.publicTables} public tables protected`,
+    );
+  }
+  if (snapshot.security.apiRoleTableGrants !== 0) {
+    throw new Error(
+      `Database privilege invariant failed: ${snapshot.security.apiRoleTableGrants} API-role grants remain`,
+    );
+  }
+  if (snapshot.security.policies !== 0) {
+    throw new Error(
+      `RLS policy invariant failed: expected deny-by-default, found ${snapshot.security.policies} policies`,
+    );
+  }
+  if (snapshot.security.apiRoleDefaultPrivileges !== 0) {
+    throw new Error(
+      `Default privilege invariant failed: ${snapshot.security.apiRoleDefaultPrivileges} API-role grants remain`,
     );
   }
   console.log('Database migration invariants verified.');

@@ -172,6 +172,11 @@ export class ResearchJobHandlerService implements QueueJobHandler<ResearchJobPay
     const result = await designBrain.runResearch(
       payload.query,
       payload.depth === 'deep' ? 20 : payload.depth === 'quick' ? 5 : 10,
+      {
+        organizationId: payload.organizationId,
+        projectId: payload.projectId,
+        userId: payload.requestedBy,
+      },
     );
     if (payload.outputKey) {
       await this.storage.put(payload.outputKey, Buffer.from(JSON.stringify(result)), {

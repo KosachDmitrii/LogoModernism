@@ -1,22 +1,41 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { APP_NAV } from '../lib/navigation';
 import { useT } from '../i18n';
-import { LanguageSwitcher } from '../components/LanguageSwitcher';
-import { ThemeSwitcher } from '../components/ThemeSwitcher';
+import { useAuth } from '../auth/AuthProvider';
+import { hasPermission } from '../auth/permissions';
 
 export function AppLayout() {
   const t = useT();
+  const { profile, activeMembership } = useAuth();
+  const canUseProduct = hasPermission(activeMembership?.role, 'product.use');
+  const initials = (profile?.name || profile?.email || 'U')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 
   return (
-    <div className="min-h-screen flex bg-zinc-950 text-zinc-100">
-      <aside className="sticky top-0 self-start h-screen w-64 border-r border-zinc-800 bg-zinc-950 flex flex-col shrink-0 overflow-y-auto">
+    <div className="app-shell min-h-screen flex bg-zinc-950 text-zinc-100">
+      <aside className="app-sidebar sticky top-0 self-start h-screen w-64 border-r border-zinc-800 bg-zinc-950 flex flex-col shrink-0 overflow-y-auto">
         <div className="p-5 border-b border-zinc-800">
           <h1 className="text-base font-semibold tracking-tight">{t('layout.appTitle')}</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">{t('layout.adminLabel')}</p>
+          <div className="mt-3 flex min-w-0 items-center gap-2.5">
+            <div className="account-avatar grid size-8 shrink-0 place-items-center rounded-full text-[11px] font-semibold">
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-zinc-300">
+                {profile?.name || profile?.email}
+              </p>
+              <p className="mt-0.5 truncate text-[10px] font-medium tracking-wider text-violet-400">
+                {activeMembership?.role}
+              </p>
+            </div>
+          </div>
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5">
-          {APP_NAV.map(({ to, labelKey, icon: Icon, end }) => (
+          {APP_NAV.filter((item) => item.id !== 'prompts' || canUseProduct).map(({ to, labelKey, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -35,9 +54,7 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="px-4 py-3 border-t border-zinc-800/80 space-y-2.5">
-          <LanguageSwitcher />
-          <ThemeSwitcher />
+        <div className="px-5 py-3 border-t border-zinc-800/80">
           <p className="text-[10px] font-mono text-zinc-700 tracking-wider">{t('layout.version')}</p>
         </div>
       </aside>

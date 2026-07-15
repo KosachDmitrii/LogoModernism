@@ -88,12 +88,13 @@ export async function checkPdfIngest(
   prisma: PrismaClient,
   title: string,
   contentHash: string,
+  scope: Pick<IngestPdfOptions, 'organizationId' | 'projectId'>,
 ): Promise<BrainPdfIngestCheck> {
   const bookTitle = title.trim();
   if (!bookTitle) {
     throw new Error('Title is required');
   }
-  return checkPdfIngestStatus(prisma, bookTitle, contentHash);
+  return checkPdfIngestStatus(prisma, bookTitle, contentHash, scope);
 }
 
 export async function ingestPdf(
@@ -106,7 +107,7 @@ export async function ingestPdf(
   }
 
   const contentHash = hashPdfContent(options.buffer);
-  const preCheck = await checkPdfIngestStatus(prisma, title, contentHash);
+  const preCheck = await checkPdfIngestStatus(prisma, title, contentHash, options);
 
   let savedPath: string;
   if (options.savedPath) {
@@ -132,7 +133,13 @@ export async function ingestPdf(
     throw new Error('PDF contains no extractable text. OCR did not produce readable content.');
   }
 
-  const ingestCheck = await checkPdfIngestStatus(prisma, title, contentHash, chunks.length);
+  const ingestCheck = await checkPdfIngestStatus(
+    prisma,
+    title,
+    contentHash,
+    options,
+    chunks.length,
+  );
   if (ingestCheck.alreadyIngested) {
     reportProgress(options, {
       phase: 'done',

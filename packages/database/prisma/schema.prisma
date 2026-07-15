@@ -37,6 +37,7 @@ model Organization {
   brainExperiences  BrainExperience[]
   tasteSignals      BrainTasteSignal[]
   learnedPrinciples LearnedPrinciple[]
+  researchCandidates BrainResearchCandidate[]
 
   @@map("organizations")
 }
@@ -75,6 +76,7 @@ model Project {
   brainExperiences  BrainExperience[]
   tasteSignals      BrainTasteSignal[]
   learnedPrinciples LearnedPrinciple[]
+  researchCandidates BrainResearchCandidate[]
 
   @@index([organizationId, createdAt(sort: Desc)], map: "projects_organization_id_created_at_idx")
   @@index([userId], map: "projects_user_id_idx")
@@ -281,6 +283,33 @@ model LearnedPrinciple {
 
   @@index([organizationId, projectId, confidence(sort: Desc)], map: "learned_design_principles_tenant_confidence_idx")
   @@map("learned_design_principles")
+}
+
+model BrainResearchCandidate {
+  id             String   @id
+  organizationId String   @map("organization_id")
+  projectId      String?  @map("project_id")
+  createdBy      String?  @map("created_by")
+  reviewedBy     String?  @map("reviewed_by")
+  query          String
+  status         String   @default("pending")
+  sourceUrl      String   @db.Text @map("source_url")
+  sourceTitle    String   @map("source_title")
+  snippet        String   @db.Text
+  summary        String   @db.Text
+  extractedText  String   @db.Text @map("extracted_text")
+  principles     Json
+  sourceScore    Float?   @map("source_score")
+  ingestResult   Json?    @map("ingest_result")
+  createdAt      DateTime @default(now()) @map("created_at")
+  reviewedAt     DateTime? @map("reviewed_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "brain_research_candidates_organization_id_fkey")
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull, map: "brain_research_candidates_project_id_fkey")
+
+  @@index([organizationId, status, createdAt(sort: Desc)], map: "brain_research_candidates_tenant_status_created_at_idx")
+  @@index([organizationId, projectId], map: "brain_research_candidates_tenant_project_idx")
+  @@map("brain_research_candidates")
 }
 
 model OutboxEvent {

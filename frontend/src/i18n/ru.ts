@@ -7,6 +7,7 @@ export const ru: Record<MessageKey, string> = {
   'common.closeDialog': 'Закрыть диалог',
   'common.loading': 'Загрузка…',
   'common.optional': 'опционально',
+  'common.readOnlyRole': 'Роль Viewer предоставляет доступ только для чтения. Обратитесь к администратору, чтобы включить продуктовые действия.',
   'common.copy': 'Копировать',
   'common.copyPrompt': 'Копировать промпт',
   'common.savePrompt': 'Сохранить промпт',
@@ -48,11 +49,43 @@ export const ru: Record<MessageKey, string> = {
   'nav.catalog': 'Каталог лого',
   'nav.saved': 'Избранное',
   'nav.brain': 'Brain',
+  'nav.settings': 'Настройки',
 
   // layout
   'layout.appTitle': 'Logo Design Platform',
   'layout.adminLabel': 'Админ',
   'layout.version': 'v1.0',
+
+  // settings
+  'settings.subtitle': 'Язык, оформление и параметры приложения.',
+  'settings.languageTitle': 'Язык',
+  'settings.languageDescription': 'Выберите язык интерфейса приложения.',
+  'settings.themeTitle': 'Оформление',
+  'settings.themeDescription': 'Выберите светлую или тёмную тему интерфейса.',
+
+  // auth
+  'auth.title': 'Вход',
+  'auth.subtitle': 'Войдите с учётной записью администратора Logo Modernism.',
+  'auth.email': 'Email',
+  'auth.password': 'Пароль',
+  'auth.signIn': 'Войти',
+  'auth.signingIn': 'Вход…',
+  'auth.signOut': 'Выйти',
+  'auth.loading': 'Загрузка аккаунта…',
+  'auth.loginFailed': 'Не удалось войти',
+  'auth.noAccount': 'Впервые в Logo Modernism?',
+  'auth.hasAccount': 'Уже есть аккаунт?',
+  'auth.createAccount': 'Создать аккаунт',
+  'auth.creatingAccount': 'Создание аккаунта…',
+  'auth.registerTitle': 'Создайте рабочее пространство',
+  'auth.registerSubtitle': 'Настройте аккаунт владельца и приватную организацию.',
+  'auth.name': 'Ваше имя',
+  'auth.organization': 'Организация',
+  'auth.confirmPassword': 'Повторите пароль',
+  'auth.passwordMismatch': 'Пароли не совпадают',
+  'auth.registrationFailed': 'Не удалось создать аккаунт',
+  'auth.checkEmail': 'Подтвердите аккаунт по ссылке в письме, затем войдите.',
+  'auth.backToLogin': 'Вернуться ко входу',
 
   // home
   'home.subtitle': 'Откройте инструменты в боковой панели.',

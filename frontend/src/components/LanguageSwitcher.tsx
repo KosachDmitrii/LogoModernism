@@ -7,18 +7,24 @@ const LOCALES: Array<{ id: Locale; key: MessageKey }> = [
   { id: 'ru', key: 'common.langRu' },
 ];
 
-export function LanguageSwitcher() {
+export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
   const t = useT();
   const locale = useLocaleStore((s) => s.locale);
   const setLocale = useLocaleStore((s) => s.setLocale);
   const activeIndex = LOCALES.findIndex((item) => item.id === locale);
 
   return (
-    <div className="flex items-center justify-between gap-3 px-0.5" role="group" aria-label={t('common.language')}>
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Globe size={13} className="text-zinc-600 shrink-0" strokeWidth={1.5} />
-        <span className="text-xs text-zinc-500 truncate">{t('common.language')}</span>
-      </div>
+    <div
+      className={clsx('flex items-center gap-3 px-0.5', !compact && 'justify-between')}
+      role="group"
+      aria-label={t('common.language')}
+    >
+      {!compact && (
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Globe size={13} className="text-zinc-600 shrink-0" strokeWidth={1.5} />
+          <span className="text-xs text-zinc-500 truncate">{t('common.language')}</span>
+        </div>
+      )}
 
       <div className="relative flex shrink-0 p-0.5 rounded-lg bg-zinc-900/80 ring-1 ring-zinc-800/60">
         <div

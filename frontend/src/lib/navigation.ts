@@ -1,7 +1,15 @@
-import { Brain, BookOpen, Heart, LayoutDashboard, Sparkles, type LucideIcon } from 'lucide-react';
+import {
+  Brain,
+  BookOpen,
+  Heart,
+  LayoutDashboard,
+  Settings,
+  Sparkles,
+  type LucideIcon,
+} from 'lucide-react';
 import type { MessageKey } from '../i18n';
 
-export type AppNavId = 'home' | 'prompts' | 'saved' | 'brain' | 'catalog';
+export type AppNavId = 'home' | 'prompts' | 'saved' | 'brain' | 'catalog' | 'settings';
 
 export interface AppNavItem {
   id: AppNavId;
@@ -17,6 +25,7 @@ export const APP_NAV: AppNavItem[] = [
   { id: 'catalog', to: '/logo-catalog', labelKey: 'nav.catalog', icon: BookOpen },
   { id: 'saved', to: '/saved', labelKey: 'nav.saved', icon: Heart },
   { id: 'brain', to: '/brain', labelKey: 'nav.brain', icon: Brain },
+  { id: 'settings', to: '/settings', labelKey: 'nav.settings', icon: Settings },
 ];
 
 export function getNavItem(id: AppNavId): AppNavItem {

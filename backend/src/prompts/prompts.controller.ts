@@ -27,6 +27,7 @@ import {
 } from '@logo-platform/shared';
 import { Tenant, type TenantScope } from '../auth/tenant-context';
 import { QueueService } from '../queue/queue.service';
+import { ALL_MEMBERS, CONTRIBUTORS, Roles } from '../auth/roles.decorator';
 
 type PipelineOutput = Awaited<ReturnType<PromptsService['generate']>>;
 
@@ -41,6 +42,7 @@ export class PromptsController {
   ) {}
 
   @Post('generate')
+  @Roles(...CONTRIBUTORS)
   @HttpCode(HttpStatus.ACCEPTED)
   async generate(
     @Body() dto: GeneratePromptDto,
@@ -133,6 +135,7 @@ export class PromptsController {
   }
 
   @Get('recommend/:industry')
+  @Roles(...CONTRIBUTORS)
   async recommend(@Param('industry') industry: string, @Tenant() tenant?: TenantScope) {
     const result = await this.promptsService.generate({
       industry,
@@ -151,6 +154,7 @@ export class PromptsController {
   }
 
   @Get('saved')
+  @Roles(...ALL_MEMBERS)
   listSaved(
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
@@ -165,6 +169,7 @@ export class PromptsController {
   }
 
   @Post(':id/save')
+  @Roles(...CONTRIBUTORS)
   toggleSave(
     @Param('id') id: string,
     @Body() body: PromptSaveDto,
@@ -175,6 +180,7 @@ export class PromptsController {
   }
 
   @Post(':id/logos/:logoId/feedback')
+  @Roles(...CONTRIBUTORS)
   submitLogoFeedback(
     @Param('id') id: string,
     @Param('logoId') logoId: string,
@@ -185,6 +191,7 @@ export class PromptsController {
   }
 
   @Post(':id/logos/:logoId/tags')
+  @Roles(...CONTRIBUTORS)
   submitLogoTags(
     @Param('id') id: string,
     @Param('logoId') logoId: string,
@@ -195,11 +202,13 @@ export class PromptsController {
   }
 
   @Get(':id')
+  @Roles(...ALL_MEMBERS)
   getPrompt(@Param('id') id: string, @Tenant() tenant?: TenantScope) {
     return this.promptsService.getPrompt(id, tenant);
   }
 
   @Post(':id/logos/generate')
+  @Roles(...CONTRIBUTORS)
   @HttpCode(HttpStatus.ACCEPTED)
   generateLogo(
     @Param('id') id: string,
@@ -210,6 +219,7 @@ export class PromptsController {
   }
 
   @Post(':id/feedback')
+  @Roles(...CONTRIBUTORS)
   submitFeedback(
     @Param('id') id: string,
     @Body() body: PromptFeedbackDto,
@@ -219,6 +229,7 @@ export class PromptsController {
   }
 
   @Post(':id/critique')
+  @Roles(...CONTRIBUTORS)
   critique(@Param('id') id: string) {
     if (!this.lastResult) {
       return { error: 'Generate prompts first' };
@@ -227,6 +238,7 @@ export class PromptsController {
   }
 
   @Post(':id/evolve')
+  @Roles(...CONTRIBUTORS)
   evolve(@Param('id') id: string) {
     if (!this.lastResult) {
       return { error: 'Generate prompts first' };

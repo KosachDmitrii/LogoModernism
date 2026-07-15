@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { PrismaClient } from '@logo-platform/database';
 import type { BrainPdfIngestCheck } from '@logo-platform/shared';
+import type { BrainTenantScope } from '@logo-platform/shared';
 
 export function hashPdfContent(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
@@ -21,11 +22,19 @@ export async function checkPdfIngestStatus(
   prisma: PrismaClient,
   bookTitle: string,
   contentHash: string,
+  scope: BrainTenantScope,
   expectedTotalChunks?: number,
 ): Promise<BrainPdfIngestCheck> {
+  if (!scope.organizationId) {
+    throw new Error('Organization scope is required for PDF ingest');
+  }
   const normalizedTitle = normalizeBookTitle(bookTitle);
   const rows = await prisma.brainExperience.findMany({
-    where: { sourceType: 'PDF' },
+    where: {
+      sourceType: 'PDF',
+      organizationId: scope.organizationId,
+      ...(scope.projectId ? { projectId: scope.projectId } : {}),
+    },
     select: { id: true, metadata: true },
   });
 

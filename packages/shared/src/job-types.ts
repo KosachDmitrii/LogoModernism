@@ -68,6 +68,7 @@ export interface ImageJobPayload extends VersionedJobPayload {
 
 export interface ResearchJobPayload extends VersionedJobPayload {
   researchId: string;
+  requestedBy?: string;
   query: string;
   sources?: string[];
   depth?: 'quick' | 'standard' | 'deep';

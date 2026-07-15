@@ -28,6 +28,8 @@ import {
 } from '../lib/brief-navigation';
 import { getBriefReadiness } from '../lib/brief-readiness';
 import { toPromptGenerateIntent } from '../lib/prompt-generate-intent';
+import { useAuth } from '../auth/AuthProvider';
+import { hasPermission } from '../auth/permissions';
 
 const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
   1: 'prompts.step.projectSubtitle',
@@ -37,6 +39,8 @@ const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
 
 export function PromptsPage() {
   const t = useT();
+  const { activeMembership } = useAuth();
+  const canUseProduct = hasPermission(activeMembership?.role, 'product.use');
   const prompts = useAppStore((s) => s.prompts);
   const brainPartner = useAppStore((s) => s.brainPartner);
   const industry = useAppStore((s) => s.industry);
@@ -157,6 +161,14 @@ export function PromptsPage() {
       onSettled: () => setRegeneratingAction(null),
     });
   };
+
+  if (!canUseProduct) {
+    return (
+      <PageContainer>
+        <PageHeader page="prompts" subtitle={t('common.readOnlyRole')} />
+      </PageContainer>
+    );
+  }
 
   return (
     <>

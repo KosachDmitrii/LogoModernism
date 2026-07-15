@@ -243,11 +243,6 @@ export function BrainKnowledgeGraph({
             );
           })}
 
-          {orbitNodes.length === 0 && (
-            <text x={GRAPH_CENTER} y={GRAPH_CENTER + 56} textAnchor="middle" className="fill-zinc-600 text-[11px]">
-              {t('brain.graph.empty')}
-            </text>
-          )}
         </svg>
 
         <div
@@ -267,7 +262,13 @@ export function BrainKnowledgeGraph({
         )}
       </div>
 
-      <p className="text-[11px] text-zinc-600 pt-0">{t('brain.graph.clickHint')}</p>
+      {orbitNodes.length === 0 ? (
+        <p className="mx-auto max-w-md text-center text-sm leading-relaxed text-zinc-500">
+          {t('brain.graph.empty')}
+        </p>
+      ) : (
+        <p className="text-[11px] text-zinc-600 pt-0">{t('brain.graph.clickHint')}</p>
+      )}
 
       {onConsolidate && (
         <div className="space-y-2 pt-2 border-t border-zinc-800/80">

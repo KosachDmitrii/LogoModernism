@@ -8,18 +8,24 @@ const THEMES: Array<{ id: Theme; icon: typeof Sun; key: 'common.themeLight' | 'c
   { id: 'dark', icon: Moon, key: 'common.themeDark' },
 ];
 
-export function ThemeSwitcher() {
+export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
   const t = useT();
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
   const activeIndex = THEMES.findIndex((item) => item.id === theme);
 
   return (
-    <div className="flex items-center justify-between gap-3 px-0.5" role="group" aria-label={t('common.theme')}>
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Sun size={13} className="text-zinc-600 shrink-0" strokeWidth={1.5} />
-        <span className="text-xs text-zinc-500 truncate">{t('common.theme')}</span>
-      </div>
+    <div
+      className={clsx('flex items-center gap-3 px-0.5', !compact && 'justify-between')}
+      role="group"
+      aria-label={t('common.theme')}
+    >
+      {!compact && (
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Sun size={13} className="text-zinc-600 shrink-0" strokeWidth={1.5} />
+          <span className="text-xs text-zinc-500 truncate">{t('common.theme')}</span>
+        </div>
+      )}
 
       <div className="relative flex shrink-0 p-0.5 rounded-lg bg-zinc-900/80 ring-1 ring-zinc-800/60">
         <div

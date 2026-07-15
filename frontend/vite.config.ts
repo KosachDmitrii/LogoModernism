@@ -8,6 +8,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  envDir: repoRoot,
   // esbuild 0.28+ errors when lowering destructuring for Safari 14.0 targets.
   // Vite's default "modules" target includes safari14 — keep native destructuring.
   esbuild: {

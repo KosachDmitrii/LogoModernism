@@ -48,7 +48,7 @@ export class DesignBrainApiService {
     return designBrain.listPrincipleCategories(scope);
   }
 
-  previewResearch(query: string, url: string) {
+  previewResearch(query: string, url: string, scope?: BrainTenantScope) {
     const trimmedQuery = query?.trim();
     const trimmedUrl = url?.trim();
     if (!trimmedQuery) {
@@ -57,37 +57,43 @@ export class DesignBrainApiService {
     if (!trimmedUrl) {
       throw new BadRequestException('url is required');
     }
-    return designBrain.previewResearch(trimmedQuery, trimmedUrl).catch((error) => {
+    return designBrain.previewResearch(trimmedQuery, trimmedUrl, scope ?? {}).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       throw new BadRequestException(message);
     });
   }
 
-  runResearch(query: string, maxSources?: number) {
+  runResearch(query: string, maxSources?: number, scope?: BrainTenantScope) {
     const trimmed = query?.trim();
     if (!trimmed) {
       throw new BadRequestException('query is required');
     }
-    return designBrain.runResearch(trimmed, maxSources);
+    return designBrain.runResearch(trimmed, maxSources, scope ?? {});
   }
 
-  listResearchCandidates(status?: BrainResearchCandidateStatus) {
-    return designBrain.listResearchCandidates(status);
+  listResearchCandidates(status?: BrainResearchCandidateStatus, scope?: BrainTenantScope) {
+    return designBrain.listResearchCandidates(status, scope ?? {});
   }
 
-  getResearchCandidate(id: string) {
-    return designBrain.getResearchCandidate(id);
+  getResearchCandidate(id: string, scope?: BrainTenantScope) {
+    return designBrain.getResearchCandidate(id, scope ?? {});
   }
 
   approveResearch(id: string, scope?: BrainTenantScope) {
     return designBrain.approveResearch(id, scope);
   }
 
-  rejectResearch(id: string) {
-    return designBrain.rejectResearch(id);
+  rejectResearch(id: string, scope?: BrainTenantScope) {
+    return designBrain.rejectResearch(id, scope ?? {});
   }
 
-  enqueuePdfIngest(buffer: Buffer, originalName: string, title: string, jobId: string) {
+  enqueuePdfIngest(
+    buffer: Buffer,
+    originalName: string,
+    title: string,
+    jobId: string,
+    scope?: BrainTenantScope,
+  ) {
     const trimmed = title?.trim();
     if (!trimmed) {
       throw new BadRequestException('Title is required');
@@ -100,6 +106,8 @@ export class DesignBrainApiService {
       originalName,
       title: trimmed,
       jobId: jobId.trim(),
+      organizationId: scope?.organizationId,
+      projectId: scope?.projectId,
     }).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       if (
@@ -120,7 +128,7 @@ export class DesignBrainApiService {
     });
   }
 
-  checkPdfIngest(title: string, contentHash: string) {
+  checkPdfIngest(title: string, contentHash: string, scope?: BrainTenantScope) {
     const trimmed = title?.trim();
     if (!trimmed) {
       throw new BadRequestException('Title is required');
@@ -128,7 +136,7 @@ export class DesignBrainApiService {
     if (!contentHash?.trim()) {
       throw new BadRequestException('contentHash is required');
     }
-    return designBrain.checkPdfIngest(trimmed, contentHash.trim());
+    return designBrain.checkPdfIngest(trimmed, contentHash.trim(), scope ?? {});
   }
 
   getPdfIngestProgress(jobId: string) {

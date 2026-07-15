@@ -1,3 +1,5 @@
+import { getSupabaseClient } from './supabase';
+
 export class ApiAbortError extends Error {
   constructor() {
     super('Request was cancelled');
@@ -13,22 +15,25 @@ export async function apiFetch(
 ): Promise<Response> {
   try {
     const authHeaders = new Headers(headers);
-    const token = window.localStorage.getItem('logo-platform.access-token');
+    const {
+      data: { session },
+    } = await getSupabaseClient().auth.getSession();
     const organizationId =
       window.localStorage.getItem('logo-platform.organization-id') ??
       import.meta.env.VITE_ORGANIZATION_ID;
     const projectId =
       window.localStorage.getItem('logo-platform.project-id') ??
       import.meta.env.VITE_PROJECT_ID;
-    const userId =
-      window.localStorage.getItem('logo-platform.user-id') ?? import.meta.env.VITE_USER_ID;
-    if (token && !authHeaders.has('Authorization')) {
-      authHeaders.set('Authorization', `Bearer ${token}`);
+    if (session?.access_token && !authHeaders.has('Authorization')) {
+      authHeaders.set('Authorization', `Bearer ${session.access_token}`);
     }
     if (organizationId) authHeaders.set('x-organization-id', organizationId);
     if (projectId) authHeaders.set('x-project-id', projectId);
-    if (userId) authHeaders.set('x-user-id', userId);
-    return await fetch(input, { ...init, headers: authHeaders, signal });
+    const response = await fetch(input, { ...init, headers: authHeaders, signal });
+    if (response.status === 401) {
+      window.dispatchEvent(new Event('logo-platform:unauthorized'));
+    }
+    return response;
   } catch (error) {
     if (signal?.aborted) throw new ApiAbortError();
     throw error;

@@ -1,4 +1,4 @@
-import type { BrainResearchRunResult } from '@logo-platform/shared';
+import type { BrainResearchRunResult, BrainTenantScope } from '@logo-platform/shared';
 import type { PrismaClient } from '@logo-platform/database';
 import { computeTasteProfile } from './taste-profile';
 import { runWebResearch } from '../research/research.service';
@@ -26,13 +26,16 @@ function configuredTopics(): string[] {
     .filter(Boolean);
 }
 
-async function pickResearchTopics(prisma: PrismaClient): Promise<string[]> {
+async function pickResearchTopics(
+  prisma: PrismaClient,
+  scope: BrainTenantScope,
+): Promise<string[]> {
   const manual = configuredTopics();
   if (manual.length) {
     return manual.slice(0, 2);
   }
 
-  const taste = await computeTasteProfile(prisma);
+  const taste = await computeTasteProfile(prisma, scope);
   const dynamic = [
     ...taste.preferredGeometry.slice(0, 2).map((item) => `${item} logo construction`),
     ...taste.preferredMarkTypes.slice(0, 1).map((item) => `${item} logo design`),
@@ -50,13 +53,21 @@ export async function runNightlyResearch(): Promise<{
   if (!process.env.DATABASE_URL) {
     return { topics: [], results: [] };
   }
+  const organizationId = process.env.BRAIN_NIGHTLY_ORGANIZATION_ID?.trim();
+  if (!organizationId) {
+    return { topics: [], results: [] };
+  }
+  const scope: BrainTenantScope = {
+    organizationId,
+    projectId: process.env.BRAIN_NIGHTLY_PROJECT_ID?.trim() || undefined,
+  };
 
-  const topics = await pickResearchTopics(prisma);
+  const topics = await pickResearchTopics(prisma, scope);
   const results: BrainResearchRunResult[] = [];
 
   for (const topic of topics) {
     try {
-      const result = await runWebResearch(topic, nightlyMaxSources());
+      const result = await runWebResearch(prisma, topic, scope, nightlyMaxSources());
       results.push(result);
       console.info(
         `[design-brain] nightly research "${topic}": ${result.candidates.length} candidates, ${result.skippedUrls.length} skipped`,

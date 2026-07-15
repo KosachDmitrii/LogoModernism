@@ -43,6 +43,7 @@ export interface BrainFeedbackInput {
 export interface BrainTenantScope {
   organizationId?: string;
   projectId?: string;
+  userId?: string;
 }
 
 export interface BrainPdfIngestCheck {
@@ -323,6 +324,10 @@ export interface BrainResearchPrinciplePreview {
 
 export interface BrainResearchCandidate {
   id: string;
+  organizationId: string;
+  projectId?: string;
+  createdBy?: string;
+  reviewedBy?: string;
   query: string;
   status: BrainResearchCandidateStatus;
   sourceUrl: string;

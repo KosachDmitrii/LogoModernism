@@ -7,10 +7,21 @@ export type TenantScope = {
   projectId?: string;
 };
 
+export type AuthIdentity = {
+  userId: string;
+  email?: string;
+};
+
 export type AuthenticatedRequest = Request & {
+  auth?: AuthIdentity;
   tenant?: TenantScope;
   requestId?: string;
 };
+
+export const AuthUser = createParamDecorator(
+  (_data: unknown, context: ExecutionContext): AuthIdentity | undefined =>
+    context.switchToHttp().getRequest<AuthenticatedRequest>().auth,
+);
 
 export const Tenant = createParamDecorator(
   (_data: unknown, context: ExecutionContext): TenantScope | undefined =>

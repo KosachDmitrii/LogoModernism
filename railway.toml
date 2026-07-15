@@ -5,11 +5,14 @@
 #   Build:  npm run build -w @logo-platform/frontend
 #   Start:  npm run preview -w @logo-platform/frontend -- --host 0.0.0.0 --port $PORT
 #   Env:    VITE_API_URL=https://logomodernism-production.up.railway.app/api
+#           VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+#           VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 #           FRONTEND_URL=https://<frontend-host>  (on backend service)
 #           CORS_ORIGINS=https://<frontend-host>,http://localhost:5173
 #
 # API env: DATABASE_POOLER_URL=:6543, DIRECT_URL=:5432, REDIS_URL,
-# AUTH_JWKS_URL, OBJECT_STORAGE_*, OTEL_EXPORTER_OTLP_ENDPOINT.
+# AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE, OBJECT_STORAGE_*,
+# OTEL_EXPORTER_OTLP_ENDPOINT.
 # Configure a second service with railway.worker.toml for BullMQ workers.
 
 [build]

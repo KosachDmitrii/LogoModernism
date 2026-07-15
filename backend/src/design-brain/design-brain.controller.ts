@@ -27,13 +27,20 @@ import {
 import { QueueService } from '../queue/queue.service';
 import { ObjectStorageService } from '../storage/object-storage.service';
 import { Tenant, type TenantScope } from '../auth/tenant-context';
-import { Roles } from '../auth/roles.decorator';
+import { ALL_MEMBERS, BRAIN_ADMINS, CONTRIBUTORS, Roles } from '../auth/roles.decorator';
 
 type UploadedFile = {
   buffer: Buffer;
   originalname: string;
   mimetype: string;
 };
+
+function tenantPdfJobId(jobId: string, tenant?: TenantScope): string {
+  if (!tenant?.organizationId) {
+    throw new BadRequestException('Organization scope is required');
+  }
+  return `${tenant.organizationId}:${tenant.projectId ?? '_'}:${jobId}`;
+}
 
 @Controller('brain')
 export class DesignBrainController {
@@ -44,22 +51,25 @@ export class DesignBrainController {
   ) {}
 
   @Get('health')
+  @Roles(...BRAIN_ADMINS)
   health() {
     return this.service.getCapabilities();
   }
 
   @Get('stats')
+  @Roles(...ALL_MEMBERS)
   stats(@Tenant() tenant?: TenantScope) {
     return this.service.getStats(tenant);
   }
 
   @Get('taste-profile')
+  @Roles(...ALL_MEMBERS)
   tasteProfile(@Tenant() tenant?: TenantScope) {
     return this.service.getTasteProfile(tenant);
   }
 
   @Post('consolidate')
-  @Roles('OWNER', 'ADMIN')
+  @Roles(...BRAIN_ADMINS)
   @HttpCode(HttpStatus.ACCEPTED)
   consolidate(@Tenant() tenant?: TenantScope) {
     if (!process.env.REDIS_URL) return this.service.consolidate(tenant);
@@ -77,6 +87,7 @@ export class DesignBrainController {
   }
 
   @Get('experiences')
+  @Roles(...BRAIN_ADMINS)
   experiences(
     @Query('sourceType') sourceType?: BrainSourceType,
     @Query('limit') limit?: string,
@@ -90,16 +101,19 @@ export class DesignBrainController {
   }
 
   @Get('experiences/:id')
+  @Roles(...BRAIN_ADMINS)
   experience(@Param('id') id: string, @Tenant() tenant?: TenantScope) {
     return this.service.getExperience(id, tenant);
   }
 
   @Get('principles/categories')
+  @Roles(...ALL_MEMBERS)
   principleCategories(@Tenant() tenant?: TenantScope) {
     return this.service.listPrincipleCategories(tenant);
   }
 
   @Get('principles')
+  @Roles(...ALL_MEMBERS)
   principles(
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
@@ -123,11 +137,11 @@ export class DesignBrainController {
   }
 
   @Post('research/run')
-  @Roles('OWNER', 'ADMIN')
+  @Roles(...BRAIN_ADMINS)
   @HttpCode(HttpStatus.ACCEPTED)
   runResearch(@Body() body: BrainResearchRunDto, @Tenant() tenant?: TenantScope) {
     if (!process.env.REDIS_URL) {
-      return this.service.runResearch(body.query, body.maxSources);
+      return this.service.runResearch(body.query, body.maxSources, tenant);
     }
     const id = `research:${Date.now()}`;
     return this.queues.enqueue(QUEUE_NAMES.research, {
@@ -136,6 +150,7 @@ export class DesignBrainController {
       requestedAt: new Date().toISOString(),
       organizationId: tenant?.organizationId,
       projectId: tenant?.projectId,
+      requestedBy: tenant?.userId,
       researchId: id,
       query: body.query,
       depth: body.maxSources && body.maxSources > 10 ? 'deep' : 'standard',
@@ -143,42 +158,50 @@ export class DesignBrainController {
   }
 
   @Post('research/preview')
-  previewResearch(@Body() body: BrainResearchPreviewDto) {
-    return this.service.previewResearch(body.query, body.url);
+  @Roles(...BRAIN_ADMINS)
+  previewResearch(@Body() body: BrainResearchPreviewDto, @Tenant() tenant?: TenantScope) {
+    return this.service.previewResearch(body.query, body.url, tenant);
   }
 
   @Get('research/candidates')
-  researchCandidates(@Query('status') status?: BrainResearchCandidateStatus) {
-    return this.service.listResearchCandidates(status);
+  @Roles(...BRAIN_ADMINS)
+  researchCandidates(
+    @Query('status') status?: BrainResearchCandidateStatus,
+    @Tenant() tenant?: TenantScope,
+  ) {
+    return this.service.listResearchCandidates(status, tenant);
   }
 
   @Get('research/candidates/:id')
-  researchCandidate(@Param('id') id: string) {
-    return this.service.getResearchCandidate(id);
+  @Roles(...BRAIN_ADMINS)
+  researchCandidate(@Param('id') id: string, @Tenant() tenant?: TenantScope) {
+    return this.service.getResearchCandidate(id, tenant);
   }
 
   @Post('research/candidates/:id/approve')
-  @Roles('OWNER', 'ADMIN')
+  @Roles(...BRAIN_ADMINS)
   approveResearch(@Param('id') id: string, @Tenant() tenant?: TenantScope) {
     return this.service.approveResearch(id, tenant);
   }
 
   @Post('research/candidates/:id/reject')
-  @Roles('OWNER', 'ADMIN')
-  rejectResearch(@Param('id') id: string) {
-    return this.service.rejectResearch(id);
+  @Roles(...BRAIN_ADMINS)
+  rejectResearch(@Param('id') id: string, @Tenant() tenant?: TenantScope) {
+    return this.service.rejectResearch(id, tenant);
   }
 
   @Post('ingest/pdf/check')
-  checkPdfIngest(@Body() body: BrainPdfIngestCheckDto) {
-    return this.service.checkPdfIngest(body.title, body.contentHash);
+  @Roles(...BRAIN_ADMINS)
+  checkPdfIngest(@Body() body: BrainPdfIngestCheckDto, @Tenant() tenant?: TenantScope) {
+    return this.service.checkPdfIngest(body.title, body.contentHash, tenant);
   }
 
   @Get('ingest/pdf/progress/:jobId')
+  @Roles(...BRAIN_ADMINS)
   async pdfIngestProgress(@Param('jobId') jobId: string, @Tenant() tenant?: TenantScope) {
     const progress = process.env.REDIS_URL
       ? await this.queues.findStatus(jobId, tenant?.organizationId)
-      : this.service.getPdfIngestProgress(jobId);
+      : this.service.getPdfIngestProgress(tenantPdfJobId(jobId, tenant));
     if (!progress) {
       throw new NotFoundException('Progress not found');
     }
@@ -186,6 +209,7 @@ export class DesignBrainController {
   }
 
   @Post('ingest/pdf')
+  @Roles(...BRAIN_ADMINS)
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(
     FileInterceptor('file', {
@@ -213,7 +237,8 @@ export class DesignBrainController {
         file.buffer,
         file.originalname,
         title,
-        jobId.trim(),
+        tenantPdfJobId(jobId.trim(), tenant),
+        tenant,
       );
     }
     const sourceKey = [
@@ -245,6 +270,7 @@ export class DesignBrainController {
   }
 
   @Post('ingest/image')
+  @Roles(...BRAIN_ADMINS)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -269,6 +295,7 @@ export class DesignBrainController {
   }
 
   @Post('ingest/feedback')
+  @Roles(...CONTRIBUTORS)
   @HttpCode(HttpStatus.ACCEPTED)
   ingestFeedback(@Body() body: BrainFeedbackDto, @Tenant() tenant?: TenantScope) {
     if (!process.env.REDIS_URL) {
@@ -292,6 +319,7 @@ export class DesignBrainController {
   }
 
   @Post('brief/interview')
+  @Roles(...CONTRIBUTORS)
   briefInterview(@Body() body: BrainBriefInterviewDto) {
     return this.service.runBriefInterview(body);
   }

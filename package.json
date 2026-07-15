@@ -24,6 +24,7 @@
     "db:backup": "npm run db:backup -w @logo-platform/database",
     "db:invariants:snapshot": "npm run db:invariants:snapshot -w @logo-platform/database",
     "db:invariants:verify": "npm run db:invariants:verify -w @logo-platform/database --",
+    "db:provision-owner": "npm run db:provision-owner -w @logo-platform/database",
     "db:supabase-check": "npm run db:supabase-check -w @logo-platform/database",
     "brain:consolidate": "npm run consolidate -w @logo-platform/design-brain",
     "test": "npm run test:brain && npm run test:brain:eval && npm run test:backend:e2e",

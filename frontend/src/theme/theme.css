@@ -13,21 +13,21 @@
 [data-theme='light'] {
   color-scheme: light;
 
-  --color-surface: #ffffff;
-  --color-surface-elevated: #f4f4f5;
-  --color-border: #e4e4e7;
+  --color-surface: #f7f7fa;
+  --color-surface-elevated: #ffffff;
+  --color-border: #e2e2e8;
   --color-accent: #3f3f46;
   --color-muted: #64646f;
   --color-highlight: #18181b;
 
   /* Canvas & surfaces (dark-first bg utilities) */
-  --lm-bg-canvas: #ffffff;
-  --lm-bg-elevated: #f4f4f5;
-  --lm-bg-muted: #ececef;
-  --lm-bg-control: #e8e8ec;
-  --lm-bg-control-hover: #dddee3;
-  --lm-bg-control-active: #d4d4d8;
-  --lm-bg-subtle: #f8f8f9;
+  --lm-bg-canvas: #f7f7fa;
+  --lm-bg-elevated: #ffffff;
+  --lm-bg-muted: #f0f0f4;
+  --lm-bg-control: #ececf1;
+  --lm-bg-control-hover: #e2e2e8;
+  --lm-bg-control-active: #d9d9e1;
+  --lm-bg-subtle: #fbfbfc;
   --lm-bg-inset: #ffffff;
 
   /* Text (dark-first text utilities) */
@@ -68,6 +68,80 @@
   --lm-amber-surface-strong: #fde68a;
   --lm-red-surface: #fee2e2;
   --lm-red-surface-strong: #fecaca;
+}
+
+/* ── Application shell ──────────────────────────────────────────── */
+
+.account-avatar {
+  background: #2e1065;
+  color: #c4b5fd;
+  box-shadow: inset 0 0 0 1px rgb(139 92 246 / 0.22);
+}
+
+.account-role {
+  background: rgb(109 40 217 / 0.18);
+  color: #c4b5fd;
+}
+
+[data-theme='light'] .app-sidebar {
+  background: #ffffff;
+  border-color: #e4e4ea;
+  box-shadow: 1px 0 0 rgb(24 24 27 / 0.02);
+}
+
+[data-theme='light'] .account-avatar {
+  background: #ede9fe;
+  color: #6d28d9;
+  box-shadow: inset 0 0 0 1px #ddd6fe;
+}
+
+[data-theme='light'] .account-role {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+/* ── Authentication surfaces ───────────────────────────────────── */
+
+.auth-page {
+  background:
+    radial-gradient(circle at 50% 0%, rgb(91 33 182 / 0.2), transparent 38rem),
+    #09090b;
+}
+
+.auth-card {
+  background: rgb(24 24 27 / 0.88);
+  box-shadow: 0 28px 80px rgb(0 0 0 / 0.38);
+  backdrop-filter: blur(18px);
+}
+
+.auth-field {
+  background: #09090b;
+}
+
+[data-theme='light'] .auth-page {
+  background:
+    radial-gradient(circle at 50% 0%, rgb(124 58 237 / 0.13), transparent 38rem),
+    linear-gradient(180deg, #faf9ff 0%, #f4f4f7 100%);
+}
+
+[data-theme='light'] .auth-card {
+  background: rgb(255 255 255 / 0.94);
+  border-color: #dedde6;
+  box-shadow:
+    0 24px 70px rgb(39 39 42 / 0.12),
+    0 2px 8px rgb(39 39 42 / 0.06);
+}
+
+[data-theme='light'] .auth-field {
+  background: #ffffff;
+  border-color: #d4d4dc;
+  color: #18181b;
+  box-shadow: inset 0 1px 2px rgb(39 39 42 / 0.04);
+}
+
+[data-theme='light'] .auth-field:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgb(124 58 237 / 0.12);
 }
 
 /* ── Zinc backgrounds ───────────────────────────────────────────── */

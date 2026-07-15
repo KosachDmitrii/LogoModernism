@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import './index.css';
 import { applyTheme } from './theme/theme-store';
+import { AuthProvider } from './auth/AuthProvider';
 
 applyTheme(
   (() => {
@@ -32,6 +33,8 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById('root')!).render(
   <QueryClientProvider client={queryClient}>
-    <App />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </QueryClientProvider>,
 );

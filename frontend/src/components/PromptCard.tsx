@@ -13,6 +13,8 @@ import { useAppStore, useIsGenerating, usePromptImages } from '../store';
 import { generatePromptLogo, togglePromptSave } from '../api';
 import { parseLogoMarkType, parseTypographyStyle } from '../lib/brief-mappers';
 import { resolveApiUrl } from '../lib/api-base';
+import { useAuth } from '../auth/AuthProvider';
+import { hasPermission } from '../auth/permissions';
 import { useT } from '../i18n';
 import { formatError } from '../lib/api-error';
 import { imageProviderLabel } from '../lib/translate-labels';
@@ -52,6 +54,8 @@ export function PromptCard({
   onSavedChange,
 }: PromptCardProps) {
   const t = useT();
+  const { activeMembership } = useAuth();
+  const canUseProduct = hasPermission(activeMembership?.role, 'product.use');
   const [copied, setCopied] = useState(false);
   const companyName = useAppStore((s) => s.companyName);
   const designBrief = useAppStore((s) => s.designBrief);
@@ -165,31 +169,33 @@ export function PromptCard({
           >
             {copied ? <Check size={16} /> : <Copy size={16} />}
           </button>
-          <button
-            type="button"
-            disabled={toggleSave.isPending}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleSave.mutate();
-            }}
-            title={saved ? t('common.removeFromSaved') : t('common.savePrompt')}
-            className={clsx(
-              'p-1.5 rounded-lg transition-colors disabled:opacity-50',
-              saved
-                ? 'bg-zinc-800 text-zinc-200'
-                : 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200',
-            )}
-          >
-            {toggleSave.isPending ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Heart size={16} className={saved ? 'fill-current' : undefined} />
-            )}
-          </button>
+          {canUseProduct && (
+            <button
+              type="button"
+              disabled={toggleSave.isPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleSave.mutate();
+              }}
+              title={saved ? t('common.removeFromSaved') : t('common.savePrompt')}
+              className={clsx(
+                'p-1.5 rounded-lg transition-colors disabled:opacity-50',
+                saved
+                  ? 'bg-zinc-800 text-zinc-200'
+                  : 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200',
+              )}
+            >
+              {toggleSave.isPending ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Heart size={16} className={saved ? 'fill-current' : undefined} />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
-      {!standalone && (
+      {canUseProduct && !standalone && (
         <button
           type="button"
           onClick={generateImage}
@@ -220,11 +226,13 @@ export function PromptCard({
               promptId={prompt.id}
               index={index}
             >
-              <LogoFeedbackBar
-                promptId={prompt.id}
-                logo={image}
-                onUpdated={(feedback) => handleLogoFeedback(image.id, feedback)}
-              />
+              {canUseProduct && (
+                <LogoFeedbackBar
+                  promptId={prompt.id}
+                  logo={image}
+                  onUpdated={(feedback) => handleLogoFeedback(image.id, feedback)}
+                />
+              )}
             </LogoImageTile>
           ))}
         </div>

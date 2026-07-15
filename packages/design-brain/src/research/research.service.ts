@@ -66,6 +66,8 @@ function findSupportingQuote(
 }
 
 async function buildCandidateFromUrl(
+  prisma: PrismaClient,
+  scope: BrainTenantScope,
   topic: string,
   url: string,
   searchQuery: string,
@@ -73,7 +75,7 @@ async function buildCandidateFromUrl(
   fallbackSnippet?: string,
   initialScore?: number,
 ): Promise<BrainResearchCandidate> {
-  const existing = findCandidateByUrl(url);
+  const existing = await findCandidateByUrl(prisma, url, scope);
   if (existing && existing.status === 'pending') {
     return existing;
   }
@@ -100,7 +102,7 @@ async function buildCandidateFromUrl(
     text,
   );
 
-  return saveResearchCandidate({
+  return saveResearchCandidate(prisma, scope, {
     query: topic,
     sourceUrl: url,
     sourceTitle: fetched.title || fallbackTitle || url,
@@ -137,7 +139,9 @@ async function collectHitsFromQueries(
 }
 
 export async function runWebResearch(
+  prisma: PrismaClient,
   topic: string,
+  scope: BrainTenantScope,
   maxSources = 30,
 ): Promise<BrainResearchRunResult> {
   const trimmedTopic = topic.trim();
@@ -163,7 +167,7 @@ export async function runWebResearch(
   const seenCandidateIds = new Set<string>();
 
   for (const hit of hits) {
-    const existing = findCandidateByUrl(hit.url);
+    const existing = await findCandidateByUrl(prisma, hit.url, scope);
     if (existing?.status === 'approved' || existing?.status === 'pending') {
       skippedUrls.push(hit.url);
       if (existing.status === 'pending' && !seenCandidateIds.has(existing.id)) {
@@ -175,6 +179,8 @@ export async function runWebResearch(
 
     try {
       const candidate = await buildCandidateFromUrl(
+        prisma,
+        scope,
         trimmedTopic,
         hit.url,
         hit.searchQuery ?? trimmedTopic,
@@ -204,18 +210,24 @@ export async function runWebResearch(
 }
 
 export async function previewWebResearch(
+  prisma: PrismaClient,
   query: string,
   url: string,
+  scope: BrainTenantScope,
 ): Promise<BrainResearchCandidate> {
-  return buildCandidateFromUrl(query, url, query);
+  return buildCandidateFromUrl(prisma, scope, query, url, query);
 }
 
-export function listCandidates(status?: BrainResearchCandidate['status']) {
-  return listResearchCandidates(status);
+export function listCandidates(
+  prisma: PrismaClient,
+  scope: BrainTenantScope,
+  status?: BrainResearchCandidate['status'],
+) {
+  return listResearchCandidates(prisma, scope, status);
 }
 
-export function getCandidate(id: string) {
-  return getResearchCandidate(id);
+export function getCandidate(prisma: PrismaClient, id: string, scope: BrainTenantScope) {
+  return getResearchCandidate(prisma, id, scope);
 }
 
 export async function approveResearchCandidate(
@@ -223,7 +235,7 @@ export async function approveResearchCandidate(
   id: string,
   scope?: BrainTenantScope,
 ): Promise<{ candidate: BrainResearchCandidate; ingest: BrainIngestResult }> {
-  const candidate = getResearchCandidate(id);
+  const candidate = await getResearchCandidate(prisma, id, scope ?? {});
   if (!candidate) {
     throw new Error(`Research candidate not found: ${id}`);
   }
@@ -232,23 +244,29 @@ export async function approveResearchCandidate(
   }
 
   const ingest = await ingestWebResearch(prisma, candidate, scope);
-  const updated = updateResearchCandidate(id, {
+  const updated = await updateResearchCandidate(prisma, id, scope ?? {}, {
     status: 'approved',
     reviewedAt: new Date().toISOString(),
+    reviewedBy: scope?.userId,
     ingestResult: ingest,
   });
 
   return { candidate: updated, ingest };
 }
 
-export function rejectResearchCandidate(id: string): BrainResearchCandidate {
-  const candidate = getResearchCandidate(id);
+export async function rejectResearchCandidate(
+  prisma: PrismaClient,
+  id: string,
+  scope: BrainTenantScope,
+): Promise<BrainResearchCandidate> {
+  const candidate = await getResearchCandidate(prisma, id, scope);
   if (!candidate) {
     throw new Error(`Research candidate not found: ${id}`);
   }
 
-  return updateResearchCandidate(id, {
+  return updateResearchCandidate(prisma, id, scope, {
     status: 'rejected',
     reviewedAt: new Date().toISOString(),
+    reviewedBy: scope.userId,
   });
 }

@@ -43,11 +43,15 @@ import {
 import { useBrainPdfIngestProgress } from '../hooks/useBrainPdfIngestProgress';
 import { useT, type MessageKey } from '../i18n';
 import { formatError } from '../lib/api-error';
+import { useAuth } from '../auth/AuthProvider';
+import { hasPermission } from '../auth/permissions';
 
 type Tab = 'overview' | 'principles' | 'learn' | 'research';
 
 export function DesignBrainPage() {
   const t = useT();
+  const { activeMembership } = useAuth();
+  const canManageBrain = hasPermission(activeMembership?.role, 'brain.manage');
   const [tab, setTab] = useState<Tab>('overview');
   const [principlesPage, setPrinciplesPage] = useState(1);
   const [principlesCategory, setPrinciplesCategory] = useState('');
@@ -57,6 +61,7 @@ export function DesignBrainPage() {
   const { data: health, isLoading: healthLoading } = useQuery({
     queryKey: ['brain-health'],
     queryFn: ({ signal }) => getBrainHealth(signal),
+    enabled: canManageBrain,
   });
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['brain-stats'],
@@ -65,14 +70,14 @@ export function DesignBrainPage() {
   const { data: taste, isLoading: tasteLoading } = useQuery({
     queryKey: ['brain-taste'],
     queryFn: ({ signal }) => getBrainTasteProfile(signal),
-    enabled: tab === 'overview' && Boolean(health),
+    enabled: tab === 'overview',
     staleTime: 60_000,
     retry: 1,
   });
   const { data: principlesData, isLoading: principlesLoading } = useQuery({
     queryKey: ['brain-principles'],
     queryFn: ({ signal }) => listBrainPrinciples(BRAIN_TOP_PRINCIPLES_LIMIT, 0, undefined, signal),
-    enabled: tab === 'overview' && Boolean(health),
+    enabled: tab === 'overview',
   });
   const principles = principlesData?.items;
   const { data: principlesPageData, isLoading: allPrinciplesLoading } = useQuery({
@@ -92,7 +97,7 @@ export function DesignBrainPage() {
   const { data: principleCategories = [] } = useQuery({
     queryKey: ['brain-principle-categories'],
     queryFn: ({ signal }) => listBrainPrincipleCategories(signal),
-    enabled: (tab === 'overview' || tab === 'principles') && Boolean(health),
+    enabled: tab === 'overview' || tab === 'principles',
   });
 
   const allPrinciples = principlesPageData?.items;
@@ -110,11 +115,15 @@ export function DesignBrainPage() {
   const { data: pendingResearch, isLoading: pendingResearchLoading } = useQuery({
     queryKey: ['brain-research-pending'],
     queryFn: ({ signal }) => listBrainResearchCandidates('pending', signal),
-    enabled: tab === 'research',
+    enabled: canManageBrain && tab === 'research',
   });
 
   const isLoading =
-    healthLoading || statsLoading || tasteLoading || principlesLoading || pendingResearchLoading;
+    (canManageBrain && healthLoading) ||
+    statsLoading ||
+    tasteLoading ||
+    principlesLoading ||
+    (canManageBrain && pendingResearchLoading);
 
   const [researchQuery, setResearchQuery] = useState('');
   const [manualUrl, setManualUrl] = useState('');
@@ -172,7 +181,11 @@ export function DesignBrainPage() {
   const activePdfJob = useActiveBrainIngestJob();
   const isPdfIngesting = useIsBrainIngesting();
   const resumeRatio = useActivePdfResumeRatio();
-  const liveProgress = useBrainPdfIngestProgress(activePdfJob?.id, isPdfIngesting, resumeRatio);
+  const liveProgress = useBrainPdfIngestProgress(
+    activePdfJob?.id,
+    canManageBrain && isPdfIngesting,
+    resumeRatio,
+  );
 
   const latestPdfJob = ingestJobs[0];
   const latestFinishedAt = ingestJobs.find(
@@ -231,9 +244,19 @@ export function DesignBrainPage() {
   const tabs: Array<{ id: Tab; labelKey: MessageKey; icon: typeof Brain }> = [
     { id: 'overview', labelKey: 'brain.tab.analytics', icon: Database },
     { id: 'principles', labelKey: 'brain.tab.principles', icon: BookOpen },
-    { id: 'learn', labelKey: 'brain.tab.upload', icon: Upload },
-    { id: 'research', labelKey: 'brain.tab.research', icon: Globe },
+    ...(canManageBrain
+      ? [
+          { id: 'learn' as const, labelKey: 'brain.tab.upload' as MessageKey, icon: Upload },
+          { id: 'research' as const, labelKey: 'brain.tab.research' as MessageKey, icon: Globe },
+        ]
+      : []),
   ];
+
+  useEffect(() => {
+    if (!canManageBrain && (tab === 'learn' || tab === 'research')) {
+      setTab('overview');
+    }
+  }, [canManageBrain, tab]);
 
   return (
     <PageContainer>
@@ -241,7 +264,7 @@ export function DesignBrainPage() {
         page="brain"
         subtitle={t('brain.subtitle')}
       >
-        {!isLoading && (
+        {canManageBrain && !isLoading && (
           <div className="flex flex-wrap gap-2 mt-3 text-xs">
             <StatusPill ok={health?.databaseConfigured} label={t('brain.status.postgresql')} />
             <StatusPill ok={health?.embeddingConfigured} label={t('brain.status.embeddings')} />

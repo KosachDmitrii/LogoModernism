@@ -16,12 +16,14 @@
     "db:invariants:snapshot": "tsx scripts/migration-invariants.ts snapshot",
     "db:invariants:verify": "tsx scripts/migration-invariants.ts verify",
     "db:tenant:backfill": "tsx scripts/backfill-legacy-tenant.ts",
+    "db:provision-owner": "tsx scripts/provision-owner.ts",
     "db:logos:migrate-storage": "tsx scripts/migrate-inline-logos.ts",
     "db:studio": "tsx scripts/prisma-cli.ts studio",
     "db:supabase-check": "tsx scripts/supabase-check.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.3.0",
+    "@supabase/supabase-js": "^2.110.5",
     "dotenv": "^16.4.7",
     "prisma": "^6.3.0"
   },

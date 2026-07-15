@@ -5,6 +5,7 @@ export const en = {
   'common.closeDialog': 'Close dialog',
   'common.loading': 'Loading…',
   'common.optional': 'optional',
+  'common.readOnlyRole': 'Your Viewer role has read-only access. Ask an administrator to enable product actions.',
   'common.copy': 'Copy',
   'common.copyPrompt': 'Copy prompt',
   'common.savePrompt': 'Save prompt',
@@ -46,11 +47,43 @@ export const en = {
   'nav.catalog': 'Logo Catalog',
   'nav.saved': 'Saved',
   'nav.brain': 'Brain',
+  'nav.settings': 'Settings',
 
   // layout
   'layout.appTitle': 'Logo Design Platform',
   'layout.adminLabel': 'Admin',
   'layout.version': 'v1.0',
+
+  // settings
+  'settings.subtitle': 'Language, appearance, and application preferences.',
+  'settings.languageTitle': 'Language',
+  'settings.languageDescription': 'Choose the language used throughout the interface.',
+  'settings.themeTitle': 'Appearance',
+  'settings.themeDescription': 'Choose a light or dark interface theme.',
+
+  // auth
+  'auth.title': 'Sign in',
+  'auth.subtitle': 'Use your Logo Modernism administrator account.',
+  'auth.email': 'Email',
+  'auth.password': 'Password',
+  'auth.signIn': 'Sign in',
+  'auth.signingIn': 'Signing in…',
+  'auth.signOut': 'Sign out',
+  'auth.loading': 'Loading account…',
+  'auth.loginFailed': 'Unable to sign in',
+  'auth.noAccount': 'New to Logo Modernism?',
+  'auth.hasAccount': 'Already have an account?',
+  'auth.createAccount': 'Create account',
+  'auth.creatingAccount': 'Creating account…',
+  'auth.registerTitle': 'Create your workspace',
+  'auth.registerSubtitle': 'Set up an owner account and a private organization.',
+  'auth.name': 'Your name',
+  'auth.organization': 'Organization',
+  'auth.confirmPassword': 'Confirm password',
+  'auth.passwordMismatch': 'Passwords do not match',
+  'auth.registrationFailed': 'Unable to create account',
+  'auth.checkEmail': 'Check your email to confirm the account, then sign in.',
+  'auth.backToLogin': 'Back to sign in',
 
   // home
   'home.subtitle': 'Use the sidebar to open admin tools.',

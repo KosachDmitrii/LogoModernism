@@ -1,90 +1,135 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type {
   BrainResearchCandidate,
   BrainResearchCandidateStatus,
+  BrainTenantScope,
 } from '@logo-platform/shared';
-import { getBrainResearchDir } from '../storage/paths';
+import type { Prisma, PrismaClient } from '@logo-platform/database';
 
-const STORE_FILE = 'candidates.json';
-
-function storePath(): string {
-  return join(getBrainResearchDir(), STORE_FILE);
-}
-
-function ensureStore(): BrainResearchCandidate[] {
-  mkdirSync(getBrainResearchDir(), { recursive: true });
-  const path = storePath();
-  try {
-    const raw = readFileSync(path, 'utf-8');
-    const parsed = JSON.parse(raw) as BrainResearchCandidate[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+function tenantWhere(scope?: BrainTenantScope): { organizationId: string; projectId?: string } {
+  if (!scope?.organizationId) {
+    throw new Error('Organization scope is required for research candidates');
   }
+  return {
+    organizationId: scope.organizationId,
+    ...(scope.projectId ? { projectId: scope.projectId } : {}),
+  };
 }
 
-function writeStore(candidates: BrainResearchCandidate[]): void {
-  mkdirSync(getBrainResearchDir(), { recursive: true });
-  writeFileSync(storePath(), JSON.stringify(candidates, null, 2), 'utf-8');
+type CandidateRow = Awaited<ReturnType<PrismaClient['brainResearchCandidate']['findFirst']>>;
+
+function toCandidate(row: NonNullable<CandidateRow>): BrainResearchCandidate {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    projectId: row.projectId ?? undefined,
+    createdBy: row.createdBy ?? undefined,
+    reviewedBy: row.reviewedBy ?? undefined,
+    query: row.query,
+    status: row.status as BrainResearchCandidateStatus,
+    sourceUrl: row.sourceUrl,
+    sourceTitle: row.sourceTitle,
+    snippet: row.snippet,
+    summary: row.summary,
+    extractedText: row.extractedText,
+    principles: row.principles as unknown as BrainResearchCandidate['principles'],
+    sourceScore: row.sourceScore ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+    reviewedAt: row.reviewedAt?.toISOString(),
+    ingestResult: row.ingestResult as unknown as BrainResearchCandidate['ingestResult'],
+  };
 }
 
-export function listResearchCandidates(
+export async function listResearchCandidates(
+  prisma: PrismaClient,
+  scope: BrainTenantScope,
   status?: BrainResearchCandidateStatus,
-): BrainResearchCandidate[] {
-  const rows = ensureStore();
-  return status ? rows.filter((row) => row.status === status) : rows;
+): Promise<BrainResearchCandidate[]> {
+  const rows = await prisma.brainResearchCandidate.findMany({
+    where: { ...tenantWhere(scope), ...(status ? { status } : {}) },
+    orderBy: { createdAt: 'desc' },
+  });
+  return rows.map(toCandidate);
 }
 
-export function getResearchCandidate(id: string): BrainResearchCandidate | null {
-  return ensureStore().find((row) => row.id === id) ?? null;
+export async function getResearchCandidate(
+  prisma: PrismaClient,
+  id: string,
+  scope: BrainTenantScope,
+): Promise<BrainResearchCandidate | null> {
+  const row = await prisma.brainResearchCandidate.findFirst({
+    where: { id, ...tenantWhere(scope) },
+  });
+  return row ? toCandidate(row) : null;
 }
 
-export function findCandidateByUrl(url: string): BrainResearchCandidate | null {
-  const normalized = url.trim().toLowerCase();
-  return (
-    ensureStore().find((row) => row.sourceUrl.trim().toLowerCase() === normalized) ?? null
-  );
+export async function findCandidateByUrl(
+  prisma: PrismaClient,
+  url: string,
+  scope: BrainTenantScope,
+): Promise<BrainResearchCandidate | null> {
+  const row = await prisma.brainResearchCandidate.findFirst({
+    where: {
+      ...tenantWhere(scope),
+      sourceUrl: { equals: url.trim(), mode: 'insensitive' },
+    },
+  });
+  return row ? toCandidate(row) : null;
 }
 
-export function saveResearchCandidate(
-  input: Omit<BrainResearchCandidate, 'id' | 'createdAt' | 'status'> & {
+export async function saveResearchCandidate(
+  prisma: PrismaClient,
+  scope: BrainTenantScope,
+  input: Omit<
+    BrainResearchCandidate,
+    'id' | 'createdAt' | 'status' | 'organizationId' | 'projectId' | 'createdBy' | 'reviewedBy'
+  > & {
     id?: string;
     status?: BrainResearchCandidateStatus;
   },
-): BrainResearchCandidate {
-  const candidates = ensureStore();
-  const candidate: BrainResearchCandidate = {
-    id: input.id ?? randomUUID(),
-    status: input.status ?? 'pending',
-    createdAt: new Date().toISOString(),
-    ...input,
-  };
-
-  const index = candidates.findIndex((row) => row.id === candidate.id);
-  if (index >= 0) {
-    candidates[index] = candidate;
-  } else {
-    candidates.unshift(candidate);
-  }
-
-  writeStore(candidates);
-  return candidate;
+): Promise<BrainResearchCandidate> {
+  const tenant = tenantWhere(scope);
+  const row = await prisma.brainResearchCandidate.create({
+    data: {
+      id: input.id ?? randomUUID(),
+      ...tenant,
+      createdBy: scope.userId,
+      query: input.query,
+      status: input.status ?? 'pending',
+      sourceUrl: input.sourceUrl,
+      sourceTitle: input.sourceTitle,
+      snippet: input.snippet,
+      summary: input.summary,
+      extractedText: input.extractedText,
+      principles: input.principles as unknown as Prisma.InputJsonValue,
+      sourceScore: input.sourceScore,
+    },
+  });
+  return toCandidate(row);
 }
 
-export function updateResearchCandidate(
+export async function updateResearchCandidate(
+  prisma: PrismaClient,
   id: string,
+  scope: BrainTenantScope,
   patch: Partial<BrainResearchCandidate>,
-): BrainResearchCandidate {
-  const candidates = ensureStore();
-  const index = candidates.findIndex((row) => row.id === id);
-  if (index < 0) {
+): Promise<BrainResearchCandidate> {
+  const existing = await prisma.brainResearchCandidate.findFirst({
+    where: { id, ...tenantWhere(scope) },
+  });
+  if (!existing) {
     throw new Error(`Research candidate not found: ${id}`);
   }
-
-  const updated = { ...candidates[index]!, ...patch };
-  candidates[index] = updated;
-  writeStore(candidates);
-  return updated;
+  const updated = await prisma.brainResearchCandidate.update({
+    where: { id },
+    data: {
+      ...(patch.status ? { status: patch.status } : {}),
+      ...(patch.reviewedAt ? { reviewedAt: new Date(patch.reviewedAt) } : {}),
+      ...(patch.reviewedBy ? { reviewedBy: patch.reviewedBy } : {}),
+      ...(patch.ingestResult
+        ? { ingestResult: patch.ingestResult as unknown as Prisma.InputJsonValue }
+        : {}),
+    },
+  });
+  return toCandidate(updated);
 }
