@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -107,40 +108,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const sessionWorkRef = useRef<{ token: string; promise: Promise<void> } | null>(null);
 
   const establishSession = useCallback(async (nextSession: Session | null) => {
     setSession(nextSession);
     setError(null);
     if (!nextSession) {
+      sessionWorkRef.current = null;
       setProfile(null);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
-    try {
-      const pendingRegistration = readPendingRegistration();
-      if (pendingRegistration) {
-        await registerProfile(nextSession, pendingRegistration);
-        localStorage.removeItem(PENDING_REGISTRATION_KEY);
-      }
-      const nextProfile = await fetchProfile(nextSession);
-      if (!nextProfile.memberships.length) {
-        throw new Error('This account does not belong to an organization');
-      }
-      const storedOrganizationId = localStorage.getItem(ORGANIZATION_KEY);
-      const active =
-        nextProfile.memberships.find(
-          ({ organization }) => organization.id === storedOrganizationId,
-        ) ?? nextProfile.memberships[0];
-      localStorage.setItem(ORGANIZATION_KEY, active.organization.id);
-      setProfile(nextProfile);
-    } catch (nextError) {
-      setProfile(null);
-      setError(errorMessage(nextError));
-    } finally {
-      setLoading(false);
+    const existingWork = sessionWorkRef.current;
+    if (existingWork?.token === nextSession.access_token) {
+      return existingWork.promise;
     }
+
+    const promise = (async () => {
+      setLoading(true);
+      try {
+        const pendingRegistration = readPendingRegistration();
+        if (pendingRegistration) {
+          await registerProfile(nextSession, pendingRegistration);
+          localStorage.removeItem(PENDING_REGISTRATION_KEY);
+        }
+        const nextProfile = await fetchProfile(nextSession);
+        if (!nextProfile.memberships.length) {
+          throw new Error('This account does not belong to an organization');
+        }
+        const storedOrganizationId = localStorage.getItem(ORGANIZATION_KEY);
+        const active =
+          nextProfile.memberships.find(
+            ({ organization }) => organization.id === storedOrganizationId,
+          ) ?? nextProfile.memberships[0];
+        localStorage.setItem(ORGANIZATION_KEY, active.organization.id);
+        setProfile(nextProfile);
+      } catch (nextError) {
+        setProfile(null);
+        setError(errorMessage(nextError));
+      } finally {
+        setLoading(false);
+      }
+    })();
+
+    sessionWorkRef.current = { token: nextSession.access_token, promise };
+    return promise;
   }, []);
 
   useEffect(() => {
