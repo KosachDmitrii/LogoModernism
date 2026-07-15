@@ -14,6 +14,7 @@ dist/
 # Runtime artifacts
 backend/generated/
 .tmp-screenshot/
+packages/database/artifacts/
 
 # Pipeline / brain data (large or local)
 data/catalog-pipeline/pages/

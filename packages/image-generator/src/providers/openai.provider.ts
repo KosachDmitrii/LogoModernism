@@ -1,4 +1,11 @@
-import type { GeneratedImage, ImageGenerationRequest, ImageGenerationResult, ImageSize } from '@logo-platform/shared';
+import { randomUUID } from 'node:crypto';
+import {
+  fetchWithDeadline,
+  type GeneratedImage,
+  type ImageGenerationRequest,
+  type ImageGenerationResult,
+  type ImageSize,
+} from '@logo-platform/shared';
 import { enhanceLogoPrompt } from '../prompt-enhancer';
 
 interface OpenAIImageResponse {
@@ -115,17 +122,19 @@ async function postOpenAIImageRequest(
   body: Record<string, unknown>,
 ): Promise<Response> {
   let lastError: Error | undefined;
+  const idempotencyKey = randomUUID();
 
   for (let attempt = 1; attempt <= OPENAI_IMAGE_MAX_ATTEMPTS; attempt++) {
     try {
-      const response = await fetch('https://api.openai.com/v1/images/generations', {
+      const response = await fetchWithDeadline('https://api.openai.com/v1/images/generations', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
         },
         body: JSON.stringify(body),
-      });
+      }, { timeoutMs: 120_000 });
 
       if (!OPENAI_IMAGE_RETRY_STATUSES.has(response.status) || attempt === OPENAI_IMAGE_MAX_ATTEMPTS) {
         return response;

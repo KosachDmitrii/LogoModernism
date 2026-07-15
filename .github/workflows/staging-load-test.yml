@@ -1,0 +1,27 @@
+name: Staging load test
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Staging API base URL ending in /api
+        required: true
+        type: string
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: Run 50 to 1000 VU capacity test
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          AUTH_TOKEN: ${{ secrets.LOAD_TEST_AUTH_TOKEN }}
+          USER_ID: ${{ secrets.LOAD_TEST_USER_ID }}
+          ORGANIZATION_ID: ${{ secrets.LOAD_TEST_ORGANIZATION_ID }}
+          PROJECT_ID: ${{ secrets.LOAD_TEST_PROJECT_ID }}
+          PROMPT_ID: ${{ secrets.LOAD_TEST_PROMPT_ID }}
+        run: k6 run tests/load/scalable-api.k6.js

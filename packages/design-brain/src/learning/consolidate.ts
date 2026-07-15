@@ -1,4 +1,4 @@
-import type { BrainConsolidateResult } from '@logo-platform/shared';
+import type { BrainConsolidateResult, BrainTenantScope } from '@logo-platform/shared';
 import type { PrismaClient } from '@logo-platform/database';
 import { embedText } from '../embedding/embedding.service';
 import { searchExperienceEmbeddings } from '../storage/pgvector';
@@ -7,13 +7,20 @@ function normalizeFragment(fragment: string): string {
   return fragment.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-export async function consolidateBrain(prisma: PrismaClient): Promise<BrainConsolidateResult> {
+export async function consolidateBrain(
+  prisma: PrismaClient,
+  scope?: BrainTenantScope,
+): Promise<BrainConsolidateResult> {
   let mergedPrinciples = 0;
   let prunedPrinciples = 0;
   let deduplicatedExperiences = 0;
   let updatedWeights = 0;
 
   const principles = await prisma.learnedPrinciple.findMany({
+    where: {
+      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+    },
     orderBy: [{ weight: 'desc' }, { confidence: 'desc' }],
   });
 
@@ -50,6 +57,8 @@ export async function consolidateBrain(prisma: PrismaClient): Promise<BrainConso
   const weak = await prisma.learnedPrinciple.findMany({
     where: {
       AND: [{ weight: { lt: 0.35 } }, { confidence: { lt: 0.25 } }],
+      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
     },
   });
 
@@ -60,6 +69,10 @@ export async function consolidateBrain(prisma: PrismaClient): Promise<BrainConso
   }
 
   const tasteSignals = await prisma.brainTasteSignal.findMany({
+    where: {
+      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+    },
     orderBy: { createdAt: 'desc' },
     take: 200,
   });
@@ -79,7 +92,11 @@ export async function consolidateBrain(prisma: PrismaClient): Promise<BrainConso
 
     for (const principleId of principleIds) {
       const principle = await prisma.learnedPrinciple.findFirst({
-        where: { OR: [{ id: principleId }, { promptFragment: principleId }] },
+        where: {
+          OR: [{ id: principleId }, { promptFragment: principleId }],
+          ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+          ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+        },
       });
       if (!principle) continue;
 
@@ -95,6 +112,10 @@ export async function consolidateBrain(prisma: PrismaClient): Promise<BrainConso
   }
 
   const experiences = await prisma.brainExperience.findMany({
+    where: {
+      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+    },
     orderBy: { createdAt: 'desc' },
     take: 100,
   });
@@ -102,7 +123,14 @@ export async function consolidateBrain(prisma: PrismaClient): Promise<BrainConso
   for (const experience of experiences) {
     try {
       const embedding = await embedText(`${experience.title ?? ''}\n${experience.summary ?? ''}\n${experience.content.slice(0, 400)}`);
-      const matches = await searchExperienceEmbeddings(prisma, embedding, 3);
+      const matches = await searchExperienceEmbeddings(
+        prisma,
+        embedding,
+        3,
+        undefined,
+        scope?.organizationId,
+        scope?.projectId,
+      );
       const duplicate = matches.find(
         (match) => match.experience_id !== experience.id && match.similarity > 0.97,
       );

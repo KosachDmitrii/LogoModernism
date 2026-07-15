@@ -1,3 +1,24 @@
+const DEFAULT_PRODUCTION_CONNECTION_LIMIT = '2';
+const DEFAULT_DEVELOPMENT_CONNECTION_LIMIT = '10';
+const DEFAULT_POOL_TIMEOUT_SECONDS = '5';
+
+export function isSupabasePoolerUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.includes('pooler.supabase.com');
+  } catch {
+    return false;
+  }
+}
+
+export function isSupabaseTransactionPoolerUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.includes('pooler.supabase.com') && parsed.port === '6543';
+  } catch {
+    return false;
+  }
+}
+
 export function enhanceDatabaseUrl(url: string): string {
   if (!url) return url;
 
@@ -12,7 +33,21 @@ export function enhanceDatabaseUrl(url: string): string {
       params.set('connect_timeout', '30');
     }
     if (!params.has('pool_timeout')) {
-      params.set('pool_timeout', '30');
+      params.set('pool_timeout', DEFAULT_POOL_TIMEOUT_SECONDS);
+    }
+    if (!params.has('connection_limit')) {
+      params.set(
+        'connection_limit',
+        process.env.NODE_ENV === 'production'
+          ? DEFAULT_PRODUCTION_CONNECTION_LIMIT
+          : DEFAULT_DEVELOPMENT_CONNECTION_LIMIT,
+      );
+    }
+    if (!params.has('application_name')) {
+      params.set(
+        'application_name',
+        process.env.DATABASE_APPLICATION_NAME ?? 'logo-platform-api',
+      );
     }
     const usesTransactionPooler =
       parsed.hostname.includes('pooler.supabase.com') && parsed.port === '6543';
@@ -24,6 +59,18 @@ export function enhanceDatabaseUrl(url: string): string {
     return parsed.toString();
   } catch {
     return url;
+  }
+}
+
+export function assertProductionRuntimeDatabaseUrl(url: string): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  if (process.env.ALLOW_SESSION_POOLER === 'true') return;
+
+  if (isSupabasePoolerUrl(url) && !isSupabaseTransactionPoolerUrl(url)) {
+    throw new Error(
+      'Production DATABASE_POOLER_URL must use Supavisor transaction mode on port 6543. ' +
+        'Reserve the 5432 DIRECT_URL for migrations.',
+    );
   }
 }
 
@@ -41,7 +88,9 @@ export function isValidDatabaseUrl(url: string): boolean {
 export function resolveDatabaseUrl(): void {
   const poolerUrl = process.env.DATABASE_POOLER_URL?.trim();
   if (poolerUrl && isValidDatabaseUrl(poolerUrl)) {
-    process.env.DATABASE_URL = enhanceDatabaseUrl(poolerUrl);
+    const runtimeUrl = enhanceDatabaseUrl(poolerUrl);
+    assertProductionRuntimeDatabaseUrl(runtimeUrl);
+    process.env.DATABASE_URL = runtimeUrl;
     return;
   }
   if (poolerUrl) {
@@ -52,7 +101,9 @@ export function resolveDatabaseUrl(): void {
   }
 
   if (process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = enhanceDatabaseUrl(process.env.DATABASE_URL);
+    const runtimeUrl = enhanceDatabaseUrl(process.env.DATABASE_URL);
+    assertProductionRuntimeDatabaseUrl(runtimeUrl);
+    process.env.DATABASE_URL = runtimeUrl;
     return;
   }
 
@@ -61,6 +112,11 @@ export function resolveDatabaseUrl(): void {
   if (!ref || !password) return;
 
   const encoded = encodeURIComponent(password);
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'DATABASE_POOLER_URL is required in production. Do not use a direct Supabase URL for runtime traffic.',
+    );
+  }
   process.env.DATABASE_URL = enhanceDatabaseUrl(
     `postgresql://postgres:${encoded}@db.${ref}.supabase.co:5432/postgres?sslmode=require`,
   );

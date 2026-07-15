@@ -60,12 +60,24 @@ export function useBrainPdfIngestProgress(
     );
 
     let cancelled = false;
+    let timer: number | undefined;
+    let controller: AbortController | undefined;
+    let delayMs = 1_000;
+
+    const scheduleNext = () => {
+      if (cancelled) return;
+      timer = window.setTimeout(() => void poll(), delayMs);
+      delayMs = Math.min(3_000, delayMs + 500);
+    };
+
     const poll = async () => {
+      controller = new AbortController();
       try {
-        const server = await getBrainPdfIngestProgress(jobId);
+        const server = await getBrainPdfIngestProgress(jobId, controller.signal);
         if (cancelled) return;
 
         missCountRef.current = 0;
+        delayMs = 1_000;
         applyServerJobState(jobId, server);
 
         const next = toUiPercent(server, resumeRatio);
@@ -80,21 +92,27 @@ export function useBrainPdfIngestProgress(
           phase,
           status: server.status,
         });
-      } catch {
+        if (server.status === 'done' || server.status === 'skipped' || server.status === 'error') {
+          return;
+        }
+      } catch (error) {
         if (cancelled) return;
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         missCountRef.current += 1;
         if (missCountRef.current >= 45) {
           markIngestJobLost(jobId);
+          return;
         }
       }
+      scheduleNext();
     };
 
     void poll();
-    const timer = setInterval(poll, 400);
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      if (timer !== undefined) window.clearTimeout(timer);
+      controller?.abort();
     };
   }, [jobId, enabled, resumeRatio, applyServerJobState, markIngestJobLost]);
 

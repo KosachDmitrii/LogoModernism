@@ -66,13 +66,13 @@ describeE2e('Brain API (e2e)', () => {
         context: 'Excellent geometric wordmark with grid-based flat vector construction',
         metadata: { workedTags: ['geometry', 'typography'] },
       })
-      .expect(201);
+      .expect(202);
 
     const statsAfterFeedback = await request(app.getHttpServer()).get('/api/brain/stats').expect(200);
     expect(statsAfterFeedback.body.tasteSignals).toBeGreaterThanOrEqual(1);
     expect(statsAfterFeedback.body.experiences).toBeGreaterThanOrEqual(1);
 
-    const consolidate = await request(app.getHttpServer()).post('/api/brain/consolidate').expect(201);
+    const consolidate = await request(app.getHttpServer()).post('/api/brain/consolidate').expect(202);
     expect(consolidate.body.ranAt).toBeTruthy();
 
     const taste = await request(app.getHttpServer()).get('/api/brain/taste-profile').expect(200);
@@ -114,7 +114,7 @@ describeE2e('Brain API (e2e)', () => {
         score: 8,
         context: 'Clean lettermark with Swiss grid construction',
       })
-      .expect(201);
+      .expect(202);
 
     const res = await request(app.getHttpServer()).get('/api/brain/experiences?limit=5').expect(200);
     expect(Array.isArray(res.body)).toBe(true);

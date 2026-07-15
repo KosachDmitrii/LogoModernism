@@ -4,6 +4,7 @@ import type {
   BrainResearchHit,
   BrainResearchPrinciplePreview,
   BrainResearchRunResult,
+  BrainTenantScope,
 } from '@logo-platform/shared';
 import type { PrismaClient } from '@logo-platform/database';
 import { extractPrinciplesFromText, summarizeText } from '../ingest/principle-extractor';
@@ -220,6 +221,7 @@ export function getCandidate(id: string) {
 export async function approveResearchCandidate(
   prisma: PrismaClient,
   id: string,
+  scope?: BrainTenantScope,
 ): Promise<{ candidate: BrainResearchCandidate; ingest: BrainIngestResult }> {
   const candidate = getResearchCandidate(id);
   if (!candidate) {
@@ -229,7 +231,7 @@ export async function approveResearchCandidate(
     throw new Error('Candidate is already approved');
   }
 
-  const ingest = await ingestWebResearch(prisma, candidate);
+  const ingest = await ingestWebResearch(prisma, candidate, scope);
   const updated = updateResearchCandidate(id, {
     status: 'approved',
     reviewedAt: new Date().toISOString(),

@@ -1,4 +1,5 @@
 import type { BrainResearchHit } from '@logo-platform/shared';
+import { fetchWithDeadline } from '@logo-platform/shared';
 
 function archiveDetailsUrl(identifier: string): string {
   return `https://archive.org/details/${identifier}`;
@@ -24,7 +25,7 @@ export async function searchInternetArchive(
   url.searchParams.set('rows', String(Math.min(maxResults, 8)));
   url.searchParams.set('output', 'json');
 
-  const response = await fetch(url);
+  const response = await fetchWithDeadline(url, {}, { timeoutMs: 10_000 });
   if (!response.ok) return [];
 
   const data = (await response.json()) as {

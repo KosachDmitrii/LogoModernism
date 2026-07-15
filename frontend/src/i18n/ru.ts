@@ -528,6 +528,7 @@ export const ru: Record<MessageKey, string> = {
   'saved.companyLabel': 'Компания:',
   'saved.industryLabel': 'Индустрия:',
   'saved.savedLabel': 'Сохранено:',
+  'saved.loadMore': 'Загрузить ещё',
 
   // brain
   'brain.subtitle':

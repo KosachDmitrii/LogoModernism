@@ -8,10 +8,9 @@
 #           FRONTEND_URL=https://<frontend-host>  (on backend service)
 #           CORS_ORIGINS=https://<frontend-host>,http://localhost:5173
 #
-# Persistent data (Railway dashboard → backend service → Volumes):
-#   Mount path: /app/persistent
-#   Stores: PDF uploads, generated logos, research candidates
-#   Catalog (data/catalog-pipeline) stays in the repo image — do NOT mount over /app/data
+# API env: DATABASE_POOLER_URL=:6543, DIRECT_URL=:5432, REDIS_URL,
+# AUTH_JWKS_URL, OBJECT_STORAGE_*, OTEL_EXPORTER_OTLP_ENDPOINT.
+# Configure a second service with railway.worker.toml for BullMQ workers.
 
 [build]
 builder = "nixpacks"
@@ -19,8 +18,9 @@ builder = "nixpacks"
 buildCommand = "npm run build:packages && npm run build -w @logo-platform/backend"
 
 [deploy]
+preDeployCommand = "npm run db:migrate:deploy"
 startCommand = "npm run start -w @logo-platform/backend"
-healthcheckPath = "/api/health"
-healthcheckTimeout = 300
+healthcheckPath = "/api/health/ready"
+healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10

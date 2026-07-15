@@ -4,6 +4,7 @@ import type {
   LearnedPrincipleRecord,
   LearnedPrinciplesSort,
   PrincipleCitation,
+  BrainTenantScope,
 } from '@logo-platform/shared';
 import type { BrainExperience, LearnedPrinciple, Prisma, PrismaClient } from '@logo-platform/database';
 import { sanitizePostgresJson, sanitizePostgresText } from './sanitize-text';
@@ -82,6 +83,8 @@ export async function createExperience(
     summary?: string;
     metadata?: Record<string, unknown>;
     filePath?: string;
+    organizationId?: string;
+    projectId?: string;
   },
 ): Promise<BrainExperience> {
   return prisma.brainExperience.create({
@@ -92,16 +95,22 @@ export async function createExperience(
       summary: sanitizePostgresText(input.summary),
       metadata: sanitizePostgresJson(input.metadata ?? {}) as Prisma.InputJsonValue,
       filePath: sanitizePostgresText(input.filePath),
+      organizationId: input.organizationId,
+      projectId: input.projectId,
     },
   });
 }
 
 export async function listExperiences(
   prisma: PrismaClient,
-  options?: { sourceType?: BrainSourceType; limit?: number },
+  options?: { sourceType?: BrainSourceType; limit?: number } & BrainTenantScope,
 ): Promise<BrainExperienceRecord[]> {
   const rows = await prisma.brainExperience.findMany({
-    where: options?.sourceType ? { sourceType: options.sourceType } : undefined,
+    where: {
+      ...(options?.sourceType ? { sourceType: options.sourceType } : {}),
+      ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
+      ...(options?.projectId ? { projectId: options.projectId } : {}),
+    },
     orderBy: { createdAt: 'desc' },
     take: options?.limit ?? 100,
   });
@@ -112,8 +121,15 @@ export async function listExperiences(
 export async function getExperienceById(
   prisma: PrismaClient,
   id: string,
+  scope?: BrainTenantScope,
 ): Promise<BrainExperienceRecord | null> {
-  const row = await prisma.brainExperience.findUnique({ where: { id } });
+  const row = await prisma.brainExperience.findUnique({
+    where: {
+      id,
+      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+    },
+  });
   return row ? toExperienceRecord(row) : null;
 }
 
@@ -128,11 +144,17 @@ export async function upsertLearnedPrinciple(
     antiPatterns?: string[];
     tags?: string[];
     citation?: PrincipleCitation;
+    organizationId?: string;
+    projectId?: string;
   },
 ): Promise<LearnedPrinciple> {
   const promptFragment = sanitizePostgresText(input.promptFragment) ?? '';
   const existing = await prisma.learnedPrinciple.findFirst({
-    where: { promptFragment },
+    where: {
+      promptFragment,
+      ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+    },
   });
 
   if (existing) {
@@ -165,6 +187,8 @@ export async function upsertLearnedPrinciple(
       antiPatterns: (input.antiPatterns ?? []).map((p) => sanitizePostgresText(p) ?? ''),
       tags: (input.tags ?? []).map((t) => sanitizePostgresText(t) ?? ''),
       citations: sanitizePostgresJson(input.citation ? [input.citation] : []) as Prisma.InputJsonValue,
+      organizationId: input.organizationId,
+      projectId: input.projectId,
     },
   });
 }
@@ -173,9 +197,13 @@ export async function listLearnedPrinciples(
   prisma: PrismaClient,
   limit = 100,
   offset = 0,
-  options?: { category?: string; sort?: LearnedPrinciplesSort },
+  options?: { category?: string; sort?: LearnedPrinciplesSort } & BrainTenantScope,
 ): Promise<LearnedPrincipleRecord[]> {
-  const where = options?.category ? { category: options.category } : undefined;
+  const where = {
+    ...(options?.category ? { category: options.category } : {}),
+    ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
+    ...(options?.projectId ? { projectId: options.projectId } : {}),
+  };
   const orderBy = principlesOrderBy(options?.sort);
 
   const rows = await prisma.learnedPrinciple.findMany({
@@ -190,19 +218,29 @@ export async function listLearnedPrinciples(
 export async function countLearnedPrinciples(
   prisma: PrismaClient,
   category?: string,
+  scope?: BrainTenantScope,
 ): Promise<number> {
   return prisma.learnedPrinciple.count({
-    where: category ? { category } : undefined,
+    where: {
+      ...(category ? { category } : {}),
+      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+    },
   });
 }
 
 export async function listLearnedPrincipleCategories(
   prisma: PrismaClient,
+  scope?: BrainTenantScope,
 ): Promise<Array<{ category: string; count: number }>> {
   const rows = await prisma.learnedPrinciple.groupBy({
     by: ['category'],
     _count: { category: true },
     orderBy: { category: 'asc' },
+    where: {
+      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+    },
   });
   return rows.map((row) => ({
     category: row.category,

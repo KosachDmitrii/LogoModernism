@@ -40,6 +40,8 @@ export async function ingestFeedback(
       score: input.score,
       context: input.context,
       metadata: normalizedMetadata as Prisma.InputJsonValue,
+      organizationId: input.organizationId,
+      projectId: input.projectId,
     },
   });
 
@@ -55,6 +57,8 @@ export async function ingestFeedback(
       scoreDelta: scoreDelta(input.signalType, input.score),
       ...normalizedMetadata,
     },
+    organizationId: input.organizationId,
+    projectId: input.projectId,
   });
 
   const embedding = await embedText(`${input.signalType}: ${input.context}`);

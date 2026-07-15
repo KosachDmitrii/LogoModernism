@@ -17,7 +17,7 @@ export interface BrainExperienceRecord {
   similarity?: number;
 }
 
-export interface BrainSearchRequest {
+export interface BrainSearchRequest extends BrainTenantScope {
   query: string;
   limit?: number;
   sourceType?: BrainSourceType;
@@ -36,6 +36,13 @@ export interface BrainFeedbackInput {
   context: string;
   experienceId?: string;
   metadata?: Record<string, unknown>;
+  organizationId?: string;
+  projectId?: string;
+}
+
+export interface BrainTenantScope {
+  organizationId?: string;
+  projectId?: string;
 }
 
 export interface BrainPdfIngestCheck {
@@ -234,7 +241,7 @@ export interface CompileKnowledgeContext {
   projectAvoidCues: string[];
 }
 
-export interface BrainGenerateRequest {
+export interface BrainGenerateRequest extends BrainTenantScope {
   industry: string;
   companyName?: string;
   variationCount?: number;

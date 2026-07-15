@@ -1,6 +1,7 @@
 import type { BriefContext } from '@logo-platform/shared';
 import {
   analyzeClientVisualIntent,
+  fetchWithDeadline,
   mergeClientVisualIntent,
   type ClientVisualIntent,
 } from '@logo-platform/shared';
@@ -25,7 +26,7 @@ export async function analyzeClientIntent(
   const notes = input.briefContext.clientNotes.trim();
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetchWithDeadline('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -47,7 +48,7 @@ export async function analyzeClientIntent(
           },
         ],
       }),
-    });
+    }, { timeoutMs: 30_000 });
 
     if (!response.ok) return base;
 

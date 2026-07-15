@@ -38,7 +38,7 @@ describeIntegration('brain invariants (integration)', () => {
     await prisma.brainExperience.delete({ where: { id: experience.id } });
 
     const orphanRows = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
-      `SELECT COUNT(*)::bigint AS count FROM brain_experience_embeddings WHERE experience_id = $1`,
+      `SELECT COUNT(*)::bigint AS count FROM design_brain_experience_embeddings WHERE experience_id = $1`,
       experience.id,
     );
 

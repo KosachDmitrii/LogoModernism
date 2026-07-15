@@ -1,3 +1,5 @@
+import { fetchWithDeadline } from '@logo-platform/shared';
+
 const MAX_BRAINSTORM = 45;
 const MAX_SELECTED = 25;
 
@@ -125,7 +127,7 @@ async function callOpenAiJson(
   if (!apiKey) return [];
 
   const model = process.env.OPENAI_TEXT_MODEL ?? 'gpt-4o-mini';
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithDeadline('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -140,7 +142,7 @@ async function callOpenAiJson(
         { role: 'user', content: user },
       ],
     }),
-  });
+  }, { timeoutMs: 45_000 });
 
   if (!response.ok) return [];
 

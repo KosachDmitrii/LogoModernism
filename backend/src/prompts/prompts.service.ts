@@ -1,21 +1,29 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { PromptGenerationRequest } from '@logo-platform/shared';
-import { normalizeBrandName } from '@logo-platform/shared';
+import { JOB_PAYLOAD_VERSION, normalizeBrandName, QUEUE_NAMES } from '@logo-platform/shared';
 import { designBrain } from '@logo-platform/design-brain';
 import { evaluateRequestPromptCompliance } from '@logo-platform/design-brain';
 import { runPromptPipeline, critiqueDesign, evolvePrompt } from '@logo-platform/prompt-engine';
 import { ImagesService } from '../images/images.service';
 import { PromptRecordsService } from './prompt-records.service';
 import type { GeneratePromptLogoDto } from './dto/generate-prompt-logo.dto';
+import type { TenantScope } from '../auth/tenant-context';
+import { QueueService } from '../queue/queue.service';
+import type { BrainPipelineResult } from '@logo-platform/design-brain';
+import { slimPipelineResult } from './prompt-response';
+import { ObjectStorageService } from '../storage/object-storage.service';
 
 @Injectable()
 export class PromptsService {
   constructor(
     private readonly imagesService: ImagesService,
     private readonly promptRecords: PromptRecordsService,
+    private readonly queues: QueueService,
+    private readonly objectStorage: ObjectStorageService,
   ) {}
 
-  async generate(request: PromptGenerationRequest) {
+  async generate(request: PromptGenerationRequest, tenant?: TenantScope) {
     const caps = designBrain.getCapabilities();
     const preferBrain = request.useBrain !== false && caps.databaseConfigured;
 
@@ -38,6 +46,8 @@ export class PromptsService {
           briefContext: request.briefContext,
           useBrain: true,
           preferredTerritoryId: request.preferredTerritoryId,
+          organizationId: tenant?.organizationId,
+          projectId: tenant?.projectId,
         });
       } catch (error) {
         if (request.useBrain === true) throw error;
@@ -76,8 +86,8 @@ export class PromptsService {
     return { ...result, prompts, bestPrompt, constraintReport };
   }
 
-  async generateAndPersist(request: PromptGenerationRequest) {
-    const result = await this.generate(request);
+  async generateAndPersist(request: PromptGenerationRequest, tenant?: TenantScope) {
+    const result = await this.generate(request, tenant);
     if (!process.env.DATABASE_URL) {
       return {
         result,
@@ -85,44 +95,59 @@ export class PromptsService {
       };
     }
 
-    await this.promptRecords.saveBatch(request, result);
+    await this.promptRecords.saveBatch(request, result, tenant);
     const promptsWithLogos = await this.promptRecords.attachStoredState(result.prompts);
     return { result, promptsWithLogos };
   }
 
-  async togglePromptSave(promptId: string, saved: boolean) {
+  async generateResponse(request: PromptGenerationRequest, tenant?: TenantScope) {
+    const { result, promptsWithLogos } = await this.generateAndPersist(request, tenant);
+    const brainResult =
+      'brainPowered' in result && result.brainPowered
+        ? (result as BrainPipelineResult)
+        : null;
+    const slimmed = slimPipelineResult({
+      ...result,
+      prompts: promptsWithLogos,
+      bestPrompt: {
+        ...result.bestPrompt,
+        logos: promptsWithLogos.find((prompt) => prompt.id === result.bestPrompt.id)?.logos ?? [],
+        feedback: promptsWithLogos.find((prompt) => prompt.id === result.bestPrompt.id)?.feedback,
+        saved: promptsWithLogos.find((prompt) => prompt.id === result.bestPrompt.id)?.saved,
+      },
+    });
+    if (!brainResult) return slimmed;
+    return {
+      ...slimmed,
+      brainPowered: true as const,
+      decision: brainResult.decision,
+      tasteProfile: brainResult.tasteProfile,
+      retrievedExperiences: brainResult.retrievedExperiences,
+      ...(brainResult.partnerMode
+        ? {
+            partnerMode: true as const,
+            creativeTerritories: brainResult.creativeTerritories,
+            selectedTerritoryId: brainResult.selectedTerritoryId,
+            constraintReport: brainResult.constraintReport,
+            critique: brainResult.critique,
+            catalogIntelligence: brainResult.catalogIntelligence,
+            partnerAttempts: brainResult.partnerAttempts,
+          }
+        : {}),
+    };
+  }
+
+  async togglePromptSave(
+    promptId: string,
+    saved: boolean,
+    idempotencyKey?: string,
+    tenant?: TenantScope,
+  ) {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to save prompts');
     }
 
-    const record = await this.promptRecords.getById(promptId);
-    const updated = await this.promptRecords.setSaved(promptId, saved);
-
-    if (saved) {
-      try {
-        await designBrain.ingestFeedback({
-          signalType: 'APPROVE',
-          score: 7,
-          context: [
-            'Prompt saved to favorites',
-            record.companyName ? `Company: ${record.companyName}` : '',
-            `Industry: ${record.industry}`,
-            `Prompt quality: ${(record.scores as { promptQuality?: number })?.promptQuality ?? 'unknown'}`,
-            `Prompt: ${record.text.slice(0, 600)}`,
-          ]
-            .filter(Boolean)
-            .join('\n'),
-          metadata: {
-            kind: 'prompt_saved',
-            promptId,
-            companyName: record.companyName,
-            industry: record.industry,
-          },
-        });
-      } catch (error) {
-        console.warn('Brain ingest failed for prompt save', promptId, error);
-      }
-    }
+    const updated = await this.promptRecords.setSaved(promptId, saved, idempotencyKey, tenant);
 
     return { promptId, saved: updated.saved ?? saved };
   }
@@ -134,12 +159,13 @@ export class PromptsService {
       score: number;
       emoji: string;
     },
+    tenant?: TenantScope,
   ) {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store logo feedback');
     }
 
-    const record = await this.promptRecords.getById(promptId);
+    const record = await this.promptRecords.getById(promptId, tenant);
     const logo = record.logos.find((item) => item.id === logoId);
     if (!logo) {
       throw new BadRequestException(`Logo not found: ${logoId}`);
@@ -154,38 +180,6 @@ export class PromptsService {
     };
 
     const updated = await this.promptRecords.setLogoFeedback(promptId, logoId, feedback);
-
-    try {
-      await designBrain.ingestFeedback({
-        signalType: 'RATING',
-        score: body.score,
-        context: [
-          `Logo rating: ${body.score}/10 (${body.emoji})`,
-          record.companyName ? `Company: ${record.companyName}` : '',
-          `Industry: ${record.industry}`,
-          prev?.workedTags?.length ? `Worked: ${prev.workedTags.join(', ')}` : '',
-          prev?.missedTags?.length ? `Missed: ${prev.missedTags.join(', ')}` : '',
-          `Prompt: ${record.text.slice(0, 500)}`,
-          `Image: ${logo.url}`,
-        ]
-          .filter(Boolean)
-          .join('\n'),
-        metadata: {
-          kind: 'logo_rating',
-          promptId,
-          logoId,
-          score: body.score,
-          emoji: body.emoji,
-          workedTags: prev?.workedTags,
-          missedTags: prev?.missedTags,
-          companyName: record.companyName,
-          industry: record.industry,
-          imageUrl: logo.url,
-        },
-      });
-    } catch (error) {
-      console.warn('Brain ingest failed for logo feedback', promptId, logoId, error);
-    }
 
     const savedLogo = updated.logos.find((item) => item.id === logoId);
     return {
@@ -203,72 +197,19 @@ export class PromptsService {
       workedTags?: string[];
       missedTags?: string[];
     },
+    tenant?: TenantScope,
   ) {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store logo tags');
     }
 
-    const record = await this.promptRecords.getById(promptId);
+    const record = await this.promptRecords.getById(promptId, tenant);
     const logo = record.logos.find((item) => item.id === logoId);
     if (!logo) {
       throw new BadRequestException(`Logo not found: ${logoId}`);
     }
 
     const updated = await this.promptRecords.setLogoTags(promptId, logoId, body);
-
-    const baseContext = [
-      record.companyName ? `Company: ${record.companyName}` : '',
-      `Industry: ${record.industry}`,
-      `Prompt: ${record.text.slice(0, 400)}`,
-      `Image: ${logo.url}`,
-    ].filter(Boolean);
-
-    const tagMetadata = {
-      kind: 'logo_tags' as const,
-      promptId,
-      logoId,
-      companyName: record.companyName,
-      industry: record.industry,
-      imageUrl: logo.url,
-    };
-
-    try {
-      if (body.workedTags?.length) {
-        await designBrain.ingestFeedback({
-          signalType: 'APPROVE',
-          score: 7,
-          context: [
-            'Logo worked feedback',
-            ...baseContext,
-            `Worked: ${body.workedTags.join(', ')}`,
-          ].join('\n'),
-          metadata: {
-            ...tagMetadata,
-            tagPolarity: 'worked',
-            workedTags: body.workedTags,
-          },
-        });
-      }
-
-      if (body.missedTags?.length) {
-        await designBrain.ingestFeedback({
-          signalType: 'REJECT',
-          score: 6,
-          context: [
-            'Logo missed feedback',
-            ...baseContext,
-            `Missed: ${body.missedTags.join(', ')}`,
-          ].join('\n'),
-          metadata: {
-            ...tagMetadata,
-            tagPolarity: 'missed',
-            missedTags: body.missedTags,
-          },
-        });
-      }
-    } catch (error) {
-      console.warn('Brain ingest failed for logo tags', promptId, logoId, error);
-    }
 
     const savedLogo = updated.logos.find((item) => item.id === logoId);
     return {
@@ -280,56 +221,17 @@ export class PromptsService {
   }
 
   /** @deprecated use togglePromptSave */
-  async submitPromptFeedback(promptId: string, signalType: 'LIKE' | 'DISLIKE') {
+  async submitPromptFeedback(
+    promptId: string,
+    signalType: 'LIKE' | 'DISLIKE',
+    tenant?: TenantScope,
+  ) {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store prompt feedback');
     }
 
-    const record = await this.promptRecords.getById(promptId);
+    await this.promptRecords.getById(promptId, tenant);
     const updated = await this.promptRecords.setFeedback(promptId, signalType);
-    const stylePreferences =
-      typeof record.metadata === 'object' &&
-      record.metadata !== null &&
-      'stylePreferences' in record.metadata
-        ? (record.metadata as { stylePreferences?: Record<string, unknown> }).stylePreferences
-        : undefined;
-
-    try {
-      await designBrain.ingestFeedback({
-        signalType,
-        score: signalType === 'LIKE' ? 8 : 2,
-        context: [
-          `Prompt feedback: ${signalType}`,
-          record.companyName ? `Company: ${record.companyName}` : '',
-          `Industry: ${record.industry}`,
-          `Prompt ID: ${promptId}`,
-          stylePreferences ? `Style preferences: ${JSON.stringify(stylePreferences)}` : '',
-          `Prompt: ${record.text}`,
-        ]
-          .filter(Boolean)
-          .join('\n'),
-        metadata: {
-          kind: 'prompt_feedback',
-          promptId,
-          composedPromptId: promptId,
-          promptQuality:
-            typeof record.scores === 'object' &&
-            record.scores !== null &&
-            'promptQuality' in record.scores
-              ? (record.scores as { promptQuality?: number }).promptQuality
-              : undefined,
-          era:
-            typeof record.metadata === 'object' &&
-            record.metadata !== null &&
-            'era' in record.metadata
-              ? (record.metadata as { era?: string }).era
-              : undefined,
-          stylePreferences,
-        },
-      });
-    } catch (error) {
-      console.warn('Brain feedback ingest failed for prompt', promptId, error);
-    }
 
     return {
       promptId,
@@ -337,12 +239,16 @@ export class PromptsService {
     };
   }
 
-  async generateLogoForPrompt(promptId: string, body: GeneratePromptLogoDto) {
+  async generateLogoForPrompt(
+    promptId: string,
+    body: GeneratePromptLogoDto,
+    tenant?: TenantScope,
+  ) {
     if (!process.env.DATABASE_URL) {
       throw new BadRequestException('DATABASE_URL is required to store prompt logos');
     }
 
-    const record = await this.promptRecords.getById(promptId);
+    const record = await this.promptRecords.getById(promptId, tenant);
     const stylePreferences =
       typeof record.metadata === 'object' &&
       record.metadata !== null &&
@@ -360,6 +266,38 @@ export class PromptsService {
       throw new BadRequestException('Maximum 3 logos per prompt');
     }
 
+    if (process.env.REDIS_URL) {
+      const imageId = randomUUID();
+      const reservation = await this.promptRecords.reserveLogo(
+        promptId,
+        imageId,
+        record.text,
+        tenant,
+      );
+      const outputKey = [
+        'generated-logos',
+        tenant?.organizationId ?? 'unscoped',
+        `${imageId}.png`,
+      ].join('/');
+      const job = await this.queues.enqueue(QUEUE_NAMES.image, {
+        version: JOB_PAYLOAD_VERSION,
+        idempotencyKey: `prompt:${promptId}:image:${imageId}`,
+        requestedAt: new Date().toISOString(),
+        organizationId: tenant?.organizationId,
+        projectId: tenant?.projectId,
+        imageId,
+        prompt: record.text,
+        outputKey,
+        provider: body.provider,
+      });
+      return {
+        status: 'queued' as const,
+        jobId: job.id,
+        imageId,
+        remaining: reservation.remaining,
+      };
+    }
+
     const generation = await this.imagesService.generateFromComposedPrompt({
       text: record.text,
       companyName: normalizeBrandName(body.companyName ?? record.companyName),
@@ -373,12 +311,22 @@ export class PromptsService {
       allowPhotoreal: stylePreferences?.allowPhotoreal,
     });
 
-    const image = generation.images[0];
+    let image = generation.images[0];
     if (!image) {
       throw new BadRequestException('Image generation returned no result');
     }
 
-    const updated = await this.promptRecords.appendLogo(promptId, image);
+    let storage: { storageKey: string; mimeType: string } | undefined;
+    if (image.url.startsWith('data:')) {
+      const stored = await this.objectStorage.storeDataUrl(
+        `generated-logos/${tenant?.organizationId ?? 'unscoped'}/${image.id}.png`,
+        image.url,
+      );
+      image = { ...image, url: stored.publicUrl };
+      storage = { storageKey: stored.storageKey, mimeType: stored.mimeType };
+    }
+
+    const updated = await this.promptRecords.appendLogo(promptId, image, tenant, storage);
     return {
       image,
       logos: updated.logos,
@@ -386,18 +334,15 @@ export class PromptsService {
     };
   }
 
-  getPrompt(promptId: string) {
-    return this.promptRecords.getById(promptId);
+  getPrompt(promptId: string, tenant?: TenantScope) {
+    return this.promptRecords.getById(promptId, tenant);
   }
 
-  listSavedPrompts() {
+  listSavedPrompts(limit?: number, cursor?: string, tenant?: TenantScope) {
     if (!process.env.DATABASE_URL) {
-      return { prompts: [], total: 0 };
+      return { prompts: [], nextCursor: null };
     }
-    return this.promptRecords.listSaved().then((prompts) => ({
-      prompts,
-      total: prompts.length,
-    }));
+    return this.promptRecords.listSaved(limit, cursor, tenant);
   }
 
   critique(promptId: string, pipelineResult: Awaited<ReturnType<typeof this.generate>>) {

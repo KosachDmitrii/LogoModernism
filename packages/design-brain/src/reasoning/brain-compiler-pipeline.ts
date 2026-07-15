@@ -144,11 +144,18 @@ export async function runBriefCompilerPipeline(
 
   const [searchResult, tasteProfile, projectMemory, architecture, catalogResolved] =
     await Promise.all([
-      semanticSearch(prisma, { query: retrievalQuery, limit: 4 }),
-      computeTasteProfile(prisma),
+      semanticSearch(prisma, {
+        query: retrievalQuery,
+        limit: 4,
+        organizationId: request.organizationId,
+        projectId: request.projectId,
+      }),
+      computeTasteProfile(prisma, request),
       searchProjectMemory(prisma, {
         companyName: request.companyName,
         industry: request.industry,
+        organizationId: request.organizationId,
+        projectId: request.projectId,
       }),
       buildBrainArchitecture(prisma, request, []),
       Promise.resolve(resolveCatalogIntelligence(request)),

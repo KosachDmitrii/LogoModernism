@@ -1,29 +1,14 @@
 import { PrismaClient } from '@prisma/client';
 import { resolveDatabaseUrl } from './db-url';
-import { runWithPrismaReconnect, startPrismaKeepalive } from './connection';
 
 resolveDatabaseUrl();
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
 function createPrismaClient(): PrismaClient {
-  const base = new PrismaClient({
+  return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
-
-  return base.$extends({
-    query: {
-      $allOperations({
-        args,
-        query,
-      }: {
-        args: unknown;
-        query: (args: unknown) => Promise<unknown>;
-      }) {
-        return runWithPrismaReconnect(base, () => query(args));
-      },
-    },
-  }) as unknown as PrismaClient;
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
@@ -32,25 +17,15 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
 }
 
-if (process.env.DATABASE_URL) {
-  void prisma.$connect().catch((error: unknown) => {
-    console.error(
-      '[database] Initial PostgreSQL connection failed:',
-      error instanceof Error ? error.message : error,
-    );
-  });
-  startPrismaKeepalive(prisma);
-}
-
 export { PrismaClient, Prisma } from '@prisma/client';
-export { enhanceDatabaseUrl, resolveDatabaseUrl } from './db-url';
 export {
-  isPrismaConnectionError,
-  reconnectPrisma,
-  runWithPrismaReconnect,
-  startPrismaKeepalive,
-  stopPrismaKeepalive,
-} from './connection';
+  assertProductionRuntimeDatabaseUrl,
+  enhanceDatabaseUrl,
+  isSupabasePoolerUrl,
+  isSupabaseTransactionPoolerUrl,
+  resolveDatabaseUrl,
+} from './db-url';
+export { isPrismaConnectionError } from './connection';
 export type {
   User,
   Organization,

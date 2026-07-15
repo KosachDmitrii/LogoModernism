@@ -1,4 +1,5 @@
 import type { BrainResearchHit } from '@logo-platform/shared';
+import { fetchWithDeadline } from '@logo-platform/shared';
 import { rankResearchHits } from './source-scorer';
 import { searchInternetArchive } from './archive-search';
 
@@ -37,7 +38,7 @@ async function searchTavily(
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey) return [];
 
-  const response = await fetch('https://api.tavily.com/search', {
+  const response = await fetchWithDeadline('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -47,7 +48,7 @@ async function searchTavily(
       search_depth: 'basic',
       include_domains: TRUSTED_DOMAINS,
     }),
-  });
+  }, { timeoutMs: 15_000 });
 
   if (!response.ok) return [];
 
@@ -78,12 +79,12 @@ async function searchBrave(
   searchUrl.searchParams.set('q', verbatim ? query : `${query} logo design typography branding`);
   searchUrl.searchParams.set('count', String(Math.min(maxResults, 10)));
 
-  const response = await fetch(searchUrl, {
+  const response = await fetchWithDeadline(searchUrl, {
     headers: {
       Accept: 'application/json',
       'X-Subscription-Token': apiKey,
     },
-  });
+  }, { timeoutMs: 10_000 });
 
   if (!response.ok) return [];
 
@@ -114,7 +115,7 @@ async function searchWikipedia(
   searchUrl.searchParams.set('format', 'json');
   searchUrl.searchParams.set('origin', '*');
 
-  const response = await fetch(searchUrl);
+  const response = await fetchWithDeadline(searchUrl, {}, { timeoutMs: 10_000 });
   if (!response.ok) return [];
 
   const data = (await response.json()) as [string, string[], string[], string[]];

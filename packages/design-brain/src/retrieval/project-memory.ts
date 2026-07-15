@@ -1,4 +1,4 @@
-import type { BrainExperienceRecord } from '@logo-platform/shared';
+import type { BrainExperienceRecord, BrainTenantScope } from '@logo-platform/shared';
 import type { PrismaClient } from '@logo-platform/database';
 import { toExperienceRecord } from '../storage/experience.repository';
 import { semanticSearch } from './semantic-search';
@@ -20,7 +20,7 @@ function metadataMatches(
 
 export async function searchProjectMemory(
   prisma: PrismaClient,
-  opts: { companyName?: string; industry?: string; limit?: number },
+  opts: { companyName?: string; industry?: string; limit?: number } & BrainTenantScope,
 ): Promise<BrainExperienceRecord[]> {
   const limit = opts.limit ?? 8;
   const companyName = opts.companyName?.trim();
@@ -29,10 +29,18 @@ export async function searchProjectMemory(
 
   const query = [companyName, industry].filter(Boolean).join(' ');
   const [searchResult, feedbackRows] = await Promise.all([
-    semanticSearch(prisma, { query, limit, minSimilarity: 0.4 }),
+    semanticSearch(prisma, {
+      query,
+      limit,
+      minSimilarity: 0.4,
+      organizationId: opts.organizationId,
+      projectId: opts.projectId,
+    }),
     prisma.brainExperience.findMany({
       where: {
         sourceType: 'FEEDBACK',
+        ...(opts.organizationId ? { organizationId: opts.organizationId } : {}),
+        ...(opts.projectId ? { projectId: opts.projectId } : {}),
         OR: [
           companyName ? { content: { contains: companyName, mode: 'insensitive' } } : undefined,
           industry ? { content: { contains: industry, mode: 'insensitive' } } : undefined,

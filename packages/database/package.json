@@ -6,12 +6,18 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "prisma generate && tsc",
+    "test": "tsx --test tests/**/*.test.ts",
     "db:generate": "tsx scripts/prisma-cli.ts generate",
     "db:push": "tsx scripts/prisma-cli.ts db push",
     "db:migrate": "tsx scripts/prisma-cli.ts migrate dev",
+    "db:migrate:deploy": "tsx scripts/prisma-cli.ts migrate deploy",
+    "db:migrate:status": "tsx scripts/prisma-cli.ts migrate status",
+    "db:backup": "tsx scripts/backup-database.ts",
+    "db:invariants:snapshot": "tsx scripts/migration-invariants.ts snapshot",
+    "db:invariants:verify": "tsx scripts/migration-invariants.ts verify",
+    "db:tenant:backfill": "tsx scripts/backfill-legacy-tenant.ts",
+    "db:logos:migrate-storage": "tsx scripts/migrate-inline-logos.ts",
     "db:studio": "tsx scripts/prisma-cli.ts studio",
-    "db:brain-setup": "tsx scripts/brain-setup.ts",
-    "db:prompts-setup": "tsx scripts/prompts-setup.ts",
     "db:supabase-check": "tsx scripts/supabase-check.ts"
   },
   "dependencies": {

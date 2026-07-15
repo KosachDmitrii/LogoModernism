@@ -54,17 +54,30 @@ export function DesignBrainPage() {
   const [principlesSort, setPrinciplesSort] = useState<LearnedPrinciplesSort>('influence_desc');
   const queryClient = useQueryClient();
 
-  const { data: health, isLoading: healthLoading } = useQuery({ queryKey: ['brain-health'], queryFn: getBrainHealth });
-  const { data: stats, isLoading: statsLoading } = useQuery({ queryKey: ['brain-stats'], queryFn: getBrainStats });
-  const { data: taste, isLoading: tasteLoading } = useQuery({ queryKey: ['brain-taste'], queryFn: getBrainTasteProfile });
+  const { data: health, isLoading: healthLoading } = useQuery({
+    queryKey: ['brain-health'],
+    queryFn: ({ signal }) => getBrainHealth(signal),
+  });
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['brain-stats'],
+    queryFn: ({ signal }) => getBrainStats(signal),
+  });
+  const { data: taste, isLoading: tasteLoading } = useQuery({
+    queryKey: ['brain-taste'],
+    queryFn: ({ signal }) => getBrainTasteProfile(signal),
+    enabled: tab === 'overview' && Boolean(health),
+    staleTime: 60_000,
+    retry: 1,
+  });
   const { data: principlesData, isLoading: principlesLoading } = useQuery({
     queryKey: ['brain-principles'],
-    queryFn: () => listBrainPrinciples(BRAIN_TOP_PRINCIPLES_LIMIT),
+    queryFn: ({ signal }) => listBrainPrinciples(BRAIN_TOP_PRINCIPLES_LIMIT, 0, undefined, signal),
+    enabled: tab === 'overview' && Boolean(health),
   });
   const principles = principlesData?.items;
   const { data: principlesPageData, isLoading: allPrinciplesLoading } = useQuery({
     queryKey: ['brain-principles-all', principlesPage, principlesCategory, principlesSort],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       listBrainPrinciples(
         BRAIN_PRINCIPLES_PAGE_SIZE,
         (principlesPage - 1) * BRAIN_PRINCIPLES_PAGE_SIZE,
@@ -72,12 +85,14 @@ export function DesignBrainPage() {
           category: principlesCategory || undefined,
           sort: principlesSort,
         },
+        signal,
       ),
     enabled: tab === 'principles',
   });
   const { data: principleCategories = [] } = useQuery({
     queryKey: ['brain-principle-categories'],
-    queryFn: listBrainPrincipleCategories,
+    queryFn: ({ signal }) => listBrainPrincipleCategories(signal),
+    enabled: (tab === 'overview' || tab === 'principles') && Boolean(health),
   });
 
   const allPrinciples = principlesPageData?.items;
@@ -92,9 +107,10 @@ export function DesignBrainPage() {
       setPrinciplesPage(totalPrinciplePages);
     }
   }, [principlesPage, totalPrinciplePages]);
-  const { data: pendingResearch, isLoading: pendingResearchLoading, refetch: refetchPending } = useQuery({
+  const { data: pendingResearch, isLoading: pendingResearchLoading } = useQuery({
     queryKey: ['brain-research-pending'],
-    queryFn: () => listBrainResearchCandidates('pending'),
+    queryFn: ({ signal }) => listBrainResearchCandidates('pending', signal),
+    enabled: tab === 'research',
   });
 
   const isLoading =
@@ -188,7 +204,6 @@ export function DesignBrainPage() {
       queryClient.invalidateQueries({ queryKey: ['brain-principles'] });
       queryClient.invalidateQueries({ queryKey: ['brain-principles-all'] });
       queryClient.invalidateQueries({ queryKey: ['brain-principle-categories'] });
-      queryClient.invalidateQueries({ queryKey: ['brain-principle-categories'] });
       queryClient.invalidateQueries({ queryKey: ['brain-taste'] });
     },
   });
@@ -197,7 +212,6 @@ export function DesignBrainPage() {
     mutationFn: () => runBrainResearch({ query: researchQuery.trim(), maxSources: 30 }),
     onSuccess: () => {
       setResearchError(null);
-      refetchPending();
       queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
     },
     onError: (error) => setResearchError(formatError(error, t)),
@@ -209,7 +223,6 @@ export function DesignBrainPage() {
     onSuccess: () => {
       setResearchError(null);
       setManualUrl('');
-      refetchPending();
       queryClient.invalidateQueries({ queryKey: ['brain-research-pending'] });
     },
     onError: (error) => setResearchError(formatError(error, t)),

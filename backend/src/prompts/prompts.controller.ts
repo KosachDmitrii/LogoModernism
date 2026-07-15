@@ -1,5 +1,16 @@
-import { Body, Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
-import type { BrainPipelineResult } from '@logo-platform/design-brain';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { PromptsService } from './prompts.service';
 import { GeneratePromptDto } from './dto/generate-prompt.dto';
 import { GeneratePromptLogoDto } from './dto/generate-prompt-logo.dto';
@@ -8,8 +19,14 @@ import { PromptSaveDto } from './dto/prompt-save.dto';
 import { LogoFeedbackDto } from './dto/logo-feedback.dto';
 import { LogoTagsDto } from './dto/logo-tags.dto';
 import type { PromptGenerationRequest } from '@logo-platform/shared';
-import { normalizeBrandName, resolvePromptGenerateIntent } from '@logo-platform/shared';
-import { slimPipelineResult } from './prompt-response';
+import {
+  JOB_PAYLOAD_VERSION,
+  normalizeBrandName,
+  QUEUE_NAMES,
+  resolvePromptGenerateIntent,
+} from '@logo-platform/shared';
+import { Tenant, type TenantScope } from '../auth/tenant-context';
+import { QueueService } from '../queue/queue.service';
 
 type PipelineOutput = Awaited<ReturnType<PromptsService['generate']>>;
 
@@ -18,10 +35,19 @@ export class PromptsController {
   private readonly logger = new Logger(PromptsController.name);
   private lastResult: PipelineOutput | null = null;
 
-  constructor(private readonly promptsService: PromptsService) {}
+  constructor(
+    private readonly promptsService: PromptsService,
+    private readonly queues: QueueService,
+  ) {}
 
   @Post('generate')
-  async generate(@Body() dto: GeneratePromptDto, @Query('intent') queryIntent?: string) {
+  @HttpCode(HttpStatus.ACCEPTED)
+  async generate(
+    @Body() dto: GeneratePromptDto,
+    @Query('intent') queryIntent?: string,
+    @Tenant() tenant?: TenantScope,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
     const intent = resolvePromptGenerateIntent(dto.intent, queryIntent);
     const request: PromptGenerationRequest = {
       industry: dto.industry,
@@ -56,61 +82,42 @@ export class PromptsController {
     );
 
     try {
-      const { result, promptsWithLogos } = await this.promptsService.generateAndPersist(request);
-      this.lastResult = result;
+      if (process.env.REDIS_URL) {
+        const submission = await this.queues.enqueue(QUEUE_NAMES.prompt, {
+          version: JOB_PAYLOAD_VERSION,
+          idempotencyKey:
+            idempotencyKey ??
+            `prompt:${tenant?.organizationId ?? 'unscoped'}:${randomUUID()}`,
+          requestedAt: new Date().toISOString(),
+          organizationId: tenant?.organizationId,
+          projectId: tenant?.projectId,
+          requestedBy: tenant?.userId,
+          request,
+        });
+        this.logger.log(
+          JSON.stringify({
+            event: 'prompt.generate.queued',
+            intent,
+            industry: request.industry,
+            durationMs: Date.now() - startedAt,
+            jobId: submission.id,
+          }),
+        );
+        return { ...submission, status: 'queued' as const };
+      }
 
-      const brainResult = 'brainPowered' in result && result.brainPowered ? (result as BrainPipelineResult) : null;
+      const response = await this.promptsService.generateResponse(request, tenant);
       this.logger.log(
         JSON.stringify({
           event: 'prompt.generate.complete',
           intent,
           industry: request.industry,
           durationMs: Date.now() - startedAt,
-          promptCount: result.prompts.length,
-          brainPowered: Boolean(brainResult),
-          partnerMode: Boolean(brainResult?.partnerMode),
-          partnerAttempts: brainResult?.partnerAttempts ?? null,
-          constraintPassed: brainResult?.constraintReport?.passed ?? null,
-          constraintViolationCount: brainResult?.constraintReport?.violations.length ?? null,
+          promptCount: response.prompts.length,
+          brainPowered: 'brainPowered' in response && response.brainPowered,
         }),
       );
-
-      const slimmed = slimPipelineResult({
-        ...result,
-        prompts: promptsWithLogos,
-        bestPrompt: {
-          ...result.bestPrompt,
-          logos: promptsWithLogos.find((p) => p.id === result.bestPrompt.id)?.logos ?? [],
-          feedback: promptsWithLogos.find((p) => p.id === result.bestPrompt.id)?.feedback,
-          saved: promptsWithLogos.find((p) => p.id === result.bestPrompt.id)?.saved,
-        },
-      });
-
-      const meta = { intent };
-
-      if (brainResult) {
-        return {
-          ...slimmed,
-          meta,
-          brainPowered: true,
-          decision: brainResult.decision,
-          tasteProfile: brainResult.tasteProfile,
-          retrievedExperiences: brainResult.retrievedExperiences,
-          ...(brainResult.partnerMode
-            ? {
-                partnerMode: true,
-                creativeTerritories: brainResult.creativeTerritories,
-                selectedTerritoryId: brainResult.selectedTerritoryId,
-                constraintReport: brainResult.constraintReport,
-                critique: brainResult.critique,
-                catalogIntelligence: brainResult.catalogIntelligence,
-                partnerAttempts: brainResult.partnerAttempts,
-              }
-            : {}),
-        };
-      }
-
-      return { ...slimmed, meta };
+      return { ...response, meta: { intent } };
     } catch (error) {
       this.logger.error(
         JSON.stringify({
@@ -126,11 +133,11 @@ export class PromptsController {
   }
 
   @Get('recommend/:industry')
-  async recommend(@Param('industry') industry: string) {
+  async recommend(@Param('industry') industry: string, @Tenant() tenant?: TenantScope) {
     const result = await this.promptsService.generate({
       industry,
       variationCount: 1,
-    });
+    }, tenant);
     return {
       industry,
       recommendations: result.recommendations,
@@ -144,13 +151,27 @@ export class PromptsController {
   }
 
   @Get('saved')
-  listSaved() {
-    return this.promptsService.listSavedPrompts();
+  listSaved(
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+    @Tenant() tenant?: TenantScope,
+  ) {
+    const parsedLimit = limit ? Number.parseInt(limit, 10) : undefined;
+    return this.promptsService.listSavedPrompts(
+      parsedLimit && Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+      cursor,
+      tenant,
+    );
   }
 
   @Post(':id/save')
-  toggleSave(@Param('id') id: string, @Body() body: PromptSaveDto) {
-    return this.promptsService.togglePromptSave(id, body.saved);
+  toggleSave(
+    @Param('id') id: string,
+    @Body() body: PromptSaveDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Tenant() tenant?: TenantScope,
+  ) {
+    return this.promptsService.togglePromptSave(id, body.saved, idempotencyKey, tenant);
   }
 
   @Post(':id/logos/:logoId/feedback')
@@ -158,8 +179,9 @@ export class PromptsController {
     @Param('id') id: string,
     @Param('logoId') logoId: string,
     @Body() body: LogoFeedbackDto,
+    @Tenant() tenant?: TenantScope,
   ) {
-    return this.promptsService.submitLogoFeedback(id, logoId, body);
+    return this.promptsService.submitLogoFeedback(id, logoId, body, tenant);
   }
 
   @Post(':id/logos/:logoId/tags')
@@ -167,23 +189,33 @@ export class PromptsController {
     @Param('id') id: string,
     @Param('logoId') logoId: string,
     @Body() body: LogoTagsDto,
+    @Tenant() tenant?: TenantScope,
   ) {
-    return this.promptsService.submitLogoTags(id, logoId, body);
+    return this.promptsService.submitLogoTags(id, logoId, body, tenant);
   }
 
   @Get(':id')
-  getPrompt(@Param('id') id: string) {
-    return this.promptsService.getPrompt(id);
+  getPrompt(@Param('id') id: string, @Tenant() tenant?: TenantScope) {
+    return this.promptsService.getPrompt(id, tenant);
   }
 
   @Post(':id/logos/generate')
-  generateLogo(@Param('id') id: string, @Body() body: GeneratePromptLogoDto) {
-    return this.promptsService.generateLogoForPrompt(id, body);
+  @HttpCode(HttpStatus.ACCEPTED)
+  generateLogo(
+    @Param('id') id: string,
+    @Body() body: GeneratePromptLogoDto,
+    @Tenant() tenant?: TenantScope,
+  ) {
+    return this.promptsService.generateLogoForPrompt(id, body, tenant);
   }
 
   @Post(':id/feedback')
-  submitFeedback(@Param('id') id: string, @Body() body: PromptFeedbackDto) {
-    return this.promptsService.submitPromptFeedback(id, body.signalType);
+  submitFeedback(
+    @Param('id') id: string,
+    @Body() body: PromptFeedbackDto,
+    @Tenant() tenant?: TenantScope,
+  ) {
+    return this.promptsService.submitPromptFeedback(id, body.signalType, tenant);
   }
 
   @Post(':id/critique')

@@ -25,6 +25,8 @@ export interface IngestPdfOptions {
   title: string;
   jobId?: string;
   savedPath?: string;
+  organizationId?: string;
+  projectId?: string;
   onProgress?: (progress: {
     phase: BrainPdfIngestPhase;
     pageCount?: number;
@@ -201,6 +203,8 @@ export async function ingestPdf(
         ocrUsed,
         ocrPages: ocrPageCount,
       },
+      organizationId: options.organizationId,
+      projectId: options.projectId,
     });
 
     if (!firstExperienceId) {
@@ -222,6 +226,8 @@ export async function ingestPdf(
         citation: principle.citationQuote
           ? { url: `pdf://${title}`, quote: principle.citationQuote }
           : { url: `pdf://${title}`, quote: chunk.slice(0, 220) },
+        organizationId: options.organizationId,
+        projectId: options.projectId,
       });
       principlesExtracted += 1;
     }

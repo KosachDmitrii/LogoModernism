@@ -12,11 +12,13 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   organizations OrganizationMember[]
   projects      Project[]
+
+  @@map("users")
 }
 
 model Organization {
@@ -24,25 +26,34 @@ model Organization {
   name      String
   slug      String   @unique
   plan      Plan     @default(FREE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  members  OrganizationMember[]
-  projects Project[]
-  brands   Brand[]
+  members           OrganizationMember[]
+  projects          Project[]
+  brands            Brand[]
+  generatedPrompts  ComposedPromptRecord[]
+  generatedLogos    Logo[]
+  brainExperiences  BrainExperience[]
+  tasteSignals      BrainTasteSignal[]
+  learnedPrinciples LearnedPrinciple[]
+
+  @@map("organizations")
 }
 
 model OrganizationMember {
   id             String   @id @default(cuid())
   role           Role     @default(MEMBER)
-  organizationId String
-  userId         String
-  createdAt      DateTime @default(now())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "organization_members_organization_id_fkey")
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade, map: "organization_members_user_id_fkey")
 
-  @@unique([organizationId, userId])
+  @@unique([organizationId, userId], map: "organization_members_organization_id_user_id_key")
+  @@index([userId], map: "organization_members_user_id_idx")
+  @@map("organization_members")
 }
 
 model Project {
@@ -50,170 +61,244 @@ model Project {
   name           String
   description    String?
   status         ProjectStatus @default(ACTIVE)
-  organizationId String?
-  userId         String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  organizationId String?       @map("organization_id")
+  userId         String?       @map("user_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
-  organization Organization? @relation(fields: [organizationId], references: [id])
-  user         User?         @relation(fields: [userId], references: [id])
-  brands       Brand[]
-  promptRuns   PromptRun[]
-  logos        Logo[]
+  organization      Organization?          @relation(fields: [organizationId], references: [id], map: "projects_organization_id_fkey")
+  user              User?                  @relation(fields: [userId], references: [id], map: "projects_user_id_fkey")
+  brands            Brand[]
+  promptRuns        PromptRun[]
+  logos             Logo[]
+  generatedPrompts  ComposedPromptRecord[]
+  brainExperiences  BrainExperience[]
+  tasteSignals      BrainTasteSignal[]
+  learnedPrinciples LearnedPrinciple[]
+
+  @@index([organizationId, createdAt(sort: Desc)], map: "projects_organization_id_created_at_idx")
+  @@index([userId], map: "projects_user_id_idx")
+  @@map("projects")
 }
 
 model Brand {
   id             String   @id @default(cuid())
   name           String
   industry       String
-  organizationId String?
-  projectId      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  organizationId String?  @map("organization_id")
+  projectId      String?  @map("project_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization? @relation(fields: [organizationId], references: [id])
-  project      Project?      @relation(fields: [projectId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id], map: "brands_organization_id_fkey")
+  project      Project?      @relation(fields: [projectId], references: [id], map: "brands_project_id_fkey")
   dna          BrandDNA?
   logos        Logo[]
+
+  @@index([organizationId, createdAt(sort: Desc)], map: "brands_organization_id_created_at_idx")
+  @@index([projectId], map: "brands_project_id_idx")
+  @@map("brands")
 }
 
 model BrandDNA {
   id           String   @id @default(cuid())
-  brandId      String   @unique
+  brandId      String   @unique(map: "brand_profiles_brand_id_key") @map("brand_id")
   personality  String?
-  visualTraits Json
+  visualTraits Json     @map("visual_traits")
   psychology   Json
-  principleIds String[]
+  principleIds String[] @map("principle_ids")
   narrative    String?
   constraints  String[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade, map: "brand_profiles_brand_id_fkey")
+
+  @@map("brand_profiles")
 }
 
 model Logo {
-  id          String    @id @default(cuid())
-  name        String
-  brandId     String?
-  projectId   String?
-  status      LogoStatus @default(DRAFT)
-  svgContent  String?
-  promptText  String?
-  scores      Json?
-  metadata    Json?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id             String     @id @default(cuid())
+  name           String
+  brandId        String?    @map("brand_id")
+  organizationId String?    @map("organization_id")
+  projectId      String?    @map("project_id")
+  promptId       String?    @map("prompt_id")
+  status         LogoStatus @default(DRAFT)
+  storageKey     String?    @map("storage_key")
+  publicUrl      String?    @map("public_url")
+  mimeType       String?    @map("mime_type")
+  width          Int?
+  height         Int?
+  provider       String?
+  model          String?
+  svgContent     String?    @map("svg_content")
+  promptText     String?    @map("prompt_text")
+  scores         Json?
+  metadata       Json?
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  brand    Brand?        @relation(fields: [brandId], references: [id])
-  project  Project?      @relation(fields: [projectId], references: [id])
-  versions LogoVersion[]
+  brand        Brand?                @relation(fields: [brandId], references: [id], map: "generated_logos_brand_id_fkey")
+  organization Organization?         @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "generated_logos_organization_id_fkey")
+  project      Project?              @relation(fields: [projectId], references: [id], map: "generated_logos_project_id_fkey")
+  prompt       ComposedPromptRecord? @relation(fields: [promptId], references: [id], onDelete: SetNull, map: "generated_logos_prompt_id_fkey")
+  versions     LogoVersion[]
+
+  @@index([projectId, createdAt(sort: Desc)], map: "generated_logos_project_id_created_at_idx")
+  @@index([organizationId, createdAt(sort: Desc)], map: "generated_logos_organization_id_created_at_idx")
+  @@index([brandId], map: "generated_logos_brand_id_idx")
+  @@index([promptId], map: "generated_logos_prompt_id_idx")
+  @@map("generated_logos")
 }
 
 model LogoVersion {
-  id        String   @id @default(cuid())
-  logoId    String
-  version   Int
-  svgContent String?
-  promptText String?
-  scores    Json?
-  changelog String?
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  logoId     String   @map("logo_id")
+  version    Int
+  storageKey String?  @map("storage_key")
+  svgContent String?  @map("svg_content")
+  promptText String?  @map("prompt_text")
+  scores     Json?
+  changelog  String?
+  createdAt  DateTime @default(now()) @map("created_at")
 
-  logo Logo @relation(fields: [logoId], references: [id], onDelete: Cascade)
+  logo Logo @relation(fields: [logoId], references: [id], onDelete: Cascade, map: "generated_logo_versions_logo_id_fkey")
 
-  @@unique([logoId, version])
+  @@unique([logoId, version], map: "generated_logo_versions_logo_id_version_key")
+  @@map("generated_logo_versions")
 }
 
 model PromptRun {
   id          String   @id @default(cuid())
-  projectId   String?
+  projectId   String?  @map("project_id")
   industry    String
-  companyName String?
+  companyName String?  @map("company_name")
   request     Json
   result      Json
-  bestScore   Float?
-  createdAt   DateTime @default(now())
+  bestScore   Float?   @map("best_score")
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  project Project?              @relation(fields: [projectId], references: [id])
+  project Project?               @relation(fields: [projectId], references: [id], map: "prompt_generation_runs_project_id_fkey")
   prompts ComposedPromptRecord[]
+
+  @@index([projectId, createdAt(sort: Desc)], map: "prompt_generation_runs_project_id_created_at_idx")
+  @@map("prompt_generation_runs")
 }
 
 model ComposedPromptRecord {
-  id                 String   @id
-  promptRunId        String?
+  id                 String    @id
+  promptRunId        String?   @map("prompt_run_id")
+  organizationId     String?   @map("organization_id")
+  projectId          String?   @map("project_id")
   industry           String
-  companyName        String?
-  text               String   @db.Text
+  companyName        String?   @map("company_name")
+  text               String    @db.Text
   scores             Json
   dna                Json
-  metadata           Json     @default("{}")
-  selectedPrinciples Json     @default("[]")
+  metadata           Json      @default("{}")
+  selectedPrinciples Json      @default("[]") @map("selected_principles")
   rank               Int?
-  logos              Json     @default("[]")
+  logos              Json      @default("[]")
   feedback           String?
-  saved              Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  saved              Boolean   @default(false)
+  savedAt            DateTime? @map("saved_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  promptRun PromptRun? @relation(fields: [promptRunId], references: [id], onDelete: SetNull)
+  promptRun      PromptRun?    @relation(fields: [promptRunId], references: [id], onDelete: SetNull, map: "generated_prompts_prompt_run_id_fkey")
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "generated_prompts_organization_id_fkey")
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull, map: "generated_prompts_project_id_fkey")
+  generatedLogos Logo[]
 
-  @@index([promptRunId])
-  @@index([createdAt])
-}
-
-model DesignPrinciple {
-  id             String   @id
-  name           String
-  description    String
-  category       String
-  promptFragment String
-  weight         Float    @default(1)
-  tags           String[]
-  compatibility  String[]
-  antiPatterns   String[]
-  syncedAt       DateTime @default(now())
+  @@index([promptRunId], map: "generated_prompts_prompt_run_id_idx")
+  @@index([organizationId, createdAt(sort: Desc)], map: "generated_prompts_organization_id_created_at_idx")
+  @@index([projectId, createdAt(sort: Desc)], map: "generated_prompts_project_id_created_at_idx")
+  @@index([savedAt(sort: Desc), id(sort: Desc)], map: "generated_prompts_saved_at_id_idx")
+  @@map("generated_prompts")
 }
 
 model BrainExperience {
-  id         String          @id @default(cuid())
-  sourceType BrainSourceType
-  title      String?
-  content    String          @db.Text
-  summary    String?         @db.Text
-  metadata   Json            @default("{}")
-  filePath   String?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id             String          @id @default(cuid())
+  sourceType     BrainSourceType @map("source_type")
+  title          String?
+  content        String          @db.Text
+  summary        String?         @db.Text
+  metadata       Json            @default("{}")
+  filePath       String?         @map("file_path")
+  organizationId String?         @map("organization_id")
+  projectId      String?         @map("project_id")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
 
   tasteSignals BrainTasteSignal[]
+  organization Organization?      @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "design_brain_experiences_organization_id_fkey")
+  project      Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull, map: "design_brain_experiences_project_id_fkey")
+
+  @@index([createdAt(sort: Desc)], map: "design_brain_experiences_created_at_idx")
+  @@index([organizationId, projectId, createdAt(sort: Desc)], map: "design_brain_experiences_tenant_created_at_idx")
+  @@map("design_brain_experiences")
 }
 
 model BrainTasteSignal {
-  id           String          @id @default(cuid())
-  experienceId String?
-  signalType   TasteSignalType
-  score        Float
-  context      String?         @db.Text
-  metadata     Json            @default("{}")
-  createdAt    DateTime        @default(now())
+  id             String          @id @default(cuid())
+  experienceId   String?         @map("experience_id")
+  signalType     TasteSignalType @map("signal_type")
+  score          Float
+  context        String?         @db.Text
+  metadata       Json            @default("{}")
+  organizationId String?         @map("organization_id")
+  projectId      String?         @map("project_id")
+  createdAt      DateTime        @default(now()) @map("created_at")
 
-  experience BrainExperience? @relation(fields: [experienceId], references: [id], onDelete: SetNull)
+  experience   BrainExperience? @relation(fields: [experienceId], references: [id], onDelete: SetNull, map: "design_brain_taste_signals_experience_id_fkey")
+  organization Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "design_brain_taste_signals_organization_id_fkey")
+  project      Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull, map: "design_brain_taste_signals_project_id_fkey")
+
+  @@index([createdAt(sort: Desc)], map: "design_brain_taste_signals_created_at_idx")
+  @@index([organizationId, projectId, createdAt(sort: Desc)], map: "design_brain_taste_signals_tenant_created_at_idx")
+  @@map("design_brain_taste_signals")
 }
 
 model LearnedPrinciple {
   id             String   @id @default(cuid())
   category       String
-  ruleText       String   @db.Text
-  promptFragment String
+  ruleText       String   @map("rule_text") @db.Text
+  promptFragment String   @map("prompt_fragment")
   weight         Float    @default(1.0)
   confidence     Float    @default(0.5)
-  sourceIds      String[] @default([])
-  antiPatterns   String[] @default([])
+  sourceIds      String[] @default([]) @map("source_ids")
+  antiPatterns   String[] @default([]) @map("anti_patterns")
   tags           String[] @default([])
   citations      Json     @default("[]")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  organizationId String?  @map("organization_id")
+  projectId      String?  @map("project_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "learned_design_principles_organization_id_fkey")
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull, map: "learned_design_principles_project_id_fkey")
+
+  @@index([organizationId, projectId, confidence(sort: Desc)], map: "learned_design_principles_tenant_confidence_idx")
+  @@map("learned_design_principles")
+}
+
+model OutboxEvent {
+  id             String    @id @default(cuid())
+  aggregateType  String    @map("aggregate_type")
+  aggregateId    String    @map("aggregate_id")
+  eventType      String    @map("event_type")
+  payload        Json
+  idempotencyKey String    @unique(map: "outbox_events_idempotency_key_key") @map("idempotency_key")
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  availableAt    DateTime  @default(now()) @map("available_at")
+  processedAt    DateTime? @map("processed_at")
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([status, availableAt], map: "outbox_events_status_available_at_idx")
+  @@map("outbox_events")
 }
 
 enum BrainSourceType {

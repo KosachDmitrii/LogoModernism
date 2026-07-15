@@ -39,6 +39,7 @@ interface PromptCardProps {
   rank?: number;
   standalone?: boolean;
   onStateChange?: () => void;
+  onSavedChange?: (saved: boolean) => void;
 }
 
 export function PromptCard({
@@ -48,6 +49,7 @@ export function PromptCard({
   rank,
   standalone = false,
   onStateChange,
+  onSavedChange,
 }: PromptCardProps) {
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -67,12 +69,20 @@ export function PromptCard({
 
   const toggleSave = useMutation({
     mutationFn: () => togglePromptSave(prompt.id, !saved),
+    onMutate: () => {
+      onSavedChange?.(!saved);
+      return { previousSaved: saved };
+    },
     onSuccess: (result) => {
       if (standalone) {
-        onStateChange?.();
+        if (onSavedChange) onSavedChange(result.saved);
+        else onStateChange?.();
       } else {
         setPromptSaved(prompt.id, result.saved);
       }
+    },
+    onError: (_error, _variables, context) => {
+      if (context) onSavedChange?.(context.previousSaved);
     },
   });
 

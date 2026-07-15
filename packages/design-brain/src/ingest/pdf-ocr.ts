@@ -1,4 +1,5 @@
 import pdfParse from 'pdf-parse';
+import { fetchWithDeadline } from '@logo-platform/shared';
 
 const OCR_PAGES_PER_REQUEST = 5;
 const DEFAULT_MAX_OCR_PAGES = 50;
@@ -25,7 +26,7 @@ async function ocrPdfBatch(
     );
   }
 
-  const response = await fetch(
+  const response = await fetchWithDeadline(
     `https://vision.googleapis.com/v1/files:annotate?key=${encodeURIComponent(apiKey)}`,
     {
       method: 'POST',
@@ -43,6 +44,7 @@ async function ocrPdfBatch(
         ],
       }),
     },
+    { timeoutMs: 60_000 },
   );
 
   if (!response.ok) {

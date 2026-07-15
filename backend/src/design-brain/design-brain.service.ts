@@ -1,5 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import type { BrainFeedbackInput, BrainResearchCandidateStatus, BrainSourceType } from '@logo-platform/shared';
+import type {
+  BrainFeedbackInput,
+  BrainResearchCandidateStatus,
+  BrainSourceType,
+  BrainTenantScope,
+} from '@logo-platform/shared';
 import { designBrain } from '@logo-platform/design-brain';
 
 @Injectable()
@@ -8,36 +13,39 @@ export class DesignBrainApiService {
     return designBrain.getCapabilities();
   }
 
-  getStats() {
-    return designBrain.getStats();
+  getStats(scope?: BrainTenantScope) {
+    return designBrain.getStats(scope);
   }
 
-  getTasteProfile() {
-    return designBrain.getTasteProfile();
+  getTasteProfile(scope?: BrainTenantScope) {
+    return designBrain.getTasteProfile(scope);
   }
 
-  consolidate() {
-    return designBrain.consolidate();
+  consolidate(scope?: BrainTenantScope) {
+    return designBrain.consolidate(scope);
   }
 
-  listExperiences(sourceType?: BrainSourceType, limit?: number) {
-    return designBrain.listExperiences({ sourceType, limit });
+  listExperiences(sourceType?: BrainSourceType, limit?: number, scope?: BrainTenantScope) {
+    return designBrain.listExperiences({ sourceType, limit, ...scope });
   }
 
-  getExperience(id: string) {
-    return designBrain.getExperience(id);
+  getExperience(id: string, scope?: BrainTenantScope) {
+    return designBrain.getExperience(id, scope);
   }
 
   listPrinciples(
     limit?: number,
     offset?: number,
-    options?: { category?: string; sort?: import('@logo-platform/shared').LearnedPrinciplesSort },
+    options?: {
+      category?: string;
+      sort?: import('@logo-platform/shared').LearnedPrinciplesSort;
+    } & BrainTenantScope,
   ) {
     return designBrain.listPrinciples(limit, offset, options);
   }
 
-  listPrincipleCategories() {
-    return designBrain.listPrincipleCategories();
+  listPrincipleCategories(scope?: BrainTenantScope) {
+    return designBrain.listPrincipleCategories(scope);
   }
 
   previewResearch(query: string, url: string) {
@@ -71,8 +79,8 @@ export class DesignBrainApiService {
     return designBrain.getResearchCandidate(id);
   }
 
-  approveResearch(id: string) {
-    return designBrain.approveResearch(id);
+  approveResearch(id: string, scope?: BrainTenantScope) {
+    return designBrain.approveResearch(id, scope);
   }
 
   rejectResearch(id: string) {
@@ -127,8 +135,14 @@ export class DesignBrainApiService {
     return designBrain.getPdfIngestProgress(jobId);
   }
 
-  ingestImage(buffer: Buffer, originalName: string, title?: string, mimeType?: string) {
-    return designBrain.ingestImage({ buffer, originalName, title, mimeType });
+  ingestImage(
+    buffer: Buffer,
+    originalName: string,
+    title?: string,
+    mimeType?: string,
+    scope?: BrainTenantScope,
+  ) {
+    return designBrain.ingestImage({ buffer, originalName, title, mimeType, ...scope });
   }
 
   ingestFeedback(input: BrainFeedbackInput) {

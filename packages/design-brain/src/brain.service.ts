@@ -11,6 +11,7 @@ import type {
   BrainSearchResult,
   BrainSourceType,
   BrainStats,
+  BrainTenantScope,
   LearnedPrincipleCategoryCount,
   LearnedPrincipleRecord,
   LearnedPrinciplesPage,
@@ -44,9 +45,9 @@ import {
 } from './storage/experience.repository';
 import { getRelatedExperiences, semanticSearch } from './retrieval/semantic-search';
 import { isEmbeddingConfigured } from './embedding/embedding.service';
-import { computeTasteProfile } from './learning/taste-profile';
-import { consolidateBrain, scheduleNightlyConsolidation } from './learning/consolidate';
-import { runNightlyResearch, scheduleNightlyResearch } from './learning/nightly-research';
+import { computeTasteProfile, DEFAULT_TASTE_PROFILE } from './learning/taste-profile';
+import { consolidateBrain } from './learning/consolidate';
+import { runNightlyResearch } from './learning/nightly-research';
 import { getTrustedDomains } from './research/web-search';
 import {
   approveResearchCandidate,
@@ -61,19 +62,19 @@ import { runBriefInterview } from './reasoning/brain-architecture';
 import { generateWithCritiqueLoop } from './generation/critique-loop';
 
 export class DesignBrainService {
-  private nightlyTimer: NodeJS.Timeout | null = null;
-  private nightlyResearchTimer: NodeJS.Timeout | null = null;
+  private readonly tasteProfileCache = new Map<
+    string,
+    { value: TasteProfile; expiresAt: number }
+  >();
+  private readonly tasteProfileInFlight = new Map<string, Promise<TasteProfile>>();
+
+  private static readonly TASTE_PROFILE_CACHE_MS = 60_000;
+  private static readonly TASTE_PROFILE_TIMEOUT_MS = 15_000;
 
   constructor() {
     ensureBrainStorageLayout();
     touchStorageReadyMarker();
     registerPdfIngestProcessor((jobId) => this.processQueuedPdfIngest(jobId));
-    if (process.env.BRAIN_NIGHTLY_CONSOLIDATE === 'true') {
-      this.nightlyTimer = scheduleNightlyConsolidation(() => this.consolidate());
-    }
-    if (process.env.BRAIN_NIGHTLY_RESEARCH === 'true') {
-      this.nightlyResearchTimer = scheduleNightlyResearch(() => runNightlyResearch());
-    }
   }
 
   private async getClient() {
@@ -201,7 +202,9 @@ export class DesignBrainService {
 
   async ingestFeedback(input: BrainFeedbackInput): Promise<BrainIngestResult> {
     const client = await this.getClient();
-    return ingestFeedback(client, input);
+    const result = await ingestFeedback(client, input);
+    this.tasteProfileCache.delete(this.scopeKey(input));
+    return result;
   }
 
   async search(request: BrainSearchRequest): Promise<BrainSearchResult> {
@@ -217,44 +220,90 @@ export class DesignBrainService {
   async listExperiences(options?: {
     sourceType?: BrainSourceType;
     limit?: number;
+    organizationId?: string;
+    projectId?: string;
   }): Promise<BrainExperienceRecord[]> {
     const client = await this.getClient();
     return listExperiences(client, options);
   }
 
-  async getExperience(id: string): Promise<BrainExperienceRecord | null> {
+  async getExperience(
+    id: string,
+    scope?: BrainTenantScope,
+  ): Promise<BrainExperienceRecord | null> {
     const client = await this.getClient();
-    return getExperienceById(client, id);
+    return getExperienceById(client, id, scope);
   }
 
   async listPrinciples(
     limit?: number,
     offset?: number,
-    options?: { category?: string; sort?: LearnedPrinciplesSort },
+    options?: { category?: string; sort?: LearnedPrinciplesSort } & BrainTenantScope,
   ): Promise<LearnedPrinciplesPage> {
     const client = await this.getClient();
     const pageLimit = limit ?? 100;
     const pageOffset = offset ?? 0;
     const [items, total] = await Promise.all([
       listLearnedPrinciples(client, pageLimit, pageOffset, options),
-      countLearnedPrinciples(client, options?.category),
+      countLearnedPrinciples(client, options?.category, options),
     ]);
     return { items, total };
   }
 
-  async listPrincipleCategories(): Promise<LearnedPrincipleCategoryCount[]> {
+  async listPrincipleCategories(
+    scope?: BrainTenantScope,
+  ): Promise<LearnedPrincipleCategoryCount[]> {
     const client = await this.getClient();
-    return listLearnedPrincipleCategories(client);
+    return listLearnedPrincipleCategories(client, scope);
   }
 
-  async getTasteProfile(): Promise<TasteProfile> {
-    const client = await this.getClient();
-    return computeTasteProfile(client);
+  async getTasteProfile(scope?: BrainTenantScope): Promise<TasteProfile> {
+    const cacheKey = this.scopeKey(scope);
+    const cached = this.tasteProfileCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value;
+    }
+
+    let pending = this.tasteProfileInFlight.get(cacheKey);
+    if (!pending) {
+      const client = await this.getClient();
+      pending = computeTasteProfile(client, scope)
+        .then((value) => {
+          this.tasteProfileCache.set(cacheKey, {
+            value,
+            expiresAt: Date.now() + DesignBrainService.TASTE_PROFILE_CACHE_MS,
+          });
+          return value;
+        })
+        .finally(() => {
+          this.tasteProfileInFlight.delete(cacheKey);
+        });
+      this.tasteProfileInFlight.set(cacheKey, pending);
+    }
+
+    try {
+      return await Promise.race([
+        pending,
+        new Promise<TasteProfile>((_, reject) => {
+          setTimeout(
+            () => reject(new Error('taste_profile_timeout')),
+            DesignBrainService.TASTE_PROFILE_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message !== 'taste_profile_timeout') throw error;
+      return {
+        ...DEFAULT_TASTE_PROFILE,
+        summary: 'Taste profile temporarily unavailable — using modernist defaults.',
+      };
+    }
   }
 
-  async consolidate(): Promise<BrainConsolidateResult> {
+  async consolidate(scope?: BrainTenantScope): Promise<BrainConsolidateResult> {
     const client = await this.getClient();
-    return consolidateBrain(client);
+    return consolidateBrain(client, scope);
   }
 
   async runResearch(query: string, maxSources?: number) {
@@ -273,9 +322,9 @@ export class DesignBrainService {
     return getCandidate(id);
   }
 
-  async approveResearch(id: string) {
+  async approveResearch(id: string, scope?: BrainTenantScope) {
     const client = await this.getClient();
-    return approveResearchCandidate(client, id);
+    return approveResearchCandidate(client, id, scope);
   }
 
   rejectResearch(id: string) {
@@ -302,18 +351,21 @@ export class DesignBrainService {
     return generateWithCritiqueLoop(client, request);
   }
 
-  async getStats(): Promise<BrainStats> {
+  async getStats(scope?: BrainTenantScope): Promise<BrainStats> {
     const client = await this.getClient();
+    const where = {
+      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+    };
 
-    const [experiences, tasteSignals, learnedPrinciples, grouped] = await Promise.all([
-      client.brainExperience.count(),
-      client.brainTasteSignal.count(),
-      client.learnedPrinciple.count(),
-      client.brainExperience.groupBy({
-        by: ['sourceType'],
-        _count: { _all: true },
-      }),
-    ]);
+    const experiences = await client.brainExperience.count({ where });
+    const tasteSignals = await client.brainTasteSignal.count({ where });
+    const learnedPrinciples = await client.learnedPrinciple.count({ where });
+    const grouped = await client.brainExperience.groupBy({
+      by: ['sourceType'],
+      where,
+      _count: { _all: true },
+    });
 
     const bySourceType: Record<BrainSourceType, number> = {
       PDF: 0,
@@ -350,15 +402,12 @@ export class DesignBrainService {
     };
   }
 
+  private scopeKey(scope?: BrainTenantScope): string {
+    return `${scope?.organizationId ?? 'global'}:${scope?.projectId ?? '*'}`;
+  }
+
   stopNightlyConsolidation() {
-    if (this.nightlyTimer) {
-      clearInterval(this.nightlyTimer);
-      this.nightlyTimer = null;
-    }
-    if (this.nightlyResearchTimer) {
-      clearInterval(this.nightlyResearchTimer);
-      this.nightlyResearchTimer = null;
-    }
+    // Scheduling is owned by the distributed BullMQ worker.
   }
 }
 

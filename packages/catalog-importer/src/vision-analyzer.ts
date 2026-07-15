@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CatalogCandidate } from '@logo-platform/shared';
+import { fetchWithDeadline } from '@logo-platform/shared';
 import {
   candidateId,
   PIPELINE_DIR,
@@ -77,7 +78,7 @@ export async function analyzePageWithVision(options: AnalyzePageOptions): Promis
   const imageB64 = readFileSync(imagePath).toString('base64');
   const model = options.model ?? process.env.OPENAI_VISION_MODEL ?? 'gpt-4o-mini';
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithDeadline('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -104,7 +105,7 @@ export async function analyzePageWithVision(options: AnalyzePageOptions): Promis
         },
       ],
     }),
-  });
+  }, { timeoutMs: 60_000 });
 
   if (!response.ok) {
     const err = await response.text();

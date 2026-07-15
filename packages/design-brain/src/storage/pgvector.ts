@@ -1,30 +1,24 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import type { PrismaClient } from '@logo-platform/database';
 import { toVectorLiteral } from '../embedding/cosine';
-import { getRepoRoot } from './paths';
 
 let schemaReady = false;
 let schemaReadyPromise: Promise<void> | null = null;
-
-function sqlPath(): string {
-  return resolve(getRepoRoot(), 'packages/database/prisma/sql/brain-setup.sql');
-}
 
 export async function ensureBrainSchema(prisma: PrismaClient): Promise<void> {
   if (schemaReady) return;
   if (!schemaReadyPromise) {
     schemaReadyPromise = (async () => {
-      const sql = readFileSync(sqlPath(), 'utf8');
-      const statements = sql
-        .split(';')
-        .map((statement) => statement.trim())
-        .filter(Boolean);
-
-      for (const statement of statements) {
-        await prisma.$executeRawUnsafe(statement);
+      const rows = await prisma.$queryRawUnsafe<Array<{ ready: boolean }>>(
+        `SELECT (
+           to_regclass('public.design_brain_experience_embeddings') IS NOT NULL
+           AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')
+         ) AS ready`,
+      );
+      if (!rows[0]?.ready) {
+        throw new Error(
+          'Design Brain vector schema is not ready. Run versioned database migrations before starting workers.',
+        );
       }
-
       schemaReady = true;
     })().finally(() => {
       schemaReadyPromise = null;
@@ -41,7 +35,8 @@ export async function isPgvectorEnabled(prisma: PrismaClient): Promise<boolean> 
       `SELECT EXISTS (
          SELECT 1
          FROM information_schema.tables
-         WHERE table_name = 'brain_experience_embeddings'
+         WHERE table_schema = 'public'
+           AND table_name = 'design_brain_experience_embeddings'
        ) AS exists`,
     );
     return Boolean(rows[0]?.exists);
@@ -58,7 +53,7 @@ export async function upsertExperienceEmbedding(
   await ensureBrainSchema(prisma);
   const vector = toVectorLiteral(embedding);
   await prisma.$executeRawUnsafe(
-    `INSERT INTO brain_experience_embeddings (experience_id, embedding)
+    `INSERT INTO design_brain_experience_embeddings (experience_id, embedding)
      VALUES ($1, $2::vector)
      ON CONFLICT (experience_id)
      DO UPDATE SET embedding = EXCLUDED.embedding, created_at = NOW()`,
@@ -77,30 +72,25 @@ export async function searchExperienceEmbeddings(
   queryEmbedding: number[],
   limit: number,
   sourceType?: string,
+  organizationId?: string,
+  projectId?: string,
 ): Promise<VectorSearchRow[]> {
   await ensureBrainSchema(prisma);
   const vector = toVectorLiteral(queryEmbedding);
 
-  if (sourceType) {
-    return prisma.$queryRawUnsafe<VectorSearchRow[]>(
-      `SELECT emb.experience_id, 1 - (emb.embedding <=> $1::vector) AS similarity
-       FROM brain_experience_embeddings emb
-       JOIN "BrainExperience" e ON e.id = emb.experience_id
-       WHERE e."sourceType" = $3::"BrainSourceType"
-       ORDER BY emb.embedding <=> $1::vector
-       LIMIT $2`,
-      vector,
-      limit,
-      sourceType,
-    );
-  }
-
   return prisma.$queryRawUnsafe<VectorSearchRow[]>(
-    `SELECT experience_id, 1 - (embedding <=> $1::vector) AS similarity
-     FROM brain_experience_embeddings
-     ORDER BY embedding <=> $1::vector
+    `SELECT emb.experience_id, 1 - (emb.embedding <=> $1::vector) AS similarity
+     FROM design_brain_experience_embeddings emb
+     JOIN design_brain_experiences e ON e.id = emb.experience_id
+     WHERE ($3::text IS NULL OR e.source_type::text = $3)
+       AND ($4::text IS NULL OR e.organization_id = $4)
+       AND ($5::text IS NULL OR e.project_id = $5)
+     ORDER BY emb.embedding <=> $1::vector
      LIMIT $2`,
     vector,
     limit,
+    sourceType ?? null,
+    organizationId ?? null,
+    projectId ?? null,
   );
 }

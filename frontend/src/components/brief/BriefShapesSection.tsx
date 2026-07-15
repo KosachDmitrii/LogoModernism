@@ -28,7 +28,10 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [expanded, setExpanded] = useState(false);
 
-  const { data: primitives } = useQuery({ queryKey: ['primitives'], queryFn: getPrimitives });
+  const { data: primitives } = useQuery({
+    queryKey: ['primitives'],
+    queryFn: ({ signal }) => getPrimitives(signal),
+  });
 
   const analysis = useMutation({
     mutationFn: () => analyzeGeometry({ industry, complexity: 'minimal' }),

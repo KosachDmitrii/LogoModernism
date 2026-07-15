@@ -1,4 +1,5 @@
 import { gunzipSync } from 'node:zlib';
+import { fetchWithDeadline } from '@logo-platform/shared';
 import { sanitizePostgresText } from '../storage/sanitize-text';
 import { archiveIdentifierFromUrl, isArchiveUrl } from './archive-search';
 
@@ -35,7 +36,7 @@ async function fetchWikipediaArticleText(url: string): Promise<string> {
   apiUrl.searchParams.set('format', 'json');
   apiUrl.searchParams.set('origin', '*');
 
-  const response = await fetch(apiUrl);
+  const response = await fetchWithDeadline(apiUrl, {}, { timeoutMs: FETCH_TIMEOUT_MS });
   if (!response.ok) return '';
 
   const data = (await response.json()) as {
@@ -62,10 +63,10 @@ async function fetchArchiveMetadata(identifier: string): Promise<ArchiveMetadata
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`, {
+    const response = await fetchWithDeadline(`https://archive.org/metadata/${encodeURIComponent(identifier)}`, {
       signal: controller.signal,
       headers: { 'User-Agent': 'LogoModernism-DesignBrain/1.0 (research)' },
-    });
+    }, { timeoutMs: FETCH_TIMEOUT_MS });
 
     if (!response.ok) return null;
 
@@ -117,11 +118,11 @@ async function downloadArchiveFile(
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(fileUrl, {
+    const response = await fetchWithDeadline(fileUrl, {
       signal: controller.signal,
       headers: { 'User-Agent': 'LogoModernism-DesignBrain/1.0 (research)' },
       redirect: 'follow',
-    });
+    }, { timeoutMs: FETCH_TIMEOUT_MS });
 
     if (!response.ok) return null;
 
@@ -140,10 +141,10 @@ async function fetchArchiveDetailsDescription(identifier: string): Promise<strin
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`https://archive.org/details/${encodeURIComponent(identifier)}`, {
+    const response = await fetchWithDeadline(`https://archive.org/details/${encodeURIComponent(identifier)}`, {
       signal: controller.signal,
       headers: { 'User-Agent': 'LogoModernism-DesignBrain/1.0 (research)' },
-    });
+    }, { timeoutMs: FETCH_TIMEOUT_MS });
 
     if (!response.ok) return '';
 
@@ -227,14 +228,14 @@ export async function fetchUrlText(url: string): Promise<{ title: string; text: 
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithDeadline(url, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'LogoModernism-DesignBrain/1.0 (research; +https://github.com)',
         Accept: 'text/html,application/xhtml+xml,text/plain',
       },
       redirect: 'follow',
-    });
+    }, { timeoutMs: FETCH_TIMEOUT_MS });
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status} for ${url}`);

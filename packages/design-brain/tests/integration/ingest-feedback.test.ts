@@ -38,7 +38,7 @@ describeIntegration('ingestFeedback (integration)', () => {
     expect(experience?.sourceType).toBe('FEEDBACK');
 
     const embeddingRows = await prisma.$queryRawUnsafe<Array<{ experience_id: string }>>(
-      `SELECT experience_id FROM brain_experience_embeddings WHERE experience_id = $1`,
+      `SELECT experience_id FROM design_brain_experience_embeddings WHERE experience_id = $1`,
       result.experienceId,
     );
     expect(embeddingRows).toHaveLength(1);

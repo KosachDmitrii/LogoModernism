@@ -1,3 +1,5 @@
+import { fetchWithDeadline } from '@logo-platform/shared';
+
 const MAX_BRAINSTORM = 25;
 const MAX_SELECTED = 15;
 const MIN_SELECTED = 10;
@@ -86,7 +88,7 @@ async function callOpenAi(
   if (!apiKey) return [];
 
   const model = process.env.OPENAI_TEXT_MODEL ?? 'gpt-4o-mini';
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithDeadline('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -101,7 +103,7 @@ async function callOpenAi(
         { role: 'user', content: user },
       ],
     }),
-  });
+  }, { timeoutMs: 45_000 });
 
   if (!response.ok) return [];
 
@@ -213,7 +215,7 @@ export async function summarizeText(text: string, title?: string): Promise<strin
   const trimmed = excerptForSummary(normalizeText(text));
   if (!trimmed) return '';
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithDeadline('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -235,7 +237,7 @@ export async function summarizeText(text: string, title?: string): Promise<strin
         },
       ],
     }),
-  });
+  }, { timeoutMs: 45_000 });
 
   if (!response.ok) {
     return trimmed.slice(0, 280);

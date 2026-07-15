@@ -1,4 +1,5 @@
 import { EMBEDDING_DIMENSIONS } from '../storage/paths';
+import { fetchWithDeadline } from '@logo-platform/shared';
 
 const DEFAULT_MODEL = 'text-embedding-3-small';
 
@@ -24,7 +25,7 @@ export async function embedText(text: string): Promise<number[]> {
     throw new Error('Cannot embed empty text');
   }
 
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
+  const response = await fetchWithDeadline('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${getApiKey()}`,
@@ -35,7 +36,7 @@ export async function embedText(text: string): Promise<number[]> {
       input,
       dimensions: EMBEDDING_DIMENSIONS,
     }),
-  });
+  }, { timeoutMs: 30_000 });
 
   if (!response.ok) {
     const errorBody = await response.text();

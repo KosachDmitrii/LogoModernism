@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import type { BrainIngestResult } from '@logo-platform/shared';
+import { fetchWithDeadline } from '@logo-platform/shared';
 import type { PrismaClient } from '@logo-platform/database';
 import { reverseAnalyzeLogo } from '@logo-platform/ai-engines';
 import { embedText } from '../embedding/embedding.service';
@@ -31,6 +32,8 @@ export interface IngestImageOptions {
   originalName: string;
   title?: string;
   mimeType?: string;
+  organizationId?: string;
+  projectId?: string;
 }
 
 interface VisionAnalysis {
@@ -66,7 +69,7 @@ export async function ingestImage(
   const imageB64 = options.buffer.toString('base64');
   const model = process.env.OPENAI_VISION_MODEL ?? 'gpt-4o-mini';
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithDeadline('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -90,7 +93,7 @@ export async function ingestImage(
         },
       ],
     }),
-  });
+  }, { timeoutMs: 45_000 });
 
   if (!response.ok) {
     const err = await response.text();
@@ -150,6 +153,8 @@ export async function ingestImage(
       reverseAnalysis,
       principleIds: reverseAnalysis.matchedPrinciples.map((p) => p.id),
     },
+    organizationId: options.organizationId,
+    projectId: options.projectId,
   });
 
   const embedding = await embedText(enrichedContent);
@@ -167,6 +172,8 @@ export async function ingestImage(
       sourceId: experience.id,
       antiPatterns: principle.antiPatterns,
       tags: principle.tags,
+      organizationId: options.organizationId,
+      projectId: options.projectId,
     });
     principlesExtracted += 1;
   }

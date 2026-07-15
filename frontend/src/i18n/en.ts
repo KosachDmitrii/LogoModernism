@@ -523,6 +523,7 @@ export const en = {
   'saved.companyLabel': 'Company:',
   'saved.industryLabel': 'Industry:',
   'saved.savedLabel': 'Saved:',
+  'saved.loadMore': 'Load more',
 
   // brain
   'brain.subtitle':

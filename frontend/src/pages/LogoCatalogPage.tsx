@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Filter, Search, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -69,9 +69,15 @@ export function LogoCatalogPage() {
   const [chapter, setChapter] = useState('');
   const [section, setSection] = useState('');
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [era, setEra] = useState('');
   const [entryKind, setEntryKind] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
   const eraFilterOptions = useMemo(
     () => [
@@ -81,30 +87,37 @@ export function LogoCatalogPage() {
     [t],
   );
 
-  const { data: stats } = useQuery({ queryKey: ['catalog-stats'], queryFn: getCatalogStats });
-  const { data: taxonomy } = useQuery({ queryKey: ['catalog-taxonomy'], queryFn: getCatalogTaxonomy });
+  const { data: stats } = useQuery({
+    queryKey: ['catalog-stats'],
+    queryFn: ({ signal }) => getCatalogStats(signal),
+  });
+  const { data: taxonomy } = useQuery({
+    queryKey: ['catalog-taxonomy'],
+    queryFn: ({ signal }) => getCatalogTaxonomy(signal),
+  });
 
   const { data: results, isFetching } = useQuery({
-    queryKey: ['catalog-search', chapter, section, query, era, entryKind, projectIndustry],
-    queryFn: () =>
+    queryKey: ['catalog-search', chapter, section, debouncedQuery, era, entryKind, projectIndustry],
+    queryFn: ({ signal }) =>
       searchCatalog({
         chapter: chapter || undefined,
         section: section || undefined,
-        q: query || undefined,
+        q: debouncedQuery || undefined,
         era: era || undefined,
         entryKind: entryKind || undefined,
         rankByIndustry: projectIndustry || undefined,
-      }),
+      }, signal),
+    placeholderData: (previous) => previous,
   });
 
   const { data: recommendations } = useQuery({
     queryKey: ['catalog-recommend', projectIndustry, designBrief.markType],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       getCatalogRecommendations({
         industry: projectIndustry,
         markType: designBrief.markType || undefined,
         limit: 6,
-      }),
+      }, signal),
     enabled: Boolean(projectIndustry?.trim()),
   });
 
@@ -112,11 +125,11 @@ export function LogoCatalogPage() {
 
   const { data: appliedEntries } = useQuery({
     queryKey: ['catalog-applied', appliedIds],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       Promise.all(
         appliedIds.map(async (id) => {
           try {
-            return await getCatalogEntry(id);
+            return await getCatalogEntry(id, signal);
           } catch {
             return { id, name: id.replace(/^ref-(import-)?/, '') };
           }
@@ -137,7 +150,7 @@ export function LogoCatalogPage() {
 
   const { data: fetchedSelected } = useQuery({
     queryKey: ['catalog-entry', selectedId],
-    queryFn: () => getCatalogEntry(selectedId!),
+    queryFn: ({ signal }) => getCatalogEntry(selectedId!, signal),
     enabled: Boolean(selectedId) && !resultMatch && !recommendationMatch,
   });
 

@@ -1,4 +1,8 @@
-import type { BrainIngestResult, BrainResearchCandidate } from '@logo-platform/shared';
+import type {
+  BrainIngestResult,
+  BrainResearchCandidate,
+  BrainTenantScope,
+} from '@logo-platform/shared';
 import type { PrismaClient } from '@logo-platform/database';
 import { embedText } from '../embedding/embedding.service';
 import { createExperience, upsertLearnedPrinciple } from '../storage/experience.repository';
@@ -8,6 +12,7 @@ import { sanitizePostgresText } from '../storage/sanitize-text';
 export async function ingestWebResearch(
   prisma: PrismaClient,
   candidate: BrainResearchCandidate,
+  scope?: BrainTenantScope,
 ): Promise<BrainIngestResult> {
   const title = sanitizePostgresText(candidate.sourceTitle) ?? 'Web research';
   const content = sanitizePostgresText(candidate.extractedText) ?? '';
@@ -26,6 +31,8 @@ export async function ingestWebResearch(
       researchCandidateId: candidate.id,
       curated: true,
     },
+    organizationId: scope?.organizationId,
+    projectId: scope?.projectId,
   });
 
   const embedding = await embedText(`${title}\n${summary ?? ''}\n${content.slice(0, 800)}`);
@@ -48,6 +55,8 @@ export async function ingestWebResearch(
               quote: principle.citationQuote,
             }
           : undefined,
+      organizationId: scope?.organizationId,
+      projectId: scope?.projectId,
     });
     principlesExtracted += 1;
   }

@@ -3,6 +3,7 @@ import type { ClientVisualIntent, DesignStrategy } from '@logo-platform/shared';
 import { buildCatalogPromptContext } from '@logo-platform/knowledge-base';
 import {
   exactBrandSpellingFragment,
+  fetchWithDeadline,
   hasExplicitBrandName,
   normalizeBrandName,
   NO_BRAND_TEXT_FRAGMENT,
@@ -181,7 +182,7 @@ export async function reasonDesignDecision(context: ReasoningContext): Promise<D
     .filter(Boolean)
     .join('\n');
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithDeadline('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -196,7 +197,7 @@ export async function reasonDesignDecision(context: ReasoningContext): Promise<D
         { role: 'user', content: userPrompt },
       ],
     }),
-  });
+  }, { timeoutMs: 45_000 });
 
   if (!response.ok) {
     return finalizeDecision(fallbackDecision(context), context);

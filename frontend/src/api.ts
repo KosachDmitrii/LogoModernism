@@ -26,8 +26,57 @@ import type {
 import type { PromptGenerateIntent } from './lib/prompt-generate-intent';
 import { parseApiError } from './lib/api-error';
 import { getApiBase } from './lib/api-base';
+import { apiFetch as fetch } from './lib/api-client';
 
 const API_BASE = getApiBase();
+
+type QueueJobStatus<Result = unknown> = {
+  id: string;
+  state: 'active' | 'completed' | 'delayed' | 'failed' | 'waiting' | 'unknown';
+  progress: unknown;
+  result?: Result;
+  failedReason?: string;
+  createdAt: string;
+  finishedAt?: string;
+};
+
+async function getJobStatus<Result>(
+  jobId: string,
+  signal?: AbortSignal,
+): Promise<QueueJobStatus<Result>> {
+  const res = await fetch(`${API_BASE}/jobs/${encodeURIComponent(jobId)}`, { signal });
+  if (!res.ok) await parseApiError(res, 'errors.api.progressCheckFailed');
+  return res.json();
+}
+
+async function waitForJob<Result>(
+  jobId: string,
+  signal?: AbortSignal,
+  deadlineMs = 180_000,
+): Promise<QueueJobStatus<Result>> {
+  const startedAt = Date.now();
+  let delayMs = 1_000;
+  while (Date.now() - startedAt < deadlineMs) {
+    const status = await getJobStatus<Result>(jobId, signal);
+    if (status.state === 'completed') return status;
+    if (status.state === 'failed') {
+      throw new Error(status.failedReason ?? 'Background job failed');
+    }
+    await new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(() => {
+        signal?.removeEventListener('abort', abort);
+        resolve();
+      }, delayMs);
+      const abort = () => {
+        window.clearTimeout(timer);
+        reject(signal?.reason ?? new DOMException('The request was aborted', 'AbortError'));
+      };
+      signal?.addEventListener('abort', abort, { once: true });
+    });
+    delayMs = Math.min(3_000, delayMs + 500);
+  }
+  throw new Error(`Background job exceeded ${deadlineMs}ms deadline`);
+}
 
 export async function generatePrompts(body: {
   industry: string;
@@ -56,11 +105,20 @@ export async function generatePrompts(body: {
     headers: {
       'Content-Type': 'application/json',
       'X-Prompt-Intent': intent,
+      'Idempotency-Key': crypto.randomUUID(),
     },
     body: JSON.stringify({ ...payload, intent }),
   });
   if (!res.ok) await parseApiError(res, 'common.generationFailed');
-  return res.json();
+  const response = (await res.json()) as
+    | GenerateResponse
+    | { id: string; status: 'queued' };
+  if (!('id' in response && response.status === 'queued')) {
+    return response as GenerateResponse;
+  }
+  const job = await waitForJob<GenerateResponse>(response.id, undefined, 5 * 60_000);
+  if (!job.result) throw new Error('Prompt generation job returned no result');
+  return { ...job.result, meta: { intent } };
 }
 
 export async function getRecommendations(industry: string): Promise<RecommendResponse> {
@@ -75,24 +133,24 @@ export async function getPrinciplesOverview(): Promise<{ total: number; categori
   return res.json();
 }
 
-export async function getCatalogStats() {
-  const res = await fetch(`${API_BASE}/principles/catalog/stats`);
+export async function getCatalogStats(signal?: AbortSignal) {
+  const res = await fetch(`${API_BASE}/principles/catalog/stats`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.catalogStatsFailed');
   return res.json();
 }
 
-export async function getCatalogTaxonomy() {
-  const res = await fetch(`${API_BASE}/principles/catalog/taxonomy`);
+export async function getCatalogTaxonomy(signal?: AbortSignal) {
+  const res = await fetch(`${API_BASE}/principles/catalog/taxonomy`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.catalogTaxonomyFailed');
   return res.json();
 }
 
-export async function searchCatalog(params: Record<string, string | undefined>) {
+export async function searchCatalog(params: Record<string, string | undefined>, signal?: AbortSignal) {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
     if (v) qs.set(k, v);
   }
-  const res = await fetch(`${API_BASE}/principles/catalog/search?${qs}`);
+  const res = await fetch(`${API_BASE}/principles/catalog/search?${qs}`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.catalogSearchFailed');
   return res.json();
 }
@@ -102,19 +160,19 @@ export async function getCatalogRecommendations(params: {
   markType?: string;
   era?: string;
   limit?: number;
-}) {
+}, signal?: AbortSignal) {
   const qs = new URLSearchParams();
   qs.set('industry', params.industry);
   if (params.markType) qs.set('markType', params.markType);
   if (params.era) qs.set('era', params.era);
   if (params.limit != null) qs.set('limit', String(params.limit));
-  const res = await fetch(`${API_BASE}/principles/catalog/recommend?${qs}`);
+  const res = await fetch(`${API_BASE}/principles/catalog/recommend?${qs}`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.catalogRecommendFailed');
   return res.json();
 }
 
-export async function getCatalogEntry(id: string) {
-  const res = await fetch(`${API_BASE}/principles/catalog/${encodeURIComponent(id)}`);
+export async function getCatalogEntry(id: string, signal?: AbortSignal) {
+  const res = await fetch(`${API_BASE}/principles/catalog/${encodeURIComponent(id)}`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.catalogEntryFailed');
   return res.json();
 }
@@ -158,8 +216,8 @@ export async function analyzeComposition(body: {
   return res.json();
 }
 
-export async function getPrimitives() {
-  const res = await fetch(`${API_BASE}/engines/primitives`);
+export async function getPrimitives(signal?: AbortSignal) {
+  const res = await fetch(`${API_BASE}/engines/primitives`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.primitivesLoadFailed');
   return res.json();
 }
@@ -180,14 +238,26 @@ export async function runFullPipeline(body: { companyName?: string; industry: st
   return res.json();
 }
 
-export async function getImageProviders(): Promise<{ providers: ImageProviderInfo[] }> {
-  const res = await fetch(`${API_BASE}/images/providers`);
+export async function getImageProviders(signal?: AbortSignal): Promise<{ providers: ImageProviderInfo[] }> {
+  const res = await fetch(`${API_BASE}/images/providers`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.imageProvidersFailed');
   return res.json();
 }
 
-export async function listSavedPrompts(): Promise<{ prompts: ComposedPrompt[]; total: number }> {
-  const res = await fetch(`${API_BASE}/prompts/saved`);
+export interface SavedPromptsPage {
+  prompts: ComposedPrompt[];
+  total?: number;
+  nextCursor?: string | null;
+}
+
+export async function listSavedPrompts(
+  cursor?: string | null,
+  limit = 20,
+  signal?: AbortSignal,
+): Promise<SavedPromptsPage> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  const res = await fetch(`${API_BASE}/prompts/saved?${params}`, { signal });
   if (!res.ok) await parseApiError(res, 'common.failedToLoadSavedPrompts');
   return res.json();
 }
@@ -198,7 +268,10 @@ export async function togglePromptSave(
 ): Promise<{ promptId: string; saved: boolean }> {
   const res = await fetch(`${API_BASE}/prompts/${encodeURIComponent(promptId)}/save`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': crypto.randomUUID(),
+    },
     body: JSON.stringify({ saved }),
   });
   if (!res.ok) await parseApiError(res, 'common.failedToSavePrompt');
@@ -281,7 +354,21 @@ export async function generatePromptLogo(
     body: JSON.stringify(payload),
   });
   if (!res.ok) await parseApiError(res, 'common.imageGenerationFailed');
-  return res.json();
+  const response = (await res.json()) as
+    | { image: GeneratedImage; logos: GeneratedImage[]; remaining: number }
+    | { status: 'queued'; jobId: string; imageId: string; remaining: number };
+  if ('image' in response) return response;
+
+  await waitForJob(response.jobId);
+  const promptResponse = await fetch(
+    `${API_BASE}/prompts/${encodeURIComponent(promptId)}`,
+  );
+  if (!promptResponse.ok) await parseApiError(promptResponse, 'common.imageGenerationFailed');
+  const prompt = (await promptResponse.json()) as ComposedPrompt & { logos?: GeneratedImage[] };
+  const logos = prompt.logos ?? [];
+  const image = logos.find((item) => item.id === response.imageId);
+  if (!image) throw new Error('Generated image was not persisted');
+  return { image, logos, remaining: response.remaining };
 }
 
 export async function generateImageFromPrompt(body: {
@@ -316,20 +403,20 @@ export async function runBriefInterview(body: {
   return res.json();
 }
 
-export async function getBrainHealth(): Promise<BrainCapabilities> {
-  const res = await fetch(`${API_BASE}/brain/health`);
+export async function getBrainHealth(signal?: AbortSignal): Promise<BrainCapabilities> {
+  const res = await fetch(`${API_BASE}/brain/health`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.brainHealthFailed');
   return res.json();
 }
 
-export async function getBrainStats(): Promise<BrainStats> {
-  const res = await fetch(`${API_BASE}/brain/stats`);
+export async function getBrainStats(signal?: AbortSignal): Promise<BrainStats> {
+  const res = await fetch(`${API_BASE}/brain/stats`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.brainStatsFailed');
   return res.json();
 }
 
-export async function getBrainTasteProfile(): Promise<TasteProfile> {
-  const res = await fetch(`${API_BASE}/brain/taste-profile`);
+export async function getBrainTasteProfile(signal?: AbortSignal): Promise<TasteProfile> {
+  const res = await fetch(`${API_BASE}/brain/taste-profile`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.tasteProfileFailed');
   return res.json();
 }
@@ -337,13 +424,19 @@ export async function getBrainTasteProfile(): Promise<TasteProfile> {
 export async function consolidateBrain(): Promise<BrainConsolidateResult> {
   const res = await fetch(`${API_BASE}/brain/consolidate`, { method: 'POST' });
   if (!res.ok) await parseApiError(res, 'errors.api.consolidateFailed');
-  return res.json();
+  const submission = (await res.json()) as { id?: string } | BrainConsolidateResult;
+  if ('ranAt' in submission) return submission;
+  if (!submission.id) throw new Error('Consolidation job was not created');
+  const job = await waitForJob<{ result: BrainConsolidateResult }>(submission.id);
+  if (!job.result?.result) throw new Error('Consolidation job returned no result');
+  return job.result.result;
 }
 
 export async function listBrainPrinciples(
   limit = 50,
   offset = 0,
   options?: { category?: string; sort?: LearnedPrinciplesSort },
+  signal?: AbortSignal,
 ): Promise<LearnedPrinciplesPage> {
   const params = new URLSearchParams({
     limit: String(limit),
@@ -351,13 +444,13 @@ export async function listBrainPrinciples(
   });
   if (options?.category) params.set('category', options.category);
   if (options?.sort) params.set('sort', options.sort);
-  const res = await fetch(`${API_BASE}/brain/principles?${params}`);
+  const res = await fetch(`${API_BASE}/brain/principles?${params}`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.principlesLoadFailed');
   return res.json();
 }
 
-export async function listBrainPrincipleCategories(): Promise<LearnedPrincipleCategoryCount[]> {
-  const res = await fetch(`${API_BASE}/brain/principles/categories`);
+export async function listBrainPrincipleCategories(signal?: AbortSignal): Promise<LearnedPrincipleCategoryCount[]> {
+  const res = await fetch(`${API_BASE}/brain/principles/categories`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.principlesLoadFailed');
   return res.json();
 }
@@ -372,10 +465,41 @@ export async function checkBrainPdfIngest(title: string, contentHash: string): P
   return res.json();
 }
 
-export async function getBrainPdfIngestProgress(jobId: string): Promise<BrainPdfIngestProgress> {
-  const res = await fetch(`${API_BASE}/brain/ingest/pdf/progress/${encodeURIComponent(jobId)}`);
-  if (!res.ok) await parseApiError(res, 'errors.api.progressCheckFailed');
-  return res.json();
+export async function getBrainPdfIngestProgress(
+  jobId: string,
+  signal?: AbortSignal,
+): Promise<BrainPdfIngestProgress> {
+  const response = await fetch(
+    `${API_BASE}/brain/ingest/pdf/progress/${encodeURIComponent(jobId)}`,
+    { signal },
+  );
+  if (!response.ok) await parseApiError(response, 'errors.api.progressCheckFailed');
+  const value = (await response.json()) as
+    | BrainPdfIngestProgress
+    | QueueJobStatus<{ result?: BrainIngestResult }>;
+  if ('status' in value) return value;
+  const job = value;
+  const status =
+    job.state === 'completed'
+      ? 'done'
+      : job.state === 'failed'
+        ? 'error'
+        : job.state === 'active'
+          ? 'processing'
+          : 'queued';
+  return {
+    jobId,
+    title: '',
+    fileName: '',
+    status,
+    phase: status === 'processing' ? 'processing' : status === 'done' ? 'done' : undefined,
+    message:
+      typeof job.progress === 'number' ? `${Math.round(job.progress)}%` : undefined,
+    result: job.result?.result,
+    error: job.failedReason,
+    startedAt: job.createdAt,
+    finishedAt: job.finishedAt,
+  };
 }
 
 export async function ingestBrainPdf(
@@ -404,7 +528,12 @@ export async function ingestBrainFeedback(body: {
     body: JSON.stringify(body),
   });
   if (!res.ok) await parseApiError(res, 'errors.api.feedbackFailed');
-  return res.json();
+  const submission = (await res.json()) as { id?: string } | BrainIngestResult;
+  if ('experienceId' in submission) return submission;
+  if (!submission.id) throw new Error('Feedback job was not created');
+  const job = await waitForJob<BrainIngestResult>(submission.id);
+  if (!job.result) throw new Error('Feedback job returned no result');
+  return job.result;
 }
 
 export async function runBrainResearch(body: { query: string; maxSources?: number }): Promise<BrainResearchRunResult> {
@@ -414,7 +543,16 @@ export async function runBrainResearch(body: { query: string; maxSources?: numbe
     body: JSON.stringify(body),
   });
   if (!res.ok) await parseApiError(res, 'errors.api.researchRunFailed');
-  return res.json();
+  const submission = (await res.json()) as { id?: string } | BrainResearchRunResult;
+  if ('candidates' in submission) return submission;
+  if (!submission.id) throw new Error('Research job was not created');
+  const job = await waitForJob<{ result: BrainResearchRunResult }>(
+    submission.id,
+    undefined,
+    10 * 60_000,
+  );
+  if (!job.result?.result) throw new Error('Research job returned no result');
+  return job.result.result;
 }
 
 export async function previewBrainResearch(body: { query: string; url: string }): Promise<BrainResearchCandidate> {
@@ -427,9 +565,12 @@ export async function previewBrainResearch(body: { query: string; url: string })
   return res.json();
 }
 
-export async function listBrainResearchCandidates(status?: 'pending' | 'approved' | 'rejected'): Promise<BrainResearchCandidate[]> {
+export async function listBrainResearchCandidates(
+  status?: 'pending' | 'approved' | 'rejected',
+  signal?: AbortSignal,
+): Promise<BrainResearchCandidate[]> {
   const qs = status ? `?status=${encodeURIComponent(status)}` : '';
-  const res = await fetch(`${API_BASE}/brain/research/candidates${qs}`);
+  const res = await fetch(`${API_BASE}/brain/research/candidates${qs}`, { signal });
   if (!res.ok) await parseApiError(res, 'errors.api.researchCandidatesFailed');
   return res.json();
 }

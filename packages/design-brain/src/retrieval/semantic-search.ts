@@ -15,6 +15,8 @@ export async function semanticSearch(
     queryEmbedding,
     limit,
     request.sourceType,
+    request.organizationId,
+    request.projectId,
   );
 
   const minSimilarity = request.minSimilarity ?? 0;
@@ -24,7 +26,11 @@ export async function semanticSearch(
     if (row.similarity < minSimilarity) continue;
 
     const experience = await prisma.brainExperience.findUnique({
-      where: { id: row.experience_id },
+      where: {
+        id: row.experience_id,
+        ...(request.organizationId ? { organizationId: request.organizationId } : {}),
+        ...(request.projectId ? { projectId: request.projectId } : {}),
+      },
     });
     if (!experience) continue;
 

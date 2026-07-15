@@ -16,11 +16,11 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
 
   const { data: appliedEntries } = useQuery({
     queryKey: ['catalog-applied-brief', appliedIds],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       Promise.all(
         appliedIds.map(async (id) => {
           try {
-            return await getCatalogEntry(id);
+            return await getCatalogEntry(id, signal);
           } catch {
             return { id, name: id.replace(/^ref-(import-)?/, '') };
           }

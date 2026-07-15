@@ -1,37 +1,45 @@
-import type { TasteProfile, TasteSignalType } from '@logo-platform/shared';
+import type { BrainTenantScope, TasteProfile, TasteSignalType } from '@logo-platform/shared';
 import type { PrismaClient } from '@logo-platform/database';
 
 const POSITIVE: TasteSignalType[] = ['LIKE', 'APPROVE'];
 const NEGATIVE: TasteSignalType[] = ['DISLIKE', 'REJECT'];
+
+export const DEFAULT_TASTE_PROFILE: TasteProfile = {
+  preferredMarkTypes: ['wordmark', 'lettermark'],
+  preferredGeometry: ['circle', 'grid-based'],
+  preferredColors: ['black_white'],
+  preferredRendering: ['flat vector'],
+  avoidedPatterns: ['gradients', 'shadows', 'photorealism'],
+  averageScore: 7,
+  signalCount: 0,
+  summary: 'No taste signals yet — using modernist defaults.',
+};
 
 function extractTags(text: string, keywords: string[]): string[] {
   const lower = text.toLowerCase();
   return keywords.filter((keyword) => lower.includes(keyword));
 }
 
-export async function computeTasteProfile(prisma: PrismaClient): Promise<TasteProfile> {
+export async function computeTasteProfile(
+  prisma: PrismaClient,
+  scope?: BrainTenantScope,
+): Promise<TasteProfile> {
   const signals = await prisma.brainTasteSignal.findMany({
+    where: {
+      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+    },
     orderBy: { createdAt: 'desc' },
-    take: 500,
+    take: 200,
     select: {
       signalType: true,
       score: true,
-      context: true,
       metadata: true,
     },
   });
 
   if (!signals.length) {
-    return {
-      preferredMarkTypes: ['wordmark', 'lettermark'],
-      preferredGeometry: ['circle', 'grid-based'],
-      preferredColors: ['black_white'],
-      preferredRendering: ['flat vector'],
-      avoidedPatterns: ['gradients', 'shadows', 'photorealism'],
-      averageScore: 7,
-      signalCount: 0,
-      summary: 'No taste signals yet — using modernist defaults.',
-    };
+    return { ...DEFAULT_TASTE_PROFILE };
   }
 
   const markTypes = new Map<string, number>();
@@ -43,7 +51,7 @@ export async function computeTasteProfile(prisma: PrismaClient): Promise<TastePr
 
   for (const signal of signals) {
     const metadata = (signal.metadata ?? {}) as Record<string, unknown>;
-    const text = [signal.context, JSON.stringify(metadata)].join(' ').toLowerCase();
+    const text = JSON.stringify(metadata).toLowerCase();
     const weight = POSITIVE.includes(signal.signalType)
       ? signal.score
       : NEGATIVE.includes(signal.signalType)

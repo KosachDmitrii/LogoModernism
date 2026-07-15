@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { Heart, Loader2 } from 'lucide-react';
-import { listSavedPrompts } from '../api';
+import { listSavedPrompts, type SavedPromptsPage as SavedPromptsPageData } from '../api';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
 import { PromptCard } from '../components/PromptCard';
@@ -23,14 +23,49 @@ export function SavedPromptsPage() {
   const t = useT();
   const locale = useLocale();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['saved-prompts'],
-    queryFn: () => listSavedPrompts(),
+    queryFn: ({ pageParam, signal }) => listSavedPrompts(pageParam, 20, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 
-  const prompts = data?.prompts ?? [];
-  const total = data?.total ?? prompts.length;
+  const prompts = data?.pages.flatMap((page) => page.prompts) ?? [];
+  const total = data?.pages[0]?.total ?? prompts.length;
+
+  const updateSavedPrompt = (prompt: (typeof prompts)[number], saved: boolean) => {
+    queryClient.setQueryData<InfiniteData<SavedPromptsPageData, string | null>>(
+      ['saved-prompts'],
+      (current) => {
+        if (!current) return current;
+        const exists = current.pages.some((page) => page.prompts.some((item) => item.id === prompt.id));
+        if (saved === exists) return current;
+
+        const pages = current.pages.map((page, index) => ({
+          ...page,
+          total:
+            page.total === undefined
+              ? undefined
+              : Math.max(0, page.total + (saved ? 1 : -1)),
+          prompts: saved && index === 0
+            ? [{ ...prompt, saved: true }, ...page.prompts]
+            : page.prompts.filter((item) => item.id !== prompt.id),
+        }));
+        return { ...current, pages };
+      },
+    );
+    if (!saved) setSelectedId((current) => (current === prompt.id ? null : current));
+  };
 
   return (
     <PageContainer>
@@ -85,10 +120,21 @@ export function SavedPromptsPage() {
                 selected={selectedId === prompt.id}
                 onSelect={() => setSelectedId((current) => (current === prompt.id ? null : prompt.id))}
                 standalone
-                onStateChange={() => refetch()}
+                onSavedChange={(saved) => updateSavedPrompt(prompt, saved)}
               />
             </div>
           ))}
+          {hasNextPage && (
+            <button
+              type="button"
+              disabled={isFetchingNextPage}
+              onClick={() => void fetchNextPage()}
+              className="mx-auto flex items-center gap-2 rounded-lg border border-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:border-zinc-700 disabled:opacity-50"
+            >
+              {isFetchingNextPage && <Loader2 size={16} className="animate-spin" />}
+              {t('saved.loadMore')}
+            </button>
+          )}
         </div>
       )}
     </PageContainer>
