@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Progress } from '@base-ui/react/progress';
 import { BookOpen, ExternalLink } from 'lucide-react';
 import type { LearnedPrincipleRecord } from '../../types';
 import { useT, type MessageKey } from '../../i18n';
@@ -9,6 +10,8 @@ import {
   type PrincipleInfluenceLevel,
 } from '../../lib/brain-labels';
 import { resolveCitationLink } from '../../lib/citation-url';
+import { Button } from '../ui/Button';
+import { Tooltip } from '../ui/Tooltip';
 
 const INFLUENCE_LABEL_KEYS: Record<PrincipleInfluenceLevel, MessageKey> = {
   weak: 'brain.principleInfluence.weak',
@@ -62,13 +65,13 @@ export function BrainPrinciplesCard({
             )}
           </div>
           {onViewAll && hasMore && (
-            <button
+            <Button
               type="button"
               onClick={onViewAll}
               className="text-xs text-violet-400 hover:text-violet-300 shrink-0"
             >
               {t('brain.principlesViewAll')}
-            </button>
+            </Button>
           )}
         </div>
         <p className="text-xs text-zinc-500 leading-relaxed">{t(hintKey)}</p>
@@ -132,16 +135,17 @@ function PrincipleRow({ principle, rank }: { principle: LearnedPrincipleRecord; 
               </blockquote>
               {citationLink?.href ? (
                 <figcaption className="mt-1.5">
-                  <a
-                    href={citationLink.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={citationLink.href}
-                    className="inline-flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300"
-                  >
-                    {t('brain.principleSource')}
-                    <ExternalLink size={11} />
-                  </a>
+                  <Tooltip content={citationLink.href}>
+                    <a
+                      href={citationLink.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300"
+                    >
+                      {t('brain.principleSource')}
+                      <ExternalLink size={11} />
+                    </a>
+                  </Tooltip>
                 </figcaption>
               ) : citationLink?.kind === 'pdf' ? (
                 <figcaption className="mt-1.5 text-[11px] text-zinc-500">
@@ -160,27 +164,24 @@ function PrincipleRow({ principle, rank }: { principle: LearnedPrincipleRecord; 
           <div className="pt-1">
             <div className="flex items-center justify-between gap-3 text-[11px] text-zinc-500">
               <span>{t('brain.principleInfluence')}</span>
-              <span
-                className="text-zinc-300 font-medium cursor-help"
-                title={weightDetail}
-              >
-                {influenceLabel}
-              </span>
+              <Tooltip content={weightDetail}>
+                <span tabIndex={0} className="text-zinc-300 font-medium cursor-help">
+                  {influenceLabel}
+                </span>
+              </Tooltip>
             </div>
-            <div
+            <Progress.Root
+              value={principle.weight}
+              min={0}
+              max={PRINCIPLE_MAX_WEIGHT}
               className="mt-1.5 h-1.5 rounded-full bg-zinc-800 overflow-hidden"
-              role="progressbar"
-              aria-valuenow={principle.weight}
-              aria-valuemin={0}
-              aria-valuemax={PRINCIPLE_MAX_WEIGHT}
               aria-label={`${influenceLabel} (${weightDetail})`}
-              title={weightDetail}
             >
-              <div
+              <Progress.Indicator
                 className="h-full rounded-full bg-violet-500/80"
                 style={{ width: `${influencePercent}%` }}
               />
-            </div>
+            </Progress.Root>
           </div>
         </div>
       </div>

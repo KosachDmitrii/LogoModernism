@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { Progress } from '@base-ui/react/progress';
 import clsx from 'clsx';
 
 interface ScoreBarProps {
@@ -22,14 +23,24 @@ export function ScoreBar({ label, hint, value, max = 10 }: ScoreBarProps) {
         </div>
         <span className="shrink-0 font-mono text-zinc-300">{value.toFixed(1)}</span>
       </div>
-      <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-        <motion.div
-          className={clsx('h-full rounded-full', color)}
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
+      <Progress.Root
+        value={value}
+        min={0}
+        max={max}
+        aria-label={label}
+        className="h-1.5 rounded-full bg-zinc-800 overflow-hidden"
+      >
+        <Progress.Indicator
+          render={
+            <motion.div
+              className={clsx('h-full rounded-full', color)}
+              initial={{ width: 0 }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+            />
+          }
         />
-      </div>
+      </Progress.Root>
     </div>
   );
 }

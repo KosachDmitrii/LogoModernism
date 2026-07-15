@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { Tabs } from '@base-ui/react/tabs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Brain,
@@ -46,6 +47,8 @@ import { formatError } from '../lib/api-error';
 import { useAuth } from '../auth/AuthProvider';
 import { hasPermission } from '../auth/permissions';
 import { useToast } from '../components/ToastProvider';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
 type Tab = 'overview' | 'principles' | 'learn' | 'research';
 
@@ -291,8 +294,8 @@ export function DesignBrainPage() {
           {t('brain.loading')}
         </div>
       ) : (
-        <>
-      <div className="flex gap-1 mb-8 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
+        <Tabs.Root value={tab} onValueChange={(value) => setTab(value as Tab)}>
+      <Tabs.List className="flex gap-1 mb-8 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
         {tabs.map(({ id, labelKey, icon: Icon }) => {
           const isUploadTab = id === 'learn';
           const isResearchTab = id === 'research';
@@ -313,10 +316,9 @@ export function DesignBrainPage() {
             (isUploadTab && isPdfIngesting) || (isResearchTab && isResearching);
 
           return (
-          <button
+          <Tabs.Tab
             key={id}
-            type="button"
-            onClick={() => setTab(id)}
+            value={id}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
               tab === id
                 ? 'bg-violet-900/50 text-violet-200'
@@ -335,12 +337,12 @@ export function DesignBrainPage() {
                 {stats!.learnedPrinciples}
               </span>
             )}
-          </button>
+          </Tabs.Tab>
           );
         })}
-      </div>
+      </Tabs.List>
 
-      {tab === 'overview' && (
+      <Tabs.Panel value="overview">
         <div className="space-y-6">
           <BrainKnowledgeGraph
             categories={principleCategories}
@@ -404,9 +406,9 @@ export function DesignBrainPage() {
             />
           )}
         </div>
-      )}
+      </Tabs.Panel>
 
-      {tab === 'principles' && (
+      <Tabs.Panel value="principles">
         <div className="space-y-4">
           <BrainPrinciplesFilters
             categories={principleCategories}
@@ -457,9 +459,9 @@ export function DesignBrainPage() {
             </div>
           )}
         </div>
-      )}
+      </Tabs.Panel>
 
-      {tab === 'learn' && (
+      <Tabs.Panel value="learn">
         <div className="space-y-8">
           <IngestSection
             title={t('brain.uploadPdfTitle')}
@@ -484,9 +486,9 @@ export function DesignBrainPage() {
             )}
           </IngestSection>
         </div>
-      )}
+      </Tabs.Panel>
 
-      {tab === 'research' && (
+      <Tabs.Panel value="research">
         <div className="space-y-6">
           <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
             <p className="text-sm text-zinc-300 font-medium">{t('brain.research.title')}</p>
@@ -499,14 +501,14 @@ export function DesignBrainPage() {
                 {t('brain.research.trusted', { domains: health.trustedDomains.slice(0, 4).join(', ') })}
               </p>
             )}
-            <input
+            <Input
               value={researchQuery}
               onChange={(e) => setResearchQuery(e.target.value)}
               placeholder={t('brain.research.topicPlaceholder')}
               className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 text-sm"
               onKeyDown={(e) => e.key === 'Enter' && researchQuery.trim() && researchRun.mutate()}
             />
-            <button
+            <Button
               type="button"
               onClick={() => researchRun.mutate()}
               disabled={!researchQuery.trim() || researchRun.isPending}
@@ -514,7 +516,7 @@ export function DesignBrainPage() {
             >
               {researchRun.isPending ? <Loader2 size={16} className="animate-spin" /> : <Globe size={16} />}
               {researchRun.isPending ? t('brain.research.researching') : t('brain.research.start')}
-            </button>
+            </Button>
           </div>
 
           {researchRun.data && researchRun.data.generatedQueries.length > 0 && (
@@ -552,20 +554,20 @@ export function DesignBrainPage() {
 
           <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-3">
             <p className="text-xs font-medium text-zinc-400">{t('brain.research.previewUrl')}</p>
-            <input
+            <Input
               value={manualUrl}
               onChange={(e) => setManualUrl(e.target.value)}
               placeholder={t('brain.research.urlPlaceholder')}
               className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 text-sm"
             />
-            <button
+            <Button
               type="button"
               onClick={() => researchPreview.mutate()}
               disabled={!manualUrl.trim() || researchPreview.isPending}
               className="px-4 py-2 rounded-lg bg-zinc-800 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
             >
               {researchPreview.isPending ? t('brain.research.fetching') : t('brain.research.previewButton')}
-            </button>
+            </Button>
           </div>
 
 
@@ -596,8 +598,8 @@ export function DesignBrainPage() {
             )}
           </div>
         </div>
-      )}
-        </>
+      </Tabs.Panel>
+        </Tabs.Root>
       )}
     </PageContainer>
   );
@@ -659,7 +661,7 @@ function ResearchCandidateCard({
         </div>
       )}
       <div className="flex gap-2 pt-1">
-        <button
+        <Button
           type="button"
           onClick={onApprove}
           disabled={isApproving || isRejecting}
@@ -667,8 +669,8 @@ function ResearchCandidateCard({
         >
           {isApproving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           {t('brain.research.approveLearn')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={onReject}
           disabled={isApproving || isRejecting}
@@ -676,7 +678,7 @@ function ResearchCandidateCard({
         >
           {isRejecting ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
           {t('common.reject')}
-        </button>
+        </Button>
       </div>
     </div>
   );

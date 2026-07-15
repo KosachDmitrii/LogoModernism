@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, ExternalLink, X } from 'lucide-react';
+import { RadioGroup } from '@base-ui/react/radio-group';
 import { getCatalogEntry } from '../../api';
 import { rememberBriefBuildSection } from '../../lib/brief-navigation';
 import { catalogStructureLabels } from '../../lib/catalog-structure-preview';
 import { useAppStore } from '../../store';
 import { useT } from '../../i18n';
 import { BriefRadioOption } from './BriefRadioOption';
+import { Button } from '../ui/Button';
 
 export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: () => void }) {
   const t = useT();
@@ -44,7 +46,12 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
       <p className="text-[13px] text-zinc-500 leading-relaxed">{t('brief.references.intro')}</p>
       <p className="text-xs text-zinc-600 leading-relaxed">{t('brief.references.structureOnly')}</p>
 
-      <div className="space-y-2">
+      <RadioGroup
+        value={designBrief.autoCatalogReferences ? 'auto' : 'manual'}
+        onValueChange={(value) => updateDesignBrief({ autoCatalogReferences: value === 'auto' })}
+        aria-label={t('brief.references.catalogMode')}
+        className="space-y-2"
+      >
         <p className="text-xs font-medium text-zinc-500">{t('brief.references.catalogMode')}</p>
         <BriefRadioOption
           name="catalog-reference-mode"
@@ -62,7 +69,7 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
         >
           {t('brief.references.autoCatalog')}
         </BriefRadioOption>
-      </div>
+      </RadioGroup>
 
       <Link
         to="/logo-catalog"
@@ -84,13 +91,13 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
                 ? t('brief.references.appliedCount', { count: appliedIds.length })
                 : t('brief.references.appliedCountPlural', { count: appliedIds.length })}
             </p>
-            <button
+            <Button
               type="button"
               onClick={clearReferences}
               className="text-[11px] text-zinc-500 hover:text-zinc-300 uppercase tracking-wide"
             >
               {t('brief.references.clearAll')}
-            </button>
+            </Button>
           </div>
           <ul className="space-y-1">
             {(appliedEntries ?? appliedIds.map((id) => ({ id, name: id }))).map((entry) => {
@@ -102,14 +109,14 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[13px] text-emerald-100/90 truncate">{entry.name}</span>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => removeReference(entry.id)}
                     className="shrink-0 p-0.5 rounded hover:bg-emerald-900/60 text-emerald-400 hover:text-red-300 transition-colors"
                     aria-label={`${t('common.remove')} ${entry.name}`}
                   >
                     <X size={14} />
-                  </button>
+                  </Button>
                 </div>
                 {structure.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -127,13 +134,13 @@ export function BriefReferencesSection({ onStepComplete }: { onStepComplete?: ()
             );
             })}
           </ul>
-          <button
+          <Button
             type="button"
             onClick={onStepComplete}
             className="w-full mt-1 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-white text-xs font-medium"
           >
             {t('brief.references.continueToClient')}
-          </button>
+          </Button>
         </div>
       ) : (
         <p className="text-xs text-zinc-600 text-center">{t('brief.references.empty')}</p>

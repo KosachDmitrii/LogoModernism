@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useT } from '../i18n';
+import { Button } from './ui/Button';
 
 interface ApplyToPromptsButtonProps {
   disabled?: boolean;
@@ -19,7 +20,7 @@ export function ApplyToPromptsButton({ disabled, onApply }: ApplyToPromptsButton
   };
 
   return (
-    <button
+    <Button
       type="button"
       disabled={disabled}
       onClick={handleClick}
@@ -27,6 +28,6 @@ export function ApplyToPromptsButton({ disabled, onApply }: ApplyToPromptsButton
     >
       {t('brief.applyToBrief')}
       <ArrowRight size={16} />
-    </button>
+    </Button>
   );
 }

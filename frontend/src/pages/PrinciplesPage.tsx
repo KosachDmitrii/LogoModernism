@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Select } from '@base-ui/react/select';
+import { Check, ChevronDown } from 'lucide-react';
 import { getPrinciplesOverview, searchPrinciples } from '../api';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
 import { useT } from '../i18n';
+import { Input } from '../components/ui/Input';
 
 export function PrinciplesPage() {
   const t = useT();
@@ -22,24 +25,43 @@ export function PrinciplesPage() {
     <PageContainer>
       <PageHeader page="principles" subtitle={t('principles.subtitle')} />
       <div className="mb-6 grid gap-3 sm:grid-cols-[1fr_240px]">
-        <input
+        <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t('principles.searchPlaceholder')}
           className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
         />
-        <select
-          value={category}
-          onChange={(event) => setCategory(event.target.value)}
-          className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
-        >
-          <option value="">{t('principles.allCategories')}</option>
-          {overview.data?.categories.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+        <Select.Root value={category} onValueChange={(value) => setCategory(value ?? '')}>
+          <Select.Trigger className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm outline-none focus:border-violet-500">
+            <Select.Value />
+            <Select.Icon>
+              <ChevronDown size={16} />
+            </Select.Icon>
+          </Select.Trigger>
+          <Select.Portal>
+            <Select.Positioner className="z-50" sideOffset={4}>
+              <Select.Popup className="max-h-72 min-w-[var(--anchor-width)] overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 py-1 text-sm shadow-xl">
+                <Select.Item
+                  value=""
+                  className="flex cursor-default items-center justify-between gap-3 px-3 py-2 text-zinc-300 outline-none data-[highlighted]:bg-zinc-800"
+                >
+                  <Select.ItemText>{t('principles.allCategories')}</Select.ItemText>
+                  <Select.ItemIndicator><Check size={14} /></Select.ItemIndicator>
+                </Select.Item>
+                {overview.data?.categories.map((item) => (
+                  <Select.Item
+                    key={item}
+                    value={item}
+                    className="flex cursor-default items-center justify-between gap-3 px-3 py-2 text-zinc-300 outline-none data-[highlighted]:bg-zinc-800"
+                  >
+                    <Select.ItemText>{item}</Select.ItemText>
+                    <Select.ItemIndicator><Check size={14} /></Select.ItemIndicator>
+                  </Select.Item>
+                ))}
+              </Select.Popup>
+            </Select.Positioner>
+          </Select.Portal>
+        </Select.Root>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {principles.data?.map((principle) => (

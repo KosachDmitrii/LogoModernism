@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { Collapsible } from '@base-ui/react/collapsible';
 import { Copy, ImageIcon, Loader2, Download, Heart } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
@@ -20,6 +21,8 @@ import { formatError } from '../lib/api-error';
 import { imageProviderLabel } from '../lib/translate-labels';
 import { ApiAbortError } from '../lib/api-client';
 import { useToast } from './ToastProvider';
+import { Button } from './ui/Button';
+import { Tooltip } from './ui/Tooltip';
 
 const MAX_LOGOS = 3;
 
@@ -183,26 +186,29 @@ export function PromptCard({
           <span className="text-xs text-zinc-500">{prompt.metadata?.era}</span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button
+          <Tooltip content={t('common.copyPrompt')}>
+          <Button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               copy();
             }}
-            title={t('common.copyPrompt')}
+            aria-label={t('common.copyPrompt')}
             className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
             <Copy size={16} />
-          </button>
+          </Button>
+          </Tooltip>
           {canUseProduct && (
-            <button
+            <Tooltip content={saved ? t('common.removeFromSaved') : t('common.savePrompt')}>
+            <Button
               type="button"
               disabled={toggleSave.isPending}
               onClick={(e) => {
                 e.stopPropagation();
                 toggleSave.mutate();
               }}
-              title={saved ? t('common.removeFromSaved') : t('common.savePrompt')}
+              aria-label={saved ? t('common.removeFromSaved') : t('common.savePrompt')}
               className={clsx(
                 'p-1.5 rounded-lg transition-colors disabled:opacity-50',
                 saved
@@ -215,13 +221,14 @@ export function PromptCard({
               ) : (
                 <Heart size={16} className={saved ? 'fill-current' : undefined} />
               )}
-            </button>
+            </Button>
+            </Tooltip>
           )}
         </div>
       </div>
 
       {canUseProduct && !standalone && (
-        <button
+        <Button
           type="button"
           onClick={generateImage}
           disabled={isGenerating || atLogoLimit}
@@ -233,7 +240,7 @@ export function PromptCard({
             : atLogoLimit
               ? t('prompts.card.maximumLogos', { max: MAX_LOGOS })
               : t('prompts.card.generateLogoImage', { current: logos.length, max: MAX_LOGOS })}
-        </button>
+        </Button>
       )}
 
       {logos.length > 0 && (
@@ -267,12 +274,13 @@ export function PromptCard({
         {prompt.text}
       </p>
 
-      {selected && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          className="space-y-2 pt-3 border-t border-zinc-800"
-        >
+      <Collapsible.Root open={selected}>
+        <Collapsible.Panel>
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="space-y-2 pt-3 border-t border-zinc-800"
+          >
           <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
             {t('prompts.card.scoresTitle')}
           </p>
@@ -302,8 +310,9 @@ export function PromptCard({
               </span>
             ))}
           </div>
-        </motion.div>
-      )}
+          </motion.div>
+        </Collapsible.Panel>
+      </Collapsible.Root>
 
     </article>
   );

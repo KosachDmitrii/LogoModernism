@@ -1,7 +1,10 @@
 import clsx from 'clsx';
 import { Moon, Sun } from 'lucide-react';
+import { Toggle } from '@base-ui/react/toggle';
+import { ToggleGroup } from '@base-ui/react/toggle-group';
 import { useT } from '../i18n';
 import { useThemeStore, type Theme } from '../theme/theme-store';
+import { Tooltip } from './ui/Tooltip';
 
 const THEMES: Array<{ id: Theme; icon: typeof Sun; key: 'common.themeLight' | 'common.themeDark' }> = [
   { id: 'light', icon: Sun, key: 'common.themeLight' },
@@ -27,7 +30,15 @@ export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
         </div>
       )}
 
-      <div className="relative flex shrink-0 p-0.5 rounded-lg bg-zinc-900/80 ring-1 ring-zinc-800/60">
+      <ToggleGroup
+        value={[theme]}
+        onValueChange={(values) => {
+          const next = values[0] as Theme | undefined;
+          if (next) setTheme(next);
+        }}
+        aria-label={t('common.theme')}
+        className="relative flex shrink-0 p-0.5 rounded-lg bg-zinc-900/80 ring-1 ring-zinc-800/60"
+      >
         <div
           aria-hidden
           className={clsx(
@@ -41,14 +52,11 @@ export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
         {THEMES.map(({ id, icon: Icon, key }) => {
           const isActive = theme === id;
           return (
-            <button
+            <Tooltip key={id} content={t(key)}>
+            <Toggle
               key={id}
-              type="button"
-              role="radio"
-              aria-checked={isActive}
+              value={id}
               aria-label={t(key)}
-              title={t(key)}
-              onClick={() => setTheme(id)}
               className={clsx(
                 'relative z-10 w-8 py-1 rounded-md flex items-center justify-center transition-colors duration-150',
                 'focus:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/50',
@@ -56,10 +64,11 @@ export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
               )}
             >
               <Icon size={13} strokeWidth={1.75} />
-            </button>
+            </Toggle>
+            </Tooltip>
           );
         })}
-      </div>
+      </ToggleGroup>
     </div>
   );
 }

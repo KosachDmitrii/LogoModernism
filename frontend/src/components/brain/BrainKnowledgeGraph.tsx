@@ -17,6 +17,7 @@ import {
   labelPosition,
   TONE_STROKE,
 } from '../../lib/brain-graph';
+import { Button } from '../ui/Button';
 
 const IMPULSE_DURATION_S = 5.5;
 
@@ -109,7 +110,7 @@ export function BrainKnowledgeGraph({
         <svg
           viewBox={graphViewBox(orbitNodes)}
           className="block w-full h-auto overflow-visible"
-          role="img"
+          role="group"
           aria-label={t('brain.graph.aria')}
         >
           <defs>
@@ -189,9 +190,20 @@ export function BrainKnowledgeGraph({
                 key={node.id}
                 className="cursor-pointer transition-opacity"
                 style={{ opacity: hoveredId && !isHovered ? 0.45 : 1 }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${node.label}: ${node.count}`}
                 onMouseEnter={() => setHover(node.id)}
                 onMouseLeave={() => setHover(null)}
+                onFocus={() => setHover(node.id)}
+                onBlur={() => setHover(null)}
                 onClick={() => selectCategory(node.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    selectCategory(node.id);
+                  }
+                }}
               >
                 <circle
                   cx={node.x}
@@ -272,7 +284,7 @@ export function BrainKnowledgeGraph({
 
       {onConsolidate && (
         <div className="space-y-2 pt-2 border-t border-zinc-800/80">
-          <button
+          <Button
             type="button"
             onClick={onConsolidate}
             disabled={isConsolidating}
@@ -284,7 +296,7 @@ export function BrainKnowledgeGraph({
               <RefreshCw size={16} />
             )}
             {isConsolidating ? t('brain.consolidateRunning') : t('brain.runConsolidate')}
-          </button>
+          </Button>
           <p className="text-xs text-zinc-600">{t('brain.consolidateHint')}</p>
           {consolidateResult && (
             <p className="text-xs text-zinc-500">

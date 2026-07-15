@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Loader2, Palette } from 'lucide-react';
+import { RadioGroup } from '@base-ui/react/radio-group';
 import { defaultPaletteColors, paletteNeedsColorSelections, resolveColorSelections } from '@logo-platform/shared';
 import { analyzeComposition } from '../../api';
 import { useAppStore } from '../../store';
@@ -13,6 +14,7 @@ import { BriefColorSelections } from './BriefColorSelections';
 import { BriefRadioOption } from './BriefRadioOption';
 import { CustomSelect } from '../CustomSelect';
 import { useToast } from '../ToastProvider';
+import { Button } from '../ui/Button';
 
 type RenderEffectMode = 'flat' | 'shadow' | '3d' | 'shadow_3d';
 
@@ -141,6 +143,14 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
 
       <div className="space-y-2 pt-1">
         <p className="text-xs font-medium text-zinc-500">{t('brief.style.renderEffects')}</p>
+        <RadioGroup
+          value={renderEffect}
+          onValueChange={(value) =>
+            updateDesignBrief({ ...renderEffectFlags(value as RenderEffectMode), styleApplied: true })
+          }
+          aria-label={t('brief.style.renderEffects')}
+          className="space-y-2"
+        >
         {RENDER_EFFECT_OPTIONS.map((option) => (
           <BriefRadioOption
             key={option.value}
@@ -153,9 +163,10 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
             <span className="block mt-0.5 text-zinc-500">{t(option.hintKey)}</span>
           </BriefRadioOption>
         ))}
+        </RadioGroup>
       </div>
 
-      <button
+      <Button
         type="button"
         disabled={!canApply || analysis.isPending}
         onClick={(e) => {
@@ -170,7 +181,7 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
           <Palette size={14} />
         )}
         {t('brief.style.apply')}
-      </button>
+      </Button>
 
       {!industry.trim() && (
         <p className="text-xs text-zinc-600">{t('brief.typography.setIndustryFirst')}</p>

@@ -11,6 +11,7 @@ import { PageHeader } from '../components/PageHeader';
 import { useToast } from '../components/ToastProvider';
 import { useT } from '../i18n';
 import { formatError } from '../lib/api-error';
+import { Button } from '../components/ui/Button';
 
 export function PricingPage() {
   const t = useT();
@@ -89,14 +90,14 @@ export function PricingPage() {
               {t('auth.createAccount')}
             </Link>
           ) : canManage && currentPlan !== 'PLUS' ? (
-            <button
+            <Button
               type="button"
               disabled={checkoutLoading !== null}
               onClick={() => void upgrade('PLUS')}
               className="pricing-primary-action disabled:opacity-60"
             >
               {checkoutLoading === 'PLUS' ? t('pricing.checkoutLoading') : t('pricing.upgradePlus')}
-            </button>
+            </Button>
           ) : !canManage ? (
             <span className="text-sm text-zinc-500">{t('pricing.adminUnlimited')}</span>
           ) : null}
@@ -118,14 +119,14 @@ export function PricingPage() {
               {t('auth.createAccount')}
             </Link>
           ) : canManage && currentPlan !== 'PRO' ? (
-            <button
+            <Button
               type="button"
               disabled={checkoutLoading !== null}
               onClick={() => void upgrade('PRO')}
               className="pricing-secondary-action disabled:opacity-60"
             >
               {checkoutLoading === 'PRO' ? t('pricing.checkoutLoading') : t('pricing.upgradePro')}
-            </button>
+            </Button>
           ) : !canManage ? (
             <span className="text-sm text-zinc-500">{t('pricing.adminUnlimited')}</span>
           ) : null}
@@ -187,14 +188,14 @@ function LogoPackCard({
         </div>
         <span className="text-xl font-semibold text-zinc-100">{price}</span>
       </div>
-      <button
+      <Button
         type="button"
         disabled={disabled}
         onClick={onBuy}
         className="pricing-secondary-action mt-5 disabled:opacity-60"
       >
         {loading ? t('pricing.checkoutLoading') : t('pricing.buyPack')}
-      </button>
+      </Button>
     </article>
   );
 }

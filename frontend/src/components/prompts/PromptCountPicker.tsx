@@ -1,4 +1,6 @@
 import clsx from 'clsx';
+import { Toggle } from '@base-ui/react/toggle';
+import { ToggleGroup } from '@base-ui/react/toggle-group';
 import type { PromptCountOption } from '../../types';
 import { useT } from '../../i18n';
 
@@ -38,13 +40,22 @@ export function PromptCountPicker({
       <label className="block text-xs font-medium text-zinc-400">
         {t('prompts.count.label')}
       </label>
-      <div className="flex gap-1 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
+      <ToggleGroup
+        value={[String(normalized)]}
+        onValueChange={(values) => {
+          const next = Number(values[0]);
+          if (PROMPT_COUNT_OPTIONS.includes(next as PromptCountOption)) {
+            onChange(next as PromptCountOption);
+          }
+        }}
+        disabled={disabled}
+        aria-label={t('prompts.count.label')}
+        className="flex gap-1 p-1 rounded-xl bg-zinc-900 border border-zinc-800"
+      >
         {PROMPT_COUNT_OPTIONS.map((count) => (
-          <button
+          <Toggle
             key={count}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChange(count)}
+            value={String(count)}
             className={clsx(
               'flex-1 rounded-lg text-sm font-medium transition-colors disabled:opacity-40',
               compact ? 'py-2' : 'py-2.5',
@@ -54,9 +65,9 @@ export function PromptCountPicker({
             )}
           >
             {count}
-          </button>
+          </Toggle>
         ))}
-      </div>
+      </ToggleGroup>
       <p className="text-xs text-zinc-600 leading-relaxed">{t(hintKey)}</p>
     </div>
   );

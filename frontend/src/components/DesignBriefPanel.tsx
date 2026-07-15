@@ -5,6 +5,8 @@ import type { DesignBrief } from '../types';
 import { getEraSourceKey } from '../lib/brief-mappers';
 import { briefSourceLabel, markTypeLabel, typographyStyleLabel } from '../lib/translate-labels';
 import { useT, type MessageKey } from '../i18n';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
 
 const COLOR_OPTIONS: Array<{ value: DesignBrief['colorPalette']; labelKey: MessageKey }> = [
   { value: '', labelKey: 'brief.style.autoFromRules' },
@@ -54,10 +56,12 @@ const READONLY_VALUE_CLASS =
   'px-3 py-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 text-xs text-zinc-400 whitespace-pre-wrap';
 
 function AutoResizeTextarea({
+  id,
   value,
   onChange,
   className,
 }: {
+  id: string;
   value: string;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   className: string;
@@ -77,6 +81,7 @@ function AutoResizeTextarea({
 
   return (
     <textarea
+      id={id}
       ref={ref}
       value={value}
       onChange={(event) => {
@@ -182,13 +187,13 @@ export function DesignBriefPanel() {
             ))}
           </div>
         </div>
-        <button
+        <Button
           type="button"
           onClick={clearDesignBrief}
           className="text-xs text-zinc-500 hover:text-zinc-300"
         >
           {t('common.clear')}
-        </button>
+        </Button>
       </div>
 
       {!hasFieldContent && (
@@ -277,15 +282,22 @@ export function DesignBriefPanel() {
         <div className="space-y-3">
           {filledEditableFields.map(({ key, labelKey, multiline }) => (
             <div key={key}>
-              <label className="block text-xs font-medium text-zinc-500 mb-1">{t(labelKey)}</label>
+              <label
+                htmlFor={`design-brief-${key}`}
+                className="block text-xs font-medium text-zinc-500 mb-1"
+              >
+                {t(labelKey)}
+              </label>
               {multiline ? (
                 <AutoResizeTextarea
+                  id={`design-brief-${key}`}
                   value={designBrief[key]}
                   onChange={(e) => updateDesignBrief({ [key]: e.target.value })}
                   className={TEXTAREA_CLASS}
                 />
               ) : (
-                <input
+                <Input
+                  id={`design-brief-${key}`}
                   value={designBrief[key]}
                   onChange={(e) => updateDesignBrief({ [key]: e.target.value })}
                   className={INPUT_CLASS}

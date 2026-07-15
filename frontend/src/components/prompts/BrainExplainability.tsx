@@ -1,6 +1,7 @@
 import { Brain } from 'lucide-react';
 import type { ComposedPrompt } from '../../types';
 import { useT } from '../../i18n';
+import { Tooltip } from '../ui/Tooltip';
 
 interface BrainExplainabilityProps {
   prompt: ComposedPrompt;
@@ -48,13 +49,14 @@ export function BrainExplainability({ prompt }: BrainExplainabilityProps) {
       {agentContributions && agentContributions.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {agentContributions.map((agent) => (
-            <span
-              key={agent.role}
-              title={agent.summary}
-              className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 capitalize"
-            >
-              {agent.role.replace('-', ' ')}
-            </span>
+            <Tooltip key={agent.role} content={agent.summary}>
+              <span
+                tabIndex={0}
+                className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 capitalize"
+              >
+                {agent.role.replace('-', ' ')}
+              </span>
+            </Tooltip>
           ))}
         </div>
       )}

@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useT } from '../../i18n';
+import { Button } from '../ui/Button';
 
 export const BRAIN_PRINCIPLES_PAGE_SIZE = 50;
 export const BRAIN_TOP_PRINCIPLES_LIMIT = 10;
@@ -31,7 +32,7 @@ export function BrainPrinciplesPagination({
       aria-label={t('brain.principlesPagination')}
     >
       <div className="flex items-center gap-2">
-        <button
+        <Button
           type="button"
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
@@ -39,11 +40,11 @@ export function BrainPrinciplesPagination({
         >
           <ChevronLeft size={14} />
           {t('common.previous')}
-        </button>
+        </Button>
         <span className="text-xs text-zinc-400 tabular-nums">
           {t('brain.principlesPage', { page, total: totalPages })}
         </span>
-        <button
+        <Button
           type="button"
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
@@ -51,7 +52,7 @@ export function BrainPrinciplesPagination({
         >
           {t('common.next')}
           <ChevronRight size={14} />
-        </button>
+        </Button>
       </div>
       <p className="text-xs text-zinc-500">
         {t('brain.principlesRange', { from, to, total: totalItems })}

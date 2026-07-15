@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Combobox } from '@base-ui/react/combobox';
 import clsx from 'clsx';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { useT, type MessageKey } from '../i18n';
 import { en } from '../i18n/en';
 import { useThemeStore } from '../theme/theme-store';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
 
 /** Grouped industries — values are sent to the API (English). */
 export const INDUSTRY_GROUPS: Array<{ groupKey: MessageKey; options: string[] }> = [
@@ -92,7 +95,6 @@ function IndustryGroupAccordion({
   isLight,
   open,
   value,
-  onSelect,
   displayLabel,
 }: {
   label: string;
@@ -102,7 +104,6 @@ function IndustryGroupAccordion({
   isLight: boolean;
   open: boolean;
   value: string;
-  onSelect: (opt: string) => void;
   displayLabel: (opt: string) => string;
 }) {
   const hasSelected = options.some((opt) => opt === value);
@@ -113,7 +114,7 @@ function IndustryGroupAccordion({
       aria-label={label}
       className={clsx('border-b last:border-b-0', isLight ? 'border-zinc-200' : 'border-zinc-800/60')}
     >
-      <button
+      <Button
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
@@ -145,7 +146,7 @@ function IndustryGroupAccordion({
         <span className={clsx('text-[11px] tabular-nums shrink-0', isLight ? 'text-zinc-400' : 'text-zinc-600')}>
           {options.length}
         </span>
-      </button>
+      </Button>
 
       <div
         className={clsx(
@@ -158,30 +159,26 @@ function IndustryGroupAccordion({
             {options.map((opt) => {
               const selected = value === opt;
               return (
-                <button
+                <Combobox.Item
                   key={opt}
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  tabIndex={open && expanded ? 0 : -1}
-                  onClick={() => onSelect(opt)}
+                  value={opt}
                   className={clsx(
-                    'w-full flex items-center justify-between gap-2 pl-8 pr-4 py-2 text-sm text-left transition-colors',
+                    'w-full flex cursor-default items-center justify-between gap-2 pl-8 pr-4 py-2 text-sm text-left transition-colors outline-none',
                     selected &&
                       (isLight
                         ? 'border-l-2 border-zinc-900 bg-zinc-100 text-zinc-900 font-medium pl-[30px]'
                         : 'border-l-2 border-zinc-200 bg-zinc-800 text-zinc-100 pl-[30px]'),
                     !selected &&
                       (isLight
-                        ? 'text-zinc-800 hover:bg-zinc-50'
-                        : 'text-zinc-300 hover:bg-zinc-900'),
+                        ? 'text-zinc-800 hover:bg-zinc-50 data-[highlighted]:bg-zinc-50'
+                        : 'text-zinc-300 hover:bg-zinc-900 data-[highlighted]:bg-zinc-900'),
                   )}
                 >
                   <span className="truncate">{displayLabel(opt)}</span>
-                  {selected && (
+                  <Combobox.ItemIndicator>
                     <Check size={14} className={isLight ? 'text-zinc-900' : 'text-zinc-200'} />
-                  )}
-                </button>
+                  </Combobox.ItemIndicator>
+                </Combobox.Item>
               );
             })}
           </div>
@@ -205,10 +202,6 @@ export function IndustrySelect({ value, onChange, className }: IndustrySelectPro
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<MessageKey>>(() => new Set());
-  const rootRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const panelId = 'industry-select-panel';
-
   const showCustom = customMode || (value !== '' && !isKnown);
 
   const displayLabel = (opt: string) => {
@@ -260,38 +253,6 @@ export function IndustrySelect({ value, onChange, className }: IndustrySelectPro
     });
   };
 
-  useEffect(() => {
-    if (!open) return;
-
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-        setQuery('');
-      }
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-        setQuery('');
-      }
-    };
-
-    document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      const id = window.setTimeout(() => searchRef.current?.focus(), 120);
-      return () => window.clearTimeout(id);
-    }
-  }, [open]);
-
   const selectOption = (opt: string) => {
     setCustomMode(false);
     onChange(opt);
@@ -322,7 +283,7 @@ export function IndustrySelect({ value, onChange, className }: IndustrySelectPro
   );
 
   const panelClass = clsx(
-    'absolute left-0 right-0 top-0 z-50 rounded-xl border shadow-xl overflow-hidden',
+    'w-[var(--anchor-width)] rounded-xl border shadow-xl overflow-hidden',
     isLight
       ? 'bg-white border-zinc-200 shadow-zinc-900/15'
       : 'bg-zinc-950 border-zinc-800 shadow-black/50',
@@ -334,10 +295,23 @@ export function IndustrySelect({ value, onChange, className }: IndustrySelectPro
   );
 
   return (
-    <div ref={rootRef} className={clsx('relative', open && 'z-50', className)}>
+    <Combobox.Root
+      value={isKnown ? value : null}
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) setQuery('');
+      }}
+      onValueChange={(nextValue) => {
+        if (nextValue !== null) selectOption(nextValue);
+      }}
+      inputValue={query}
+      onInputValueChange={setQuery}
+    >
+    <div className={className}>
       {showCustom ? (
         <div className="space-y-2">
-          <input
+          <Input
             type="text"
             autoFocus
             value={value}
@@ -350,7 +324,7 @@ export function IndustrySelect({ value, onChange, className }: IndustrySelectPro
                 : 'bg-zinc-900 border-zinc-800 text-zinc-200 placeholder:text-zinc-600 focus:border-zinc-600',
             )}
           />
-          <button
+          <Button
             type="button"
             onClick={() => {
               setCustomMode(false);
@@ -359,90 +333,77 @@ export function IndustrySelect({ value, onChange, className }: IndustrySelectPro
             className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
           >
             {t('industries.chooseFromList')}
-          </button>
+          </Button>
         </div>
-      ) : open ? (
-        <>
-          <div aria-hidden className={clsx(triggerClass, 'invisible pointer-events-none')}>
-            <span className="truncate">{triggerLabel}</span>
-            <ChevronDown size={16} aria-hidden className="shrink-0" />
-          </div>
-
-          <div id={panelId} role="listbox" className={panelClass}>
-          <div className={searchRowClass}>
-            <Search size={14} className="text-zinc-500 shrink-0" />
-            <input
-              ref={searchRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('industries.searchPlaceholder')}
-              className={clsx(
-                'w-full bg-transparent text-sm focus:outline-none',
-                isLight
-                  ? 'text-zinc-900 placeholder:text-zinc-400'
-                  : 'text-zinc-200 placeholder:text-zinc-600',
-              )}
-            />
-          </div>
-
-          <div
-            className={clsx(
-              'max-h-64 overflow-y-auto overscroll-contain',
-              isLight ? 'divide-y divide-zinc-200' : 'divide-y divide-zinc-800/60',
-            )}
-          >
-            {filteredGroups.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-zinc-500 text-center">
-                {t('industries.searchEmpty')}
-              </p>
-            ) : (
-              filteredGroups.map((group) => (
-                <IndustryGroupAccordion
-                  key={group.groupKey}
-                  label={t(group.groupKey)}
-                  options={group.options}
-                  expanded={isSearching || expandedGroups.has(group.groupKey)}
-                  onToggle={() => toggleGroup(group.groupKey)}
-                  isLight={isLight}
-                  open={open}
-                  value={value}
-                  onSelect={selectOption}
-                  displayLabel={displayLabel}
-                />
-              ))
-            )}
-
-            <div className={clsx('border-t', isLight ? 'border-zinc-200' : 'border-zinc-800')}>
-              <button
-                type="button"
-                onClick={startCustom}
-                className={clsx(
-                  'w-full px-4 py-2.5 text-sm text-left transition-colors',
-                  isLight
-                    ? 'text-zinc-600 hover:bg-zinc-50'
-                    : 'text-zinc-400 hover:bg-zinc-900',
-                )}
-              >
-                {t('industries.another')}
-              </button>
-            </div>
-            </div>
-          </div>
-        </>
       ) : (
-        <button
-          type="button"
-          aria-haspopup="listbox"
-          aria-expanded={false}
-          aria-controls={panelId}
-          onClick={() => setOpen(true)}
-          className={triggerClass}
-        >
+        <Combobox.Trigger className={triggerClass}>
           <span className="truncate">{triggerLabel}</span>
           <ChevronDown size={16} aria-hidden className="shrink-0 text-zinc-500" />
-        </button>
+        </Combobox.Trigger>
       )}
     </div>
+    {!showCustom && (
+      <Combobox.Portal>
+        <Combobox.Positioner side="bottom" align="start" sideOffset={-42} className="z-50">
+          <Combobox.Popup className={panelClass} initialFocus>
+            <div className={searchRowClass}>
+              <Search size={14} className="text-zinc-500 shrink-0" />
+              <Combobox.Input
+                placeholder={t('industries.searchPlaceholder')}
+                className={clsx(
+                  'w-full bg-transparent text-sm focus:outline-none',
+                  isLight
+                    ? 'text-zinc-900 placeholder:text-zinc-400'
+                    : 'text-zinc-200 placeholder:text-zinc-600',
+                )}
+              />
+            </div>
+
+            <Combobox.List
+              className={clsx(
+                'max-h-64 overflow-y-auto overscroll-contain',
+                isLight ? 'divide-y divide-zinc-200' : 'divide-y divide-zinc-800/60',
+              )}
+            >
+              {filteredGroups.length === 0 ? (
+                <Combobox.Empty className="px-4 py-6 text-sm text-zinc-500 text-center">
+                  {t('industries.searchEmpty')}
+                </Combobox.Empty>
+              ) : (
+                filteredGroups.map((group) => (
+                  <IndustryGroupAccordion
+                    key={group.groupKey}
+                    label={t(group.groupKey)}
+                    options={group.options}
+                    expanded={isSearching || expandedGroups.has(group.groupKey)}
+                    onToggle={() => toggleGroup(group.groupKey)}
+                    isLight={isLight}
+                    open={open}
+                    value={value}
+                    displayLabel={displayLabel}
+                  />
+                ))
+              )}
+
+              <div className={clsx('border-t', isLight ? 'border-zinc-200' : 'border-zinc-800')}>
+                <Button
+                  type="button"
+                  onClick={startCustom}
+                  className={clsx(
+                    'w-full px-4 py-2.5 text-sm text-left transition-colors',
+                    isLight
+                      ? 'text-zinc-600 hover:bg-zinc-50'
+                      : 'text-zinc-400 hover:bg-zinc-900',
+                  )}
+                >
+                  {t('industries.another')}
+                </Button>
+              </div>
+            </Combobox.List>
+          </Combobox.Popup>
+        </Combobox.Positioner>
+      </Combobox.Portal>
+    )}
+    </Combobox.Root>
   );
 }

@@ -9,6 +9,7 @@ import { formatError } from '../../lib/api-error';
 import { markTypeLabel } from '../../lib/translate-labels';
 import { CustomSelect } from '../CustomSelect';
 import { useToast } from '../ToastProvider';
+import { Button } from '../ui/Button';
 import {
   deriveRebusWordmark,
   isRebusTypographyStyle,
@@ -219,7 +220,7 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
         <p className="text-xs text-amber-300/80">{t('brief.typography.rebusNeedsName')}</p>
       )}
 
-      <button
+      <Button
         type="button"
         disabled={!canAnalyze || analysis.isPending}
         onClick={() => analysis.mutate()}
@@ -227,7 +228,7 @@ export function BriefTypographySection({ onStepComplete }: BriefTypographySectio
       >
         {analysis.isPending && <Loader2 size={14} className="animate-spin" />}
         {t('brief.typography.analyze')}
-      </button>
+      </Button>
 
       {disabledReason && (
         <p className="text-xs text-amber-300/80">{disabledReason}</p>

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Loader2, MessageCircleQuestion, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
+import { Toggle } from '@base-ui/react/toggle';
+import { ToggleGroup } from '@base-ui/react/toggle-group';
 import { useAppStore } from '../../store';
 import { runBriefInterview } from '../../api';
 import type { BriefInterviewResponse, DesignBrief } from '../../types';
@@ -9,6 +11,8 @@ import { designBriefToBriefContext, parseMarkTypeFromBrief } from '../../lib/bri
 import { useT } from '../../i18n';
 import { formatError } from '../../lib/api-error';
 import { useToast } from '../ToastProvider';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 
 export function BriefAnalyzeSection() {
   const t = useT();
@@ -78,7 +82,7 @@ export function BriefAnalyzeSection() {
         {t('brief.analyze.intro')}
       </p>
 
-      <button
+      <Button
         type="button"
         disabled={!canAnalyze || interview.isPending}
         onClick={() => interview.mutate()}
@@ -90,7 +94,7 @@ export function BriefAnalyzeSection() {
           <Sparkles size={14} />
         )}
         {t('brief.analyze.button')}
-      </button>
+      </Button>
 
       {!canAnalyze && (
         <p className="text-xs text-amber-300/80">{t('brief.typography.setIndustryFirst')}</p>
@@ -145,12 +149,19 @@ export function BriefAnalyzeSection() {
                   <p className="text-[13px] text-zinc-300">{q.prompt}</p>
                   <p className="text-[11px] text-zinc-600">{q.why}</p>
                   {q.options ? (
-                    <div className="flex flex-wrap gap-1">
+                    <ToggleGroup
+                      value={answers[q.id] ? [answers[q.id]] : []}
+                      onValueChange={(values) => {
+                        const value = values[0];
+                        if (value) applyAnswer(q.id, q.field, value);
+                      }}
+                      aria-label={q.prompt}
+                      className="flex flex-wrap gap-1"
+                    >
                       {q.options.map((opt) => (
-                        <button
+                        <Toggle
                           key={opt}
-                          type="button"
-                          onClick={() => applyAnswer(q.id, q.field, opt)}
+                          value={opt}
                           className={clsx(
                             'px-2 py-0.5 rounded text-[11px] border transition-colors',
                             answers[q.id] === opt
@@ -159,11 +170,11 @@ export function BriefAnalyzeSection() {
                           )}
                         >
                           {opt.replace(/_/g, ' ')}
-                        </button>
+                        </Toggle>
                       ))}
-                    </div>
+                    </ToggleGroup>
                   ) : (
-                    <input
+                    <Input
                       type="text"
                       placeholder={t('common.yourAnswer')}
                       value={answers[q.id] ?? ''}

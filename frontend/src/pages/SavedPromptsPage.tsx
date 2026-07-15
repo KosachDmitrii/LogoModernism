@@ -8,6 +8,7 @@ import { PromptCard } from '../components/PromptCard';
 import { industryLabel } from '../lib/translate-labels';
 import { formatError } from '../lib/api-error';
 import { useT, useLocale } from '../i18n';
+import { Button } from '../components/ui/Button';
 
 function formatSavedAt(value: string | undefined, locale: 'en' | 'ru') {
   if (!value) return '';
@@ -125,7 +126,7 @@ export function SavedPromptsPage() {
             </div>
           ))}
           {hasNextPage && (
-            <button
+            <Button
               type="button"
               disabled={isFetchingNextPage}
               onClick={() => void fetchNextPage()}
@@ -133,7 +134,7 @@ export function SavedPromptsPage() {
             >
               {isFetchingNextPage && <Loader2 size={16} className="animate-spin" />}
               {t('saved.loadMore')}
-            </button>
+            </Button>
           )}
         </div>
       )}

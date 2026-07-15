@@ -20,6 +20,8 @@ import { useT, type MessageKey } from '../i18n';
 import { industryLabel, markTypeLabel } from '../lib/translate-labels';
 import { sanitizeBriefTagField, sanitizeCatalogTagList } from '@logo-platform/shared';
 import { useAuth } from '../auth/AuthProvider';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
 interface CatalogEntry {
   id: string;
@@ -264,7 +266,7 @@ export function LogoCatalogPage() {
         <aside className="space-y-4">
           <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{t('catalog.chapters')}</p>
           <div className="space-y-1">
-            <button
+            <Button
               type="button"
               onClick={() => {
                 setChapter('');
@@ -276,10 +278,10 @@ export function LogoCatalogPage() {
               )}
             >
               {t('catalog.all')} ({stats?.total ?? '…'})
-            </button>
+            </Button>
             {taxonomy?.map((ch: { id: string; label: string; sections: { id: string; label: string }[] }) => (
               <div key={ch.id}>
-                <button
+                <Button
                   type="button"
                   onClick={() => {
                     setChapter(ch.id);
@@ -291,11 +293,11 @@ export function LogoCatalogPage() {
                   )}
                 >
                   {ch.label}
-                </button>
+                </Button>
                 {chapter === ch.id && (
                   <div className="ml-2 mt-1 space-y-0.5 border-l border-zinc-800 pl-2">
                     {ch.sections.map((sec) => (
-                      <button
+                      <Button
                         key={sec.id}
                         type="button"
                         onClick={() => setSection(sec.id)}
@@ -305,7 +307,7 @@ export function LogoCatalogPage() {
                         )}
                       >
                         {sec.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
@@ -319,7 +321,7 @@ export function LogoCatalogPage() {
               { kind: 'case_study', labelKey: 'catalog.caseStudies' as MessageKey },
               { kind: 'designer_profile', labelKey: 'catalog.designers' as MessageKey },
             ].map(({ kind, labelKey }) => (
-              <button
+              <Button
                 key={kind}
                 type="button"
                 onClick={() => {
@@ -333,16 +335,16 @@ export function LogoCatalogPage() {
                 )}
               >
                 {t(labelKey)}
-              </button>
+              </Button>
             ))}
             {entryKind && (
-              <button
+              <Button
                 type="button"
                 onClick={() => setEntryKind('')}
                 className="text-xs text-zinc-500 hover:text-zinc-300 px-3"
               >
                 {t('catalog.clearFilter')}
-              </button>
+              </Button>
             )}
           </div>
         </aside>
@@ -355,7 +357,7 @@ export function LogoCatalogPage() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {(recommendations as CatalogEntry[]).map((entry) => (
-                  <button
+                  <Button
                     key={entry.id}
                     type="button"
                     onClick={() => focusEntry(entry)}
@@ -367,7 +369,7 @@ export function LogoCatalogPage() {
                     )}
                   >
                     {entry.name}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -376,7 +378,7 @@ export function LogoCatalogPage() {
           <div className="flex gap-2 mb-4">
             <div className="relative flex-1">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input
+              <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('catalog.searchPlaceholder')}
@@ -404,7 +406,7 @@ export function LogoCatalogPage() {
 
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {(results as CatalogEntry[] | undefined)?.map((entry) => (
-              <button
+              <Button
                 key={entry.id}
                 type="button"
                 onClick={() => setSelectedId(entry.id)}
@@ -447,7 +449,7 @@ export function LogoCatalogPage() {
                     {t('catalog.qualityScore', { score: entry.minimalismLevel.toFixed(0) })}
                   </span>
                 </div>
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -536,33 +538,33 @@ export function LogoCatalogPage() {
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <button
+                    <Button
                       type="button"
                       onClick={() => resolveShapeConflict('client')}
                       className="rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-2 text-xs font-medium text-emerald-200 hover:bg-emerald-900/40"
                     >
                       {t('catalog.keepClientShapes')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={() => resolveShapeConflict('reference')}
                       className="rounded-lg border border-amber-700/60 bg-amber-950/40 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-900/40"
                     >
                       {t('catalog.useReferenceShapes')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
 
               {selectedIsApplied && canApply ? (
-                <button
+                <Button
                   type="button"
                   onClick={() => removeApplied(selected.id)}
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-800/60 bg-red-950/40 hover:bg-red-900/40 text-red-300 text-sm font-medium transition-colors"
                 >
                   {t('catalog.removeFromBrief')}
                   <X size={16} />
-                </button>
+                </Button>
               ) : canApply ? (
                 <ApplyToPromptsButton onApply={applySelected} />
               ) : (
@@ -591,21 +593,21 @@ export function LogoCatalogPage() {
                     key={entry.id}
                     className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/30"
                   >
-                    <button
+                    <Button
                       type="button"
                       onClick={() => setSelectedId(entry.id)}
                       className="text-xs text-emerald-100 truncate text-left hover:text-white"
                     >
                       {entry.name}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={() => removeApplied(entry.id)}
                       className="shrink-0 p-1 rounded hover:bg-emerald-900/60 text-emerald-400 hover:text-red-300 transition-colors"
                       aria-label={`${t('common.remove')} ${entry.name}`}
                     >
                       <X size={16} />
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>

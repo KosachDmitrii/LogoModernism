@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
 import clsx from 'clsx';
+import { Toggle } from '@base-ui/react/toggle';
+import { ToggleGroup } from '@base-ui/react/toggle-group';
 import { getPrimitives } from '../../api';
 import { useAppStore } from '../../store';
 import { useT } from '../../i18n';
+import { Button } from '../ui/Button';
 
 interface Primitive {
   id: string;
@@ -38,12 +41,6 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
     );
   }, [designBrief.selectedShapes, primitives]);
 
-  const toggleSelection = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  };
-
   const handleApply = () => {
     if (!primitives || selectedIds.length === 0) return;
 
@@ -72,14 +69,19 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
               ? t('brief.shapes.selectedCount', { count: selectedIds.length })
               : t('brief.shapes.selectedCountPlural', { count: selectedIds.length })}
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <ToggleGroup
+            multiple
+            value={selectedIds}
+            onValueChange={setSelectedIds}
+            aria-label={t('brief.shapes.selectedCountPlural', { count: selectedIds.length })}
+            className="grid grid-cols-2 sm:grid-cols-3 gap-2"
+          >
             {(primitives as Primitive[]).map((primitive) => {
               const isSelected = selectedIds.includes(primitive.id);
               return (
-                <button
+                <Toggle
                   key={primitive.id}
-                  type="button"
-                  onClick={() => toggleSelection(primitive.id)}
+                  value={primitive.id}
                   className={clsx(
                     'relative p-2 rounded-lg border text-center transition-colors',
                     isSelected
@@ -96,19 +98,19 @@ export function BriefShapesSection({ onStepComplete }: { onStepComplete?: () => 
                   ) : (
                     <Plus size={10} className="absolute top-1.5 right-1.5 text-zinc-500" />
                   )}
-                </button>
+                </Toggle>
               );
             })}
-          </div>
+          </ToggleGroup>
 
-          <button
+          <Button
             type="button"
             disabled={selectedIds.length === 0}
             onClick={handleApply}
             className="w-full px-3 py-2 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-xs font-medium disabled:opacity-40"
           >
             {t('brief.shapes.apply')}
-          </button>
+          </Button>
           <p className="text-xs text-zinc-600">
             {t('brief.shapes.primitiveLibrary', { count: primitiveCount })}
           </p>

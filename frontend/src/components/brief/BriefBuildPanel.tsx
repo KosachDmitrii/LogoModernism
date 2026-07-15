@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Accordion } from '@base-ui/react/accordion';
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,6 +22,7 @@ import { BriefClientSection } from './BriefClientSection';
 import { BriefAnalyzeSection } from './BriefAnalyzeSection';
 import { StartOverButton } from '../prompts/StartOverButton';
 import { useT, type MessageKey } from '../../i18n';
+import { Button } from '../ui/Button';
 
 import {
   advanceBriefBuildSection,
@@ -91,10 +93,6 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
     }
   }, [openSection]);
 
-  const toggle = (id: BuildSection) => {
-    setOpenSection((current) => (current === id ? null : id));
-  };
-
   const companyName = useAppStore((s) => s.companyName);
 
   const sections: Array<{
@@ -156,18 +154,19 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
         <p className="text-[13px] text-zinc-400 leading-relaxed">{t('brief.build.stepsIntro')}</p>
       </div>
 
-      <div className="space-y-2">
+      <Accordion.Root
+        value={openSection ? [openSection] : []}
+        onValueChange={(value) => setOpenSection(value[0] ?? null)}
+        className="space-y-2"
+      >
         {sections.map(({ id, step, labelKey, descriptionKey, icon: Icon }) => {
           const isOpen = openSection === id;
           const status = sectionStatus(designBrief, id);
 
           return (
-            <div key={id} className="rounded-xl border border-zinc-800 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => toggle(id)}
-                className="w-full flex items-center gap-3 px-3 py-3 bg-zinc-900/60 hover:bg-zinc-900 text-left"
-              >
+            <Accordion.Item key={id} value={id} className="rounded-xl border border-zinc-800 overflow-hidden">
+              <Accordion.Header>
+                <Accordion.Trigger className="w-full flex items-center gap-3 px-3 py-3 bg-zinc-900/60 hover:bg-zinc-900 text-left">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-400">
                   {step}
                 </span>
@@ -185,9 +184,9 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
                   size={16}
                   className={clsx('text-zinc-500 shrink-0 transition-transform', isOpen && 'rotate-180')}
                 />
-              </button>
-              {isOpen && (
-                <div className="px-3 py-3 border-t border-zinc-800 bg-zinc-950/40">
+                </Accordion.Trigger>
+              </Accordion.Header>
+              <Accordion.Panel className="px-3 py-3 border-t border-zinc-800 bg-zinc-950/40">
                   {id === 'typography' && (
                     <BriefTypographySection onStepComplete={() => goToNext('typography')} />
                   )}
@@ -204,34 +203,33 @@ export function BriefBuildPanel({ onGoToReview, onBack, onStartOver }: BriefBuil
                     <BriefClientSection onStepComplete={() => goToNext('client')} />
                   )}
                   {id === 'analyze' && <BriefAnalyzeSection />}
-                </div>
-              )}
-            </div>
+              </Accordion.Panel>
+            </Accordion.Item>
           );
         })}
-      </div>
+      </Accordion.Root>
 
       <BriefCoverageMap designBrief={designBrief} />
 
       <div className="flex items-center gap-3 pt-2">
         {onBack && (
-          <button
+          <Button
             type="button"
             onClick={onBack}
             className="flex items-center gap-1.5 px-3 py-3.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-zinc-800 transition-colors shrink-0"
           >
             <ArrowLeft size={16} />
             {t('brief.backToProject')}
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           type="button"
           onClick={onGoToReview}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-zinc-100 text-zinc-900 font-medium text-sm border border-zinc-700/50 hover:bg-zinc-200 transition-colors"
         >
           {t('brief.build.reviewBrief')}
           <ArrowRight size={16} />
-        </button>
+        </Button>
         {onStartOver && <StartOverButton onClick={onStartOver} />}
       </div>
     </div>

@@ -1,5 +1,7 @@
 import clsx from 'clsx';
 import { AlertTriangle } from 'lucide-react';
+import { Radio } from '@base-ui/react/radio';
+import { RadioGroup } from '@base-ui/react/radio-group';
 import type { ConstraintReport } from '../../types';
 import { useT, type MessageKey } from '../../i18n';
 
@@ -140,7 +142,13 @@ export function ConstraintConflictCard({
       {resolutions.length > 0 && (
         <div className="space-y-2 pt-1 border-t border-zinc-800/60">
           <p className="text-[11px] text-zinc-500">{t('prompts.conflict.chooseResolution')}</p>
-          <ul className="space-y-1.5">
+          <RadioGroup
+            value={selectedResolutionId}
+            onValueChange={(value) => onSelectResolution(String(value))}
+            aria-label={t('prompts.conflict.chooseResolution')}
+            className="space-y-1.5"
+            render={<ul />}
+          >
             {resolutions.map((resolution) => (
               <li key={resolution.id}>
                 <label
@@ -151,21 +159,20 @@ export function ConstraintConflictCard({
                       : 'border-zinc-800 hover:border-zinc-700',
                   )}
                 >
-                  <input
-                    type="radio"
-                    name={`conflict-${violation.id}`}
+                  <Radio.Root
                     value={resolution.id}
-                    checked={selectedResolutionId === resolution.id}
-                    onChange={() => onSelectResolution(resolution.id)}
-                    className="brief-radio mt-0.5"
-                  />
+                    aria-label={resolutionLabel(resolution.id, t)}
+                    className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-zinc-600 data-checked:border-violet-400"
+                  >
+                    <Radio.Indicator className="h-1.5 w-1.5 rounded-full bg-violet-400" />
+                  </Radio.Root>
                   <span className="text-zinc-300 leading-relaxed">
                     {resolutionLabel(resolution.id, t)}
                   </span>
                 </label>
               </li>
             ))}
-          </ul>
+          </RadioGroup>
         </div>
       )}
     </li>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Collapsible } from '@base-ui/react/collapsible';
 import clsx from 'clsx';
 import {
   ArrowRight,
@@ -15,6 +16,8 @@ import {
 import { ConstraintConflictCard } from './ConstraintConflictCard';
 import type { BrainPartnerState, ConstraintResolution, CreativeTerritory, CreativeTerritoryId } from '../../types';
 import { useT, type MessageKey } from '../../i18n';
+import { Button } from '../ui/Button';
+import { Tooltip } from '../ui/Tooltip';
 
 function formatConstraintScore(score: number): string {
   const percent = score > 1 ? score : score * 100;
@@ -92,7 +95,8 @@ function TerritoryCard({
   const t = useT();
 
   return (
-    <button
+    <Tooltip content={territory.thesis}>
+    <Button
       type="button"
       onClick={onSelect}
       className={clsx(
@@ -110,16 +114,14 @@ function TerritoryCard({
           </span>
         )}
       </div>
-      <p
-        className="text-xs text-zinc-500 line-clamp-2 leading-relaxed cursor-help"
-        title={territory.thesis}
-      >
+      <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed cursor-help">
         {territory.thesis}
       </p>
       <p className="text-[11px] text-zinc-600 mt-2">
         {t('prompts.partner.fitScore', { percent: (territory.confidence * 100).toFixed(0) })}
       </p>
-    </button>
+    </Button>
+    </Tooltip>
   );
 }
 
@@ -186,11 +188,12 @@ export function BrainPartnerPanel({
   const isApplyingConflicts = regeneratingAction === 'resolve-conflict';
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden mb-6">
-      <button
-        type="button"
-        aria-expanded={isExpanded}
-        onClick={() => onExpandedChange(!isExpanded)}
+    <Collapsible.Root
+      open={isExpanded}
+      onOpenChange={onExpandedChange}
+      className="rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden mb-6"
+    >
+      <Collapsible.Trigger
         className={clsx(
           'w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:cursor-pointer',
           isExpanded && 'border-b border-zinc-800',
@@ -214,16 +217,15 @@ export function BrainPartnerPanel({
             className={clsx('transition-transform', isExpanded && 'rotate-180')}
           />
         </div>
-      </button>
+      </Collapsible.Trigger>
 
-      {isExpanded && (
-        <>
+      <Collapsible.Panel>
           <div className="px-4 py-3 border-b border-zinc-800/80 bg-zinc-950/30">
         <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">{t('prompts.partner.howToUse')}</p>
         <ol className="grid gap-2 sm:grid-cols-3">
           {WORKFLOW_STEPS.map((step, index) => (
             <li key={step.target}>
-              <button
+              <Button
                 type="button"
                 onClick={() => scrollToWorkflowStep(step.target)}
                 className="w-full text-left rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-3 py-2 text-xs text-zinc-500 hover:border-violet-500/30 hover:bg-violet-500/5 hover:text-zinc-400 transition-colors"
@@ -233,7 +235,7 @@ export function BrainPartnerPanel({
                 </p>
                 <p className="leading-relaxed">{t(step.bodyKey)}</p>
                 <p className="text-[11px] text-violet-400/70 mt-1.5">{t('prompts.partner.jumpToSection')}</p>
-              </button>
+              </Button>
             </li>
           ))}
         </ol>
@@ -303,7 +305,7 @@ export function BrainPartnerPanel({
                       {t('prompts.partner.directionApplied')}
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <Button
                         type="button"
                         disabled={isRegenerating}
                         onClick={onNewVariations}
@@ -315,8 +317,8 @@ export function BrainPartnerPanel({
                           <RefreshCw size={14} />
                         )}
                         {t('prompts.partner.newVariations')}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         disabled={isRegenerating}
                         onClick={onRegenerateAuto}
@@ -326,7 +328,7 @@ export function BrainPartnerPanel({
                           <Loader2 size={14} className="animate-spin" />
                         ) : null}
                         {t('prompts.partner.repickDirection')}
-                      </button>
+                      </Button>
                     </div>
                     <p className="text-[11px] text-zinc-600 leading-relaxed">{t('prompts.partner.variationsHint')}</p>
                   </>
@@ -338,7 +340,7 @@ export function BrainPartnerPanel({
                         activeName: activeTerritoryName || viewingTerritory.name,
                       })}
                     </p>
-                    <button
+                    <Button
                       type="button"
                       disabled={isRegenerating}
                       onClick={() => onApplyTerritory(viewingTerritory.id as CreativeTerritoryId)}
@@ -350,7 +352,7 @@ export function BrainPartnerPanel({
                         <ArrowRight size={14} />
                       )}
                       {t('prompts.partner.generateWithDirection')}
-                    </button>
+                    </Button>
                     <p className="text-[11px] text-zinc-600 leading-relaxed">
                       {t('prompts.partner.generateWithDirectionHint')}
                     </p>
@@ -404,7 +406,7 @@ export function BrainPartnerPanel({
                   />
                 ))}
               </ul>
-              <button
+              <Button
                 type="button"
                 disabled={!canApplyAllConflicts || isApplyingConflicts || isRegenerating}
                 onClick={() => onResolveConflicts(selectedResolutions)}
@@ -416,7 +418,7 @@ export function BrainPartnerPanel({
                   <ArrowRight size={14} />
                 )}
                 {t('prompts.conflict.applyAllResolutions')}
-              </button>
+              </Button>
             </div>
           )}
         </section>
@@ -463,14 +465,14 @@ export function BrainPartnerPanel({
           {partner.catalogIntelligence.recommendations.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {partner.catalogIntelligence.recommendations.slice(0, 5).map((ref) => (
+                <Tooltip key={ref.id} content={ref.id}>
                 <span
-                  key={ref.id}
-                  title={ref.id}
                   className="text-[11px] px-2 py-1 rounded-md bg-zinc-800 text-zinc-400"
                 >
                   {ref.name}{' '}
                   <span className="text-zinc-600">({(ref.industryScore * 100).toFixed(0)}%)</span>
                 </span>
+                </Tooltip>
               ))}
             </div>
           ) : (
@@ -478,8 +480,7 @@ export function BrainPartnerPanel({
           )}
         </section>
           </div>
-        </>
-      )}
-    </div>
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }

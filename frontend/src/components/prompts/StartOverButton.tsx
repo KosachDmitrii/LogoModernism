@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { useT } from '../../i18n';
+import { Button } from '../ui/Button';
 
 interface StartOverButtonProps {
   onClick: () => void;
@@ -11,7 +12,7 @@ export function StartOverButton({ onClick, disabled, variant = 'ghost' }: StartO
   const t = useT();
 
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
       disabled={disabled}
@@ -23,6 +24,6 @@ export function StartOverButton({ onClick, disabled, variant = 'ghost' }: StartO
       )}
     >
       {t('prompts.startOver.button')}
-    </button>
+    </Button>
   );
 }

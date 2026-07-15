@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Star } from 'lucide-react';
+import { Toggle } from '@base-ui/react/toggle';
+import { ToggleGroup } from '@base-ui/react/toggle-group';
 import type { GeneratedImage, LogoFeedback } from '../types';
 import { submitLogoFeedback, submitLogoTags } from '../api';
 import {
@@ -15,6 +17,7 @@ import {
 import { useT } from '../i18n';
 import { formatError } from '../lib/api-error';
 import { useToast } from './ToastProvider';
+import { Tooltip } from './ui/Tooltip';
 
 interface LogoFeedbackBarProps {
   promptId: string;
@@ -118,18 +121,25 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
     <div className="space-y-2 pt-2 border-t border-zinc-800" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs text-zinc-500 uppercase tracking-wide">{t('feedback.title')}</span>
-        <div className="flex items-center gap-0">
+        <ToggleGroup
+          value={selectedStars ? [String(selectedStars)] : []}
+          onValueChange={(values) => {
+            const stars = Number(values[0]);
+            if (stars) handleRate(stars);
+          }}
+          disabled={rateLogo.isPending}
+          aria-label={t('feedback.title')}
+          className="flex items-center gap-0"
+        >
           {[1, 2, 3, 4, 5].map((stars) => {
             const filled = selectedStars >= stars;
             return (
-              <button
-                key={stars}
-                type="button"
-                title={t(starsToScore(stars).labelKey)}
-                disabled={rateLogo.isPending}
+              <Tooltip key={stars} content={t(starsToScore(stars).labelKey)}>
+              <Toggle
+                value={String(stars)}
+                aria-label={t(starsToScore(stars).labelKey)}
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleRate(stars);
                 }}
                 className={clsx(
                   'p-1 rounded-lg transition-colors duration-100',
@@ -138,10 +148,11 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
                 )}
               >
                 <Star size={15} className={clsx(filled && 'fill-current')} />
-              </button>
+              </Toggle>
+              </Tooltip>
             );
           })}
-        </div>
+        </ToggleGroup>
       </div>
 
       <div className="space-y-1.5">
@@ -149,43 +160,59 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
           <span className="text-[11px] text-zinc-600 uppercase tracking-wide shrink-0">
             {t('feedback.worked')}
           </span>
-          <div className="flex flex-wrap gap-1">
+          <ToggleGroup
+            multiple
+            value={workedTags}
+            onValueChange={(values) => {
+              const clicked = values.find((tag) => !workedTags.includes(tag))
+                ?? workedTags.find((tag) => !values.includes(tag));
+              if (clicked) handleWorkedTag(clicked);
+            }}
+            className="flex flex-wrap gap-1"
+          >
             {LOGO_WORKED_TAGS.map((tag) => (
-              <button
+              <Toggle
                 key={tag}
-                type="button"
+                value={tag}
                 disabled={savingTag === tag}
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleWorkedTag(tag);
                 }}
                 className={tagButtonClass(workedTags.includes(tag), savingTag === tag)}
               >
                 {t(LOGO_WORKED_TAG_KEYS[tag])}
-              </button>
+              </Toggle>
             ))}
-          </div>
+          </ToggleGroup>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] text-zinc-600 uppercase tracking-wide shrink-0">
             {t('feedback.missed')}
           </span>
-          <div className="flex flex-wrap gap-1">
+          <ToggleGroup
+            multiple
+            value={missedTags}
+            onValueChange={(values) => {
+              const clicked = values.find((tag) => !missedTags.includes(tag))
+                ?? missedTags.find((tag) => !values.includes(tag));
+              if (clicked) handleMissedTag(clicked);
+            }}
+            className="flex flex-wrap gap-1"
+          >
             {LOGO_MISSED_TAGS.map((tag) => (
-              <button
+              <Toggle
                 key={tag}
-                type="button"
+                value={tag}
                 disabled={savingTag === tag}
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleMissedTag(tag);
                 }}
                 className={tagButtonClass(missedTags.includes(tag), savingTag === tag)}
               >
                 {t(LOGO_MISSED_TAG_KEYS[tag])}
-              </button>
+              </Toggle>
             ))}
-          </div>
+          </ToggleGroup>
         </div>
       </div>
     </div>

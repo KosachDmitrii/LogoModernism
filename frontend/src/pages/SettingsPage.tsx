@@ -9,6 +9,7 @@ import { ThemeSwitcher } from '../components/ThemeSwitcher';
 import { useToast } from '../components/ToastProvider';
 import { useT } from '../i18n';
 import { formatError } from '../lib/api-error';
+import { Button } from '../components/ui/Button';
 
 type Quota = {
   limit: number | null;
@@ -71,14 +72,14 @@ export function SettingsPage() {
                 {profile?.accessRole}
               </span>
             </div>
-            <button
+            <Button
               type="button"
               onClick={() => void handleSignOut()}
               className="flex items-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-400 transition hover:border-red-800 hover:bg-red-950/20 hover:text-red-300"
             >
               <LogOut size={14} />
               {t('auth.signOut')}
-            </button>
+            </Button>
           </div>
         </section>
 
@@ -96,13 +97,13 @@ export function SettingsPage() {
               </div>
             </div>
             {billing.data?.canManageBilling && billing.data.plan !== 'FREE' && (
-              <button
+              <Button
                 type="button"
                 onClick={() => void openPortal()}
                 className="rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
               >
                 {t('billing.manageSubscription')}
-              </button>
+              </Button>
             )}
           </div>
           {billing.data?.usage && (

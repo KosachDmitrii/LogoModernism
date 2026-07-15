@@ -31,6 +31,7 @@ import { toPromptGenerateIntent } from '../lib/prompt-generate-intent';
 import { useAuth } from '../auth/AuthProvider';
 import { hasPermission } from '../auth/permissions';
 import { useToast } from '../components/ToastProvider';
+import { Button } from '../components/ui/Button';
 
 const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
   1: 'prompts.step.projectSubtitle',
@@ -219,13 +220,13 @@ export function PromptsPage() {
           {prompts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center rounded-xl border border-dashed border-zinc-800">
               <p className="text-sm text-zinc-500 mb-4">{t('prompts.results.empty')}</p>
-              <button
+              <Button
                 type="button"
                 onClick={() => setActiveStep(2)}
                 className="text-sm text-violet-400 hover:text-violet-300"
               >
                 {t('prompts.results.goToBrief')}
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="max-w-2xl mx-auto w-full">
@@ -268,14 +269,14 @@ export function PromptsPage() {
                 ))}
               </div>
               <div className="pt-4 flex items-center gap-3">
-                <button
+                <Button
                   type="button"
                   onClick={() => setActiveStep(2)}
                   className="flex items-center gap-1.5 px-3 py-3.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-zinc-800 transition-colors"
                 >
                   <ArrowLeft size={16} />
                   {t('prompts.results.backToBrief')}
-                </button>
+                </Button>
                 <StartOverButton onClick={handleStartOver} variant="primary" />
               </div>
             </div>

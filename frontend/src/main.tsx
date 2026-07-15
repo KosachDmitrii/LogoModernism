@@ -5,6 +5,7 @@ import './index.css';
 import { applyTheme } from './theme/theme-store';
 import { AuthProvider } from './auth/AuthProvider';
 import { ToastProvider } from './components/ToastProvider';
+import { TooltipProvider } from './components/ui/Tooltip';
 
 applyTheme(
   (() => {
@@ -34,10 +35,12 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById('root')!).render(
   <QueryClientProvider client={queryClient}>
-    <ToastProvider>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </ToastProvider>
+    <TooltipProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </ToastProvider>
+    </TooltipProvider>
   </QueryClientProvider>,
 );

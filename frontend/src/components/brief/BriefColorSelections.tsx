@@ -3,6 +3,9 @@ import { Plus, X } from 'lucide-react';
 import type { DesignBrief } from '../../types';
 import { defaultPaletteColors, paletteColorSlotCount, paletteNeedsColorSelections, resolveColorSelections } from '@logo-platform/shared';
 import { useT } from '../../i18n';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Tooltip } from '../ui/Tooltip';
 
 const PRESET_SWATCHES = [
   { labelKey: 'brief.style.colorBlack' as const, value: '#000000' },
@@ -73,7 +76,7 @@ export function BriefColorSelections({ palette, selections, onChange }: BriefCol
               className="h-8 w-10 rounded border border-zinc-700 bg-zinc-900 p-0.5 cursor-pointer"
               aria-label={t('brief.style.colorSlot', { index: index + 1 })}
             />
-            <input
+            <Input
               type="text"
               value={color}
               onChange={(e) => updateSlot(index, e.target.value)}
@@ -81,36 +84,36 @@ export function BriefColorSelections({ palette, selections, onChange }: BriefCol
               className="flex-1 px-2 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 font-mono focus:outline-none focus:border-zinc-600"
             />
             {slots.length > min && (
-              <button
+              <Button
                 type="button"
                 onClick={() => removeSlot(index)}
                 className="p-1.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
                 aria-label={t('brief.style.removeColor')}
               >
                 <X size={14} />
-              </button>
+              </Button>
             )}
           </div>
         ))}
       </div>
 
       {displaySlots.length < max && (
-        <button
+        <Button
           type="button"
           onClick={addSlot}
           className="inline-flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300"
         >
           <Plus size={12} />
           {t('brief.style.addColor')}
-        </button>
+        </Button>
       )}
 
       <div className="flex flex-wrap gap-1.5 pt-1">
         {PRESET_SWATCHES.map((swatch) => (
-          <button
-            key={swatch.value}
+          <Tooltip key={swatch.value} content={t(swatch.labelKey)}>
+          <Button
             type="button"
-            title={t(swatch.labelKey)}
+            aria-label={t(swatch.labelKey)}
             onClick={() => {
               const emptyIndex = displaySlots.findIndex((c) => !c.trim());
               const targetIndex = emptyIndex >= 0 ? emptyIndex : Math.min(displaySlots.length - 1, max - 1);
@@ -122,6 +125,7 @@ export function BriefColorSelections({ palette, selections, onChange }: BriefCol
             )}
             style={{ backgroundColor: swatch.value }}
           />
+          </Tooltip>
         ))}
       </div>
 

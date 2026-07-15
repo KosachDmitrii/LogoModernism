@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
+import { Radio } from '@base-ui/react/radio';
 
 interface BriefRadioOptionProps {
   name: string;
@@ -28,14 +29,14 @@ export function BriefRadioOption({
         className,
       )}
     >
-      <input
-        type="radio"
-        name={name}
+      <Radio.Root
         value={value}
-        checked={checked}
-        onChange={onChange}
-        className="brief-radio mt-0.5"
-      />
+        aria-label={`${name}-${value}`}
+        onClick={onChange}
+        className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-zinc-600 data-checked:border-violet-400"
+      >
+        <Radio.Indicator className="h-1.5 w-1.5 rounded-full bg-violet-400" />
+      </Radio.Root>
       <span className="text-xs text-zinc-300 leading-relaxed min-w-0">{children}</span>
     </label>
   );

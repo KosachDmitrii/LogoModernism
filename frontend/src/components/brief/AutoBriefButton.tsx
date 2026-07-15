@@ -5,6 +5,7 @@ import { useAppStore } from '../../store';
 import { useT } from '../../i18n';
 import { formatError } from '../../lib/api-error';
 import { useToast } from '../ToastProvider';
+import { Button } from '../ui/Button';
 
 export function AutoBriefButton() {
   const t = useT();
@@ -34,7 +35,7 @@ export function AutoBriefButton() {
 
   return (
     <div className="space-y-2">
-      <button
+      <Button
         type="button"
         onClick={() => pipeline.mutate()}
         disabled={!canRun || pipeline.isPending}
@@ -46,7 +47,7 @@ export function AutoBriefButton() {
           <Wand2 size={16} />
         )}
         {symbolOnly ? t('brief.autoBrief.runSymbolOnly') : t('brief.autoBrief.run')}
-      </button>
+      </Button>
       <p className="text-xs text-center text-zinc-500">
         {symbolOnly ? t('brief.autoBrief.symbolOnlyHint') : t('brief.autoBrief.withNameHint')}
       </p>

@@ -1,5 +1,7 @@
 import clsx from 'clsx';
 import { Globe } from 'lucide-react';
+import { Toggle } from '@base-ui/react/toggle';
+import { ToggleGroup } from '@base-ui/react/toggle-group';
 import { useLocaleStore, useT, type Locale, type MessageKey } from '../i18n';
 
 const LOCALES: Array<{ id: Locale; key: MessageKey }> = [
@@ -26,7 +28,15 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
         </div>
       )}
 
-      <div className="relative flex shrink-0 p-0.5 rounded-lg bg-zinc-900/80 ring-1 ring-zinc-800/60">
+      <ToggleGroup
+        value={[locale]}
+        onValueChange={(values) => {
+          const next = values[0] as Locale | undefined;
+          if (next) setLocale(next);
+        }}
+        aria-label={t('common.language')}
+        className="relative flex shrink-0 p-0.5 rounded-lg bg-zinc-900/80 ring-1 ring-zinc-800/60"
+      >
         <div
           aria-hidden
           className={clsx(
@@ -40,12 +50,9 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
         {LOCALES.map(({ id, key }) => {
           const isActive = locale === id;
           return (
-            <button
+            <Toggle
               key={id}
-              type="button"
-              role="radio"
-              aria-checked={isActive}
-              onClick={() => setLocale(id)}
+              value={id}
               className={clsx(
                 'relative z-10 w-8 py-1 rounded-md text-[11px] font-medium tracking-wide transition-colors duration-150',
                 'focus:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/50',
@@ -53,10 +60,10 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
               )}
             >
               {t(key)}
-            </button>
+            </Toggle>
           );
         })}
-      </div>
+      </ToggleGroup>
     </div>
   );
 }

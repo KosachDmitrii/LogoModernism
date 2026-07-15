@@ -3,6 +3,7 @@ import { MessageCircle } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { useT } from '../../i18n';
 import { useToast } from '../ToastProvider';
+import { Button } from '../ui/Button';
 
 export function BriefClientSection({ onStepComplete }: { onStepComplete?: () => void }) {
   const t = useT();
@@ -30,8 +31,11 @@ export function BriefClientSection({ onStepComplete }: { onStepComplete?: () => 
   return (
     <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
       <div>
-        <label className="block text-xs text-zinc-500 mb-1">{t('brief.client.label')}</label>
+        <label htmlFor="brief-client-notes" className="block text-xs text-zinc-500 mb-1">
+          {t('brief.client.label')}
+        </label>
         <textarea
+          id="brief-client-notes"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           rows={3}
@@ -40,7 +44,7 @@ export function BriefClientSection({ onStepComplete }: { onStepComplete?: () => 
         />
       </div>
 
-      <button
+      <Button
         type="button"
         disabled={!dirty}
         onClick={applyNotes}
@@ -48,7 +52,7 @@ export function BriefClientSection({ onStepComplete }: { onStepComplete?: () => 
       >
         <MessageCircle size={14} />
         {t('brief.client.apply')}
-      </button>
+      </Button>
 
       <p className="text-xs text-zinc-600 leading-relaxed">{t('brief.client.hint')}</p>
     </div>

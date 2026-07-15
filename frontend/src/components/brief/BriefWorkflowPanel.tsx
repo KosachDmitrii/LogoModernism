@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Tabs } from '@base-ui/react/tabs';
 import { Eye, Hammer, Loader2, Sparkles, ArrowLeft } from 'lucide-react';
 import clsx from 'clsx';
 import { useAppStore } from '../../store';
@@ -9,6 +10,7 @@ import { BriefCoverageMap } from './BriefCoverageMap';
 import { BriefChecklist } from './BriefChecklist';
 import { StartOverButton } from '../prompts/StartOverButton';
 import { useT, type MessageKey } from '../../i18n';
+import { Button } from '../ui/Button';
 
 type BriefSubTab = 'build' | 'review';
 
@@ -45,41 +47,42 @@ export function BriefWorkflowPanel({
 
       <BriefChecklist />
 
-      <div className="flex gap-1 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
-        {subTabs.map(({ id, labelKey, descriptionKey, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setSubTab(id)}
-            className={clsx(
-              'flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors',
-              subTab === id
-                ? 'bg-zinc-800 text-zinc-100'
-                : 'text-zinc-500 hover:text-zinc-300',
-            )}
-          >
-            <span className="flex items-center gap-1.5">
-              <Icon size={15} />
-              {t(labelKey)}
-              {id === 'review' && designBrief.sources.length > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 text-[11px]">
-                  {designBrief.sources.length}
-                </span>
+      <Tabs.Root value={subTab} onValueChange={(value) => setSubTab(value as BriefSubTab)}>
+        <Tabs.List className="flex gap-1 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
+          {subTabs.map(({ id, labelKey, descriptionKey, icon: Icon }) => (
+            <Tabs.Tab
+              key={id}
+              value={id}
+              className={clsx(
+                'flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors',
+                subTab === id
+                  ? 'bg-zinc-800 text-zinc-100'
+                  : 'text-zinc-500 hover:text-zinc-300',
               )}
-            </span>
-            <span className="text-[11px] font-normal text-zinc-600">{t(descriptionKey)}</span>
-          </button>
-        ))}
-      </div>
+            >
+              <span className="flex items-center gap-1.5">
+                <Icon size={15} />
+                {t(labelKey)}
+                {id === 'review' && designBrief.sources.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 text-[11px]">
+                    {designBrief.sources.length}
+                  </span>
+                )}
+              </span>
+              <span className="text-[11px] font-normal text-zinc-600">{t(descriptionKey)}</span>
+            </Tabs.Tab>
+          ))}
+        </Tabs.List>
 
-      {subTab === 'build' ? (
-        <BriefBuildPanel
-          onGoToReview={() => setSubTab('review')}
-          onBack={onBack}
-          onStartOver={onStartOver}
-        />
-      ) : (
-        <div className="space-y-4">
+        <Tabs.Panel value="build" className="mt-4">
+          <BriefBuildPanel
+            onGoToReview={() => setSubTab('review')}
+            onBack={onBack}
+            onStartOver={onStartOver}
+          />
+        </Tabs.Panel>
+        <Tabs.Panel value="review" className="mt-4">
+          <div className="space-y-4">
           <div className="p-3 rounded-xl bg-zinc-900/40 border border-zinc-800">
             <p className="text-xs font-medium text-zinc-300 mb-1">
               {t('brief.readinessLabel', { label: t(readiness.labelKey) })}{' '}
@@ -102,16 +105,16 @@ export function BriefWorkflowPanel({
 
           <div className="flex items-center gap-3">
             {onBack && (
-              <button
+              <Button
                 type="button"
                 onClick={onBack}
                 className="flex items-center gap-1.5 px-3 py-3.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-zinc-800 transition-colors shrink-0"
               >
                 <ArrowLeft size={16} />
                 {t('brief.backToProject')}
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               type="button"
               onClick={onCompose}
               disabled={!canCompose || isComposing}
@@ -123,7 +126,7 @@ export function BriefWorkflowPanel({
                 <Sparkles size={18} />
               )}
               {t('brief.composePrompts')}
-            </button>
+            </Button>
             {onStartOver && (
               <StartOverButton onClick={onStartOver} />
             )}
@@ -132,8 +135,9 @@ export function BriefWorkflowPanel({
           {designBrief.sources.length === 0 && (
             <p className="text-[13px] text-zinc-600 text-center">{t('prompts.results.noBriefYet')}</p>
           )}
-        </div>
-      )}
+          </div>
+        </Tabs.Panel>
+      </Tabs.Root>
     </div>
   );
 }

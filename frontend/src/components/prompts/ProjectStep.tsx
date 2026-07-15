@@ -1,4 +1,6 @@
 import { ArrowRight } from 'lucide-react';
+import { Field } from '@base-ui/react/field';
+import { Slider } from '@base-ui/react/slider';
 import { useMemo } from 'react';
 import { useAppStore } from '../../store';
 import { IndustrySelect } from '../IndustrySelect';
@@ -6,6 +8,8 @@ import { CustomSelect } from '../CustomSelect';
 import { eraToInspiration } from '../../lib/brief-mappers';
 import { PromptCountPicker } from './PromptCountPicker';
 import { useT, type MessageKey } from '../../i18n';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 
 const INSPIRATION_MODES: Array<{ value: string; labelKey: MessageKey }> = [
   { value: '', labelKey: 'prompts.inspiration.none' },
@@ -87,18 +91,18 @@ export function ProjectStep({ onContinue }: ProjectStepProps) {
         <IndustrySelect value={industry} onChange={setIndustry} />
       </div>
 
-      <div>
-        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+      <Field.Root>
+        <Field.Label className="block text-xs font-medium text-zinc-400 mb-1.5">
           {t('prompts.project.companyLabel')}
-        </label>
-        <input
+        </Field.Label>
+        <Input
           type="text"
           value={companyName}
           onChange={(e) => setCompanyName(e.target.value)}
           placeholder={t('prompts.project.companyPlaceholder')}
           className="w-full px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:outline-none text-sm placeholder:text-zinc-600"
         />
-      </div>
+      </Field.Root>
 
       {!hasDesignBrief && (
         <div className="grid grid-cols-2 gap-3">
@@ -141,28 +145,31 @@ export function ProjectStep({ onContinue }: ProjectStepProps) {
 
       <PromptCountPicker value={variationCount} onChange={setVariationCount} />
 
-      <div>
-        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+      <Slider.Root
+        min={1}
+        max={10}
+        value={minimalismLevel}
+        onValueChange={setMinimalismLevel}
+      >
+        <Slider.Label className="block text-xs font-medium text-zinc-400 mb-1.5">
           {t('prompts.project.minimalismLabel', { level: minimalismLevel })}
-        </label>
-        <input
-          type="range"
-          min={1}
-          max={10}
-          value={minimalismLevel}
-          onChange={(e) => setMinimalismLevel(Number(e.target.value))}
-          className="w-full accent-zinc-400"
-        />
-      </div>
+        </Slider.Label>
+        <Slider.Control className="flex h-5 w-full touch-none items-center">
+          <Slider.Track className="h-1 w-full rounded-full bg-zinc-700">
+            <Slider.Indicator className="rounded-full bg-zinc-400" />
+            <Slider.Thumb className="h-4 w-4 rounded-full bg-zinc-400 outline-none focus-visible:ring-2 focus-visible:ring-zinc-300" />
+          </Slider.Track>
+        </Slider.Control>
+      </Slider.Root>
 
-      <button
+      <Button
         type="submit"
         disabled={!industry.trim()}
         className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-zinc-100 text-zinc-900 font-medium text-sm hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >
         {t('prompts.project.continueToBrief')}
         <ArrowRight size={18} />
-      </button>
+      </Button>
     </form>
   );
 }
