@@ -405,9 +405,7 @@ export class PromptRecordsService {
     tenant: TenantScope,
     update: (logo: GeneratedImage) => GeneratedImage,
   ) {
-    await db.transaction(async (tx) => {
-      const record = await findPrompt(tx, id, tenant.userId, true);
-      if (!record) throw new NotFoundException(`Prompt not found: ${id}`);
+    return db.transaction(async (tx) => {
       const normalized = await tx.maybeOne<{ metadata: unknown }>(
         `SELECT metadata FROM generated_logos
          WHERE id = $1 AND prompt_id = $2 AND user_id = $3
@@ -434,9 +432,11 @@ export class PromptRecordsService {
             JSON.stringify({ ...metadata, feedback: next.feedback }),
           ],
         );
-        return;
+        return next;
       }
 
+      const record = await findPrompt(tx, id, tenant.userId, true);
+      if (!record) throw new NotFoundException(`Prompt not found: ${id}`);
       const logos = parseLogos(record.logos);
       const index = logos.findIndex((logo) => logo.id === logoId);
       if (index === -1) throw new NotFoundException(`Logo not found: ${logoId}`);
@@ -448,8 +448,8 @@ export class PromptRecordsService {
          RETURNING id`,
         [id, tenant.userId, JSON.stringify(logos)],
       );
+      return logos[index]!;
     }, { isolationLevel: 'READ COMMITTED' });
-    return this.getById(id, tenant);
   }
 
   private async logosForPrompt(promptId: string): Promise<LogoRow[]> {

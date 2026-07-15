@@ -19,9 +19,15 @@ export type QuotaSummary = {
   remaining: number | null;
 };
 
+export type LogoQuotaSummary = QuotaSummary & {
+  bonusAvailable: number;
+  bonusReserved: number;
+  totalRemaining: number | null;
+};
+
 export type UsageSummary = {
   periodStart: string;
   periodEnd: string;
   prompts: QuotaSummary;
-  logos: QuotaSummary;
+  logos: LogoQuotaSummary;
 };

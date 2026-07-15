@@ -30,9 +30,6 @@ export function BrainPrinciplesPagination({
       className="flex flex-wrap items-center justify-between gap-3 pt-2"
       aria-label={t('brain.principlesPagination')}
     >
-      <p className="text-xs text-zinc-500">
-        {t('brain.principlesRange', { from, to, total: totalItems })}
-      </p>
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -56,6 +53,9 @@ export function BrainPrinciplesPagination({
           <ChevronRight size={14} />
         </button>
       </div>
+      <p className="text-xs text-zinc-500">
+        {t('brain.principlesRange', { from, to, total: totalItems })}
+      </p>
     </nav>
   );
 }

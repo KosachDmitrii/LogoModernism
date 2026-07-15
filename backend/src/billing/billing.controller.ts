@@ -14,6 +14,7 @@ import { ALL_MEMBERS, Roles } from '../auth/roles.decorator';
 import { Tenant, type TenantScope } from '../auth/tenant-context';
 import { BillingService } from './billing.service';
 import { CheckoutDto } from './dto/checkout.dto';
+import { AddonCheckoutDto } from './dto/addon-checkout.dto';
 import { WebhookVerifierService } from './webhook-verifier.service';
 
 @Controller('billing')
@@ -33,6 +34,12 @@ export class BillingController {
   @Roles('OWNER', 'ADMIN')
   checkout(@Body() body: CheckoutDto, @Tenant() tenant?: TenantScope) {
     return this.billing.createCheckout(tenant!, body.plan);
+  }
+
+  @Post('addons/checkout')
+  @Roles('OWNER', 'ADMIN')
+  addonCheckout(@Body() body: AddonCheckoutDto, @Tenant() tenant?: TenantScope) {
+    return this.billing.createAddonCheckout(tenant!, body.pack);
   }
 
   @Post('portal')

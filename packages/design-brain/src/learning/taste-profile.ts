@@ -20,6 +20,11 @@ function extractTags(text: string, keywords: string[]): string[] {
   return keywords.filter((keyword) => lower.includes(keyword));
 }
 
+export function normalizeTasteScore(score: number): number {
+  const normalized = score > 10 ? score / 10 : score;
+  return Math.min(10, Math.max(0, normalized));
+}
+
 export async function computeTasteProfile(
   client: DatabaseClient,
   scope?: BrainTenantScope,
@@ -61,13 +66,14 @@ export async function computeTasteProfile(
   for (const signal of signals) {
     const metadata = (signal.metadata ?? {}) as Record<string, unknown>;
     const text = JSON.stringify(metadata).toLowerCase();
+    const normalizedScore = normalizeTasteScore(signal.score);
     const weight = POSITIVE.includes(signal.signalType)
-      ? signal.score
+      ? normalizedScore
       : NEGATIVE.includes(signal.signalType)
-        ? -Math.abs(signal.score)
-        : signal.score;
+        ? -Math.abs(normalizedScore)
+        : normalizedScore;
 
-    scoreSum += signal.score;
+    scoreSum += normalizedScore;
 
     const workedTags = Array.isArray(metadata.workedTags) ? (metadata.workedTags as string[]) : [];
     const missedTags = Array.isArray(metadata.missedTags) ? (metadata.missedTags as string[]) : [];

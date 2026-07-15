@@ -1,4 +1,4 @@
-import type { BillingOverview, TypographyStyle } from '@logo-platform/shared';
+import type { BillingOverview, LogoAddonPack, TypographyStyle } from '@logo-platform/shared';
 import type {
   GenerateResponse,
   RecommendResponse,
@@ -153,6 +153,16 @@ export async function createBillingCheckout(plan: 'PLUS' | 'PRO'): Promise<{ url
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ plan }),
+  });
+  if (!res.ok) await parseApiError(res, 'errors.api.checkoutFailed');
+  return res.json();
+}
+
+export async function createLogoAddonCheckout(pack: LogoAddonPack): Promise<{ url: string }> {
+  const res = await fetch(`${API_BASE}/billing/addons/checkout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pack }),
   });
   if (!res.ok) await parseApiError(res, 'errors.api.checkoutFailed');
   return res.json();
@@ -326,7 +336,7 @@ export async function submitLogoFeedback(
     score: number;
     emoji: string;
   },
-): Promise<{ promptId: string; logoId: string; feedback?: LogoFeedback; logos: GeneratedImage[] }> {
+): Promise<{ promptId: string; logoId: string; feedback?: LogoFeedback }> {
   const res = await fetch(
     `${API_BASE}/prompts/${encodeURIComponent(promptId)}/logos/${encodeURIComponent(logoId)}/feedback`,
     {
@@ -346,7 +356,7 @@ export async function submitLogoTags(
     workedTags?: string[];
     missedTags?: string[];
   },
-): Promise<{ promptId: string; logoId: string; feedback?: LogoFeedback; logos: GeneratedImage[] }> {
+): Promise<{ promptId: string; logoId: string; feedback?: LogoFeedback }> {
   const res = await fetch(
     `${API_BASE}/prompts/${encodeURIComponent(promptId)}/logos/${encodeURIComponent(logoId)}/tags`,
     {

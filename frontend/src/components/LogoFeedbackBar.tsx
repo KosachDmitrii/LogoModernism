@@ -44,13 +44,13 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
   const [workedTags, setWorkedTags] = useState<string[]>(existing?.workedTags ?? []);
   const [missedTags, setMissedTags] = useState<string[]>(existing?.missedTags ?? []);
   const [savingTag, setSavingTag] = useState<string | null>(null);
-  const [pulseStar, setPulseStar] = useState(1);
-  const selectedStars = scoreToStars(existing?.score);
+  const [selectedStars, setSelectedStars] = useState(() => scoreToStars(existing?.score));
 
   useEffect(() => {
     setWorkedTags(existing?.workedTags ?? []);
     setMissedTags(existing?.missedTags ?? []);
-  }, [logo.id, existing?.tagsUpdatedAt, existing?.submittedAt]);
+    setSelectedStars(scoreToStars(existing?.score));
+  }, [logo.id, existing?.score, existing?.tagsUpdatedAt, existing?.submittedAt]);
 
   const onSaved = (result: { feedback?: LogoFeedback }) => {
     if (result.feedback) onUpdated?.(result.feedback);
@@ -59,8 +59,19 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
   const rateLogo = useMutation({
     mutationFn: (body: { score: number; emoji: string }) =>
       submitLogoFeedback(promptId, logo.id, body),
-    onSuccess: onSaved,
-    onError: (error) => toast.error(formatError(error, t)),
+    onMutate: (body) => {
+      const previousStars = selectedStars;
+      setSelectedStars(scoreToStars(body.score));
+      return { previousStars };
+    },
+    onSuccess: (result) => {
+      onSaved(result);
+      toast.success(t('toast.feedbackSaved'));
+    },
+    onError: (error, _body, context) => {
+      setSelectedStars(context?.previousStars ?? scoreToStars(existing?.score));
+      toast.error(formatError(error, t));
+    },
   });
 
   const saveTags = useMutation({
@@ -74,16 +85,8 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
     },
   });
 
-  useEffect(() => {
-    if (!rateLogo.isPending) return;
-    setPulseStar(1);
-    const id = window.setInterval(() => {
-      setPulseStar((prev) => (prev % 5) + 1);
-    }, 140);
-    return () => window.clearInterval(id);
-  }, [rateLogo.isPending]);
-
   const handleRate = (stars: number) => {
+    if (rateLogo.isPending) return;
     const level = starsToScore(stars);
     rateLogo.mutate({ score: level.score, emoji: `${stars}/5` });
   };
@@ -117,7 +120,7 @@ export function LogoFeedbackBar({ promptId, logo, onUpdated }: LogoFeedbackBarPr
         <span className="text-xs text-zinc-500 uppercase tracking-wide">{t('feedback.title')}</span>
         <div className="flex items-center gap-0">
           {[1, 2, 3, 4, 5].map((stars) => {
-            const filled = rateLogo.isPending ? stars === pulseStar : selectedStars >= stars;
+            const filled = selectedStars >= stars;
             return (
               <button
                 key={stars}

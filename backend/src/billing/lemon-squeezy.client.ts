@@ -19,6 +19,8 @@ export class LemonSqueezyClient {
     organizationId: string;
     checkoutSessionId: string;
     nonce: string;
+    checkoutKind?: 'subscription' | 'logo_addon';
+    pack?: string;
   }): Promise<string> {
     const storeId = this.required('LEMON_SQUEEZY_STORE_ID');
     const frontendUrl = this.required('FRONTEND_URL').replace(/\/+$/, '');
@@ -34,6 +36,8 @@ export class LemonSqueezyClient {
                 organization_id: input.organizationId,
                 checkout_session_id: input.checkoutSessionId,
                 nonce: input.nonce,
+                checkout_kind: input.checkoutKind ?? 'subscription',
+                ...(input.pack ? { pack: input.pack } : {}),
               },
             },
             product_options: {

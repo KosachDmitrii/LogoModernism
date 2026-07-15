@@ -15,6 +15,9 @@ type Quota = {
   used: number;
   reserved: number;
   remaining: number | null;
+  bonusAvailable?: number;
+  bonusReserved?: number;
+  totalRemaining?: number | null;
 };
 
 export function SettingsPage() {
@@ -171,6 +174,18 @@ function QuotaMeter({ label, quota }: { label: string; quota: Quota }) {
           ? t('usage.unlimited')
           : t('usage.remaining', { count: quota.remaining })}
       </p>
+      {quota.bonusAvailable !== undefined && quota.limit !== null && (
+        <div className="mt-3 border-t border-zinc-800 pt-3">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="text-zinc-500">{t('usage.bonusLogos')}</span>
+            <span className="font-medium text-violet-400">
+              {quota.bonusAvailable}
+              {quota.bonusReserved ? ` (${t('usage.bonusReserved', { count: quota.bonusReserved })})` : ''}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] text-zinc-600">{t('usage.bonusLogosHint')}</p>
+        </div>
+      )}
     </div>
   );
 }

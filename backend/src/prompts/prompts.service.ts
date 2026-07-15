@@ -175,7 +175,7 @@ export class PromptsService {
     if (saved && tenant) {
       this.learnInBackground(tenant, {
         signalType: 'APPROVE',
-        score: 100,
+        score: 10,
         context: `Saved prompt: ${updated.text.slice(0, 600)}`,
         metadata: { promptId, source: 'prompt.saved' },
       });
@@ -212,14 +212,13 @@ export class PromptsService {
       submittedAt: new Date().toISOString(),
     };
 
-    const updated = await this.promptRecords.setLogoFeedback(
+    const updatedLogo = await this.promptRecords.setLogoFeedback(
       promptId,
       logoId,
       feedback,
       tenant,
     );
 
-    const savedLogo = updated.logos.find((item) => item.id === logoId);
     this.learnInBackground(tenant, {
       signalType: 'RATING',
       score: body.score,
@@ -229,8 +228,7 @@ export class PromptsService {
     return {
       promptId,
       logoId,
-      feedback: savedLogo?.feedback,
-      logos: updated.logos,
+      feedback: updatedLogo.feedback,
     };
   }
 
@@ -254,20 +252,17 @@ export class PromptsService {
       throw new BadRequestException(`Logo not found: ${logoId}`);
     }
 
-    const updated = await this.promptRecords.setLogoTags(promptId, logoId, body, tenant);
-
-    const savedLogo = updated.logos.find((item) => item.id === logoId);
+    const updatedLogo = await this.promptRecords.setLogoTags(promptId, logoId, body, tenant);
     this.learnInBackground(tenant, {
       signalType: 'RATING',
-      score: body.workedTags?.length ? 80 : 50,
+      score: body.workedTags?.length ? 8 : 5,
       context: `Logo tags for prompt ${promptId}`,
       metadata: { promptId, logoId, ...body, source: 'logo.tags' },
     });
     return {
       promptId,
       logoId,
-      feedback: savedLogo?.feedback,
-      logos: updated.logos,
+      feedback: updatedLogo.feedback,
     };
   }
 

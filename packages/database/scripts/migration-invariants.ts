@@ -40,6 +40,10 @@ const logicalTables = [
   ['UsageBucket', 'usage_buckets'],
   ['UsageOperation', 'usage_operations'],
   ['CreditBalance', 'credit_balances'],
+  ['LogoBonusBalance', 'logo_bonus_balances'],
+  ['LogoBonusTransaction', 'logo_bonus_transactions'],
+  ['BillingAddonCheckoutSession', 'billing_addon_checkout_sessions'],
+  ['BillingAddonFulfillment', 'billing_addon_fulfillments'],
 ] as const;
 
 function quoteIdentifier(value: string): string {

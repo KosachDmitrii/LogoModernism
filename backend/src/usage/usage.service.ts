@@ -33,6 +33,8 @@ type UsageOperation = {
   includedReservedCredits: number;
   purchasedReservedCredits: number;
   actualCredits: number | null;
+  includedActualCredits: number | null;
+  purchasedActualCredits: number | null;
 };
 
 type UsageBucket = {
@@ -68,6 +70,28 @@ function quotaExceeded(quotaKey: QuotaKey, resetAt: Date): HttpException {
     },
     HttpStatus.TOO_MANY_REQUESTS,
   );
+}
+
+export function splitUsageReservation(units: number, includedAvailable: number) {
+  const includedReserved = Math.min(units, Math.max(0, includedAvailable));
+  return {
+    includedReserved,
+    purchasedReserved: units - includedReserved,
+  };
+}
+
+export function splitUsageCommit(
+  charged: number,
+  includedReserved: number,
+  purchasedReserved: number,
+) {
+  const includedActual = Math.min(charged, includedReserved);
+  const purchasedActual = charged - includedActual;
+  return {
+    includedActual,
+    purchasedActual,
+    purchasedUnused: purchasedReserved - purchasedActual,
+  };
 }
 
 async function lockUser(tx: DatabaseClient, userId: string) {
@@ -153,18 +177,34 @@ export class UsageService {
         ],
       );
 
-      if (
-        limit !== null &&
-        bucket.committedCredits + bucket.reservedCredits + input.units > limit
-      ) {
-        throw quotaExceeded(quotaKey, period.end);
+      const includedAvailable =
+        limit === null
+          ? input.units
+          : Math.max(0, limit - bucket.committedCredits - bucket.reservedCredits);
+      const { includedReserved, purchasedReserved } = splitUsageReservation(
+        input.units,
+        includedAvailable,
+      );
+
+      if (purchasedReserved > 0) {
+        if (quotaKey !== 'image.generate') throw quotaExceeded(quotaKey, period.end);
+        const reservedBonus = await tx.maybeOne<{ userId: string }>(
+          `UPDATE logo_bonus_balances
+           SET available_credits = available_credits - $2,
+               reserved_credits = reserved_credits + $2,
+               updated_at = NOW()
+           WHERE user_id = $1 AND available_credits >= $2
+           RETURNING user_id`,
+          [input.tenant.userId, purchasedReserved],
+        );
+        if (!reservedBonus) throw quotaExceeded(quotaKey, period.end);
       }
 
       await tx.query(
         `UPDATE usage_buckets
          SET reserved_credits = reserved_credits + $2, updated_at = NOW()
          WHERE id = $1`,
-        [bucket.id, input.units],
+        [bucket.id, includedReserved],
       );
 
       return tx.one<UsageOperation>(
@@ -172,7 +212,7 @@ export class UsageService {
            id, organization_id, user_id, project_id, bucket_id, operation_key,
            idempotency_key, reserved_credits, included_reserved_credits,
            purchased_reserved_credits, metadata, expires_at, updated_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, 0, $9::jsonb, $10, NOW())
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, NOW())
          RETURNING *`,
         [
           randomUUID(),
@@ -183,6 +223,8 @@ export class UsageService {
           input.operationKey,
           idempotencyKey,
           input.units,
+          includedReserved,
+          purchasedReserved,
           JSON.stringify({ quotaKey, ...(input.metadata && typeof input.metadata === 'object' ? input.metadata : {}) }),
           new Date(Date.now() + RESERVATION_TTL_MS),
         ],
@@ -223,6 +265,11 @@ export class UsageService {
       if (!Number.isInteger(charged) || charged < 0 || charged > operation.reservedCredits) {
         throw new ConflictException('Actual usage exceeds the reservation');
       }
+      const { includedActual, purchasedActual, purchasedUnused } = splitUsageCommit(
+        charged,
+        operation.includedReservedCredits,
+        operation.purchasedReservedCredits,
+      );
 
       await tx.query(
         `UPDATE usage_buckets
@@ -230,14 +277,43 @@ export class UsageService {
              committed_credits = committed_credits + $3,
              updated_at = NOW()
          WHERE id = $1`,
-        [operation.bucketId, operation.reservedCredits, charged],
+        [operation.bucketId, operation.includedReservedCredits, includedActual],
       );
+      if (operation.purchasedReservedCredits > 0) {
+        await tx.query(
+          `UPDATE logo_bonus_balances
+           SET reserved_credits = reserved_credits - $2,
+               available_credits = available_credits + $3,
+               updated_at = NOW()
+           WHERE user_id = $1`,
+          [operation.userId, operation.purchasedReservedCredits, purchasedUnused],
+        );
+      }
+      if (purchasedActual > 0) {
+        await tx.query(
+          `INSERT INTO logo_bonus_transactions (
+             id, user_id, kind, credits, usage_operation_id, metadata
+           ) VALUES ($1, $2, 'CONSUMPTION', $3, $4, $5::jsonb)
+           ON CONFLICT (usage_operation_id, kind)
+             WHERE usage_operation_id IS NOT NULL DO NOTHING`,
+          [
+            randomUUID(),
+            operation.userId,
+            -purchasedActual,
+            operation.id,
+            JSON.stringify({ operationKey: operation.operationKey }),
+          ],
+        );
+      }
       return tx.one<UsageOperation>(
         `UPDATE usage_operations
          SET status = 'COMMITTED'::"UsageReservationStatus",
-             actual_credits = $2, updated_at = NOW()
+             actual_credits = $2,
+             included_actual_credits = $3,
+             purchased_actual_credits = $4,
+             updated_at = NOW()
          WHERE id = $1 RETURNING *`,
-        [id, charged],
+        [id, charged, includedActual, purchasedActual],
       );
     }, SERIALIZABLE);
   }
@@ -264,12 +340,25 @@ export class UsageService {
         `UPDATE usage_buckets
          SET reserved_credits = reserved_credits - $2, updated_at = NOW()
          WHERE id = $1`,
-        [operation.bucketId, operation.reservedCredits],
+        [operation.bucketId, operation.includedReservedCredits],
       );
+      if (operation.purchasedReservedCredits > 0) {
+        await tx.query(
+          `UPDATE logo_bonus_balances
+           SET reserved_credits = reserved_credits - $2,
+               available_credits = available_credits + $2,
+               updated_at = NOW()
+           WHERE user_id = $1`,
+          [operation.userId, operation.purchasedReservedCredits],
+        );
+      }
       return tx.one<UsageOperation>(
         `UPDATE usage_operations
          SET status = 'RELEASED'::"UsageReservationStatus",
-             actual_credits = 0, updated_at = NOW()
+             actual_credits = 0,
+             included_actual_credits = 0,
+             purchased_actual_credits = 0,
+             updated_at = NOW()
          WHERE id = $1 RETURNING *`,
         [id],
       );
@@ -323,6 +412,11 @@ export class UsageService {
          AND quota_exempt = $3`,
       [tenant.userId, period.start, exempt],
     );
+    const bonus = await db.maybeOne<{ availableCredits: number; reservedCredits: number }>(
+      `SELECT available_credits, reserved_credits
+       FROM logo_bonus_balances WHERE user_id = $1`,
+      [tenant.userId],
+    );
     const byKey = new Map(buckets.rows.map((row) => [row.quotaKey, row]));
     const summarize = (key: QuotaKey): QuotaSummary => {
       const row = byKey.get(key);
@@ -336,11 +430,21 @@ export class UsageService {
         remaining: limit === null ? null : Math.max(0, limit - used - reserved),
       };
     };
+    const promptSummary = summarize('prompt.compose');
+    const logoSummary = summarize('image.generate');
     return {
       periodStart: period.start.toISOString(),
       periodEnd: period.end.toISOString(),
-      prompts: summarize('prompt.compose'),
-      logos: summarize('image.generate'),
+      prompts: promptSummary,
+      logos: {
+        ...logoSummary,
+        bonusAvailable: bonus?.availableCredits ?? 0,
+        bonusReserved: bonus?.reservedCredits ?? 0,
+        totalRemaining:
+          logoSummary.remaining === null
+            ? null
+            : logoSummary.remaining + (bonus?.availableCredits ?? 0),
+      },
     };
   }
 }

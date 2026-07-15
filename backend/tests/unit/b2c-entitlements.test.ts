@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACCESS_ROLES,
+  LOGO_ADDON_PACK_DETAILS,
+  LOGO_ADDON_PACKS,
   PLAN_ENTITLEMENTS,
   PLANS,
 } from '@logo-platform/shared';
@@ -22,6 +24,14 @@ describe('B2C access and plan entitlements', () => {
     expect(PLAN_ENTITLEMENTS[plan].monthlyQuotas).toEqual({
       'prompt.compose': prompts,
       'image.generate': logos,
+    });
+  });
+
+  it('defines persistent logo add-on packs and their public prices', () => {
+    expect(LOGO_ADDON_PACKS).toEqual(['LOGOS_10', 'LOGOS_25']);
+    expect(LOGO_ADDON_PACK_DETAILS).toEqual({
+      LOGOS_10: { generations: 10, priceUsd: 4.99 },
+      LOGOS_25: { generations: 25, priceUsd: 9.99 },
     });
   });
 });

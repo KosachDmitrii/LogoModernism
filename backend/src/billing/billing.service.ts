@@ -10,8 +10,10 @@ import { db } from '@logo-platform/database';
 import type {
   BillingOverview,
   BillingSubscriptionStatus,
+  LogoAddonPack,
   Plan,
 } from '@logo-platform/shared';
+import { LOGO_ADDON_PACK_DETAILS } from '@logo-platform/shared';
 import type { TenantScope } from '../auth/tenant-context';
 import { UsageService } from '../usage/usage.service';
 import { LemonSqueezyClient } from './lemon-squeezy.client';
@@ -24,6 +26,8 @@ type LemonWebhook = {
       organization_id?: string;
       checkout_session_id?: string;
       nonce?: string;
+      checkout_kind?: string;
+      pack?: string;
     };
   };
   data?: {
@@ -38,12 +42,19 @@ type LemonWebhook = {
       renews_at?: string | null;
       ends_at?: string | null;
       updated_at?: string | null;
+      refunded?: boolean;
+      refunded_at?: string | null;
+      first_order_item?: {
+        product_id?: number | string;
+        variant_id?: number | string;
+      };
     };
   };
 };
 type CheckoutCustomData = NonNullable<
   NonNullable<LemonWebhook['meta']>['custom_data']
 >;
+type LemonAttributes = NonNullable<NonNullable<LemonWebhook['data']>['attributes']>;
 type SubscriptionRow = {
   userId: string;
   organizationId: string;
@@ -57,6 +68,10 @@ type CheckoutRow = {
   id: string;
   userId: string;
   organizationId: string;
+};
+type AddonCheckoutRow = CheckoutRow & {
+  pack: LogoAddonPack;
+  generationQuantity: number;
 };
 
 function sha256(value: string | Buffer): string {
@@ -163,6 +178,49 @@ export class BillingService {
     }
   }
 
+  async createAddonCheckout(tenant: TenantScope, pack: LogoAddonPack) {
+    if (tenant.accessRole === 'ADMIN') {
+      throw new BadRequestException('Administrator accounts have unlimited logo generations');
+    }
+    const details = LOGO_ADDON_PACK_DETAILS[pack];
+    if (!details) throw new BadRequestException('Unknown logo generation pack');
+    const variantId = this.variantForAddon(pack);
+    const nonce = randomBytes(24).toString('base64url');
+    const session = await db.one<{ id: string }>(
+      `INSERT INTO billing_addon_checkout_sessions (
+         id, organization_id, user_id, requested_by, pack, variant_id,
+         generation_quantity, nonce_hash, expires_at
+       ) VALUES ($1, $2, $3, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [
+        randomUUID(),
+        tenant.organizationId,
+        tenant.userId,
+        pack,
+        variantId,
+        details.generations,
+        sha256(nonce),
+        new Date(Date.now() + 30 * 60_000),
+      ],
+    );
+    try {
+      const url = await this.lemon.createCheckout({
+        variantId,
+        userId: tenant.userId,
+        organizationId: tenant.organizationId,
+        checkoutSessionId: session.id,
+        nonce,
+        checkoutKind: 'logo_addon',
+        pack,
+      });
+      return { url };
+    } catch (error) {
+      await db.query('DELETE FROM billing_addon_checkout_sessions WHERE id = $1', [session.id])
+        .catch(() => undefined);
+      throw error;
+    }
+  }
+
   async customerPortal(tenant: TenantScope) {
     const subscription = await db.maybeOne<SubscriptionRow>(
       'SELECT * FROM billing_subscriptions WHERE user_id = $1',
@@ -207,6 +265,21 @@ export class BillingService {
       String(attributes.store_id) !== configuredStore
     ) {
       throw new ForbiddenException('Webhook belongs to another store');
+    }
+
+    if (eventName === 'order_created' && resourceId && attributes) {
+      const orderVariantId = String(attributes.first_order_item?.variant_id ?? '');
+      const addonPack = this.addonForVariant(orderVariantId);
+      if (addonPack) {
+        return this.processAddonOrder({
+          payloadHash,
+          resourceId,
+          attributes,
+          custom: payload.meta?.custom_data,
+          pack: addonPack,
+          variantId: orderVariantId,
+        });
+      }
     }
 
     if (!eventName.startsWith('subscription_') || !resourceId || !attributes) {
@@ -325,6 +398,120 @@ export class BillingService {
     return { status: 'processed' };
   }
 
+  private async processAddonOrder(input: {
+    payloadHash: string;
+    resourceId: string;
+    attributes: LemonAttributes;
+    custom?: CheckoutCustomData;
+    pack: LogoAddonPack;
+    variantId: string;
+  }): Promise<{ status: 'processed' | 'duplicate' }> {
+    const { payloadHash, resourceId, attributes, custom, pack, variantId } = input;
+    if (attributes.status?.toLowerCase() !== 'paid' || attributes.refunded) {
+      throw new ForbiddenException('Logo add-on order is not paid');
+    }
+    if (
+      custom?.checkout_kind !== 'logo_addon' ||
+      custom.pack !== pack ||
+      !custom.checkout_session_id ||
+      !custom.nonce ||
+      !custom.user_id
+    ) {
+      throw new ForbiddenException('Logo add-on order is not linked to a valid checkout');
+    }
+    const details = LOGO_ADDON_PACK_DETAILS[pack];
+    try {
+      await db.transaction(async (tx) => {
+        await tx.query(
+          `INSERT INTO billing_webhook_events (id, event_name, resource_id, status)
+           VALUES ($1, 'order_created', $2, 'RECEIVED'::"BillingEventStatus")`,
+          [payloadHash, resourceId],
+        );
+        await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          `usage:${custom.user_id}`,
+        ]);
+        const checkout = await tx.maybeOne<AddonCheckoutRow>(
+          `SELECT id, user_id, organization_id, pack, generation_quantity
+           FROM billing_addon_checkout_sessions
+           WHERE id = $1
+             AND user_id = $2
+             AND ($3::text IS NULL OR organization_id = $3)
+             AND pack = $4
+             AND variant_id = $5
+             AND nonce_hash = $6
+             AND generation_quantity = $7
+             AND consumed_at IS NULL
+             AND expires_at > NOW()
+           FOR UPDATE`,
+          [
+            custom.checkout_session_id,
+            custom.user_id,
+            custom.organization_id ?? null,
+            pack,
+            variantId,
+            sha256(custom.nonce!),
+            details.generations,
+          ],
+        );
+        if (!checkout) throw new ForbiddenException('Logo add-on checkout is invalid or expired');
+
+        await tx.query(
+          `INSERT INTO billing_addon_fulfillments (
+             provider_order_id, checkout_session_id, organization_id, user_id,
+             provider_customer_id, product_id, variant_id, pack, generation_quantity
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            resourceId,
+            checkout.id,
+            checkout.organizationId,
+            checkout.userId,
+            String(attributes.customer_id ?? '') || null,
+            String(attributes.first_order_item?.product_id ?? attributes.product_id ?? '') || null,
+            variantId,
+            pack,
+            details.generations,
+          ],
+        );
+        await tx.query(
+          `INSERT INTO logo_bonus_transactions (
+             id, user_id, kind, credits, provider, provider_order_id, metadata
+           ) VALUES ($1, $2, 'PURCHASE', $3, 'LEMON_SQUEEZY', $4, $5::jsonb)`,
+          [
+            randomUUID(),
+            checkout.userId,
+            details.generations,
+            resourceId,
+            JSON.stringify({ pack, variantId, checkoutSessionId: checkout.id }),
+          ],
+        );
+        await tx.query(
+          `INSERT INTO logo_bonus_balances (user_id, available_credits, updated_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (user_id) DO UPDATE SET
+             available_credits =
+               logo_bonus_balances.available_credits + EXCLUDED.available_credits,
+             updated_at = NOW()`,
+          [checkout.userId, details.generations],
+        );
+        await tx.query(
+          `UPDATE billing_addon_checkout_sessions
+           SET consumed_at = NOW() WHERE id = $1`,
+          [checkout.id],
+        );
+        await tx.query(
+          `UPDATE billing_webhook_events
+           SET status = 'PROCESSED'::"BillingEventStatus", processed_at = NOW()
+           WHERE id = $1`,
+          [payloadHash],
+        );
+      }, { isolationLevel: 'SERIALIZABLE' });
+    } catch (error) {
+      if (isUniqueViolation(error)) return { status: 'duplicate' };
+      throw error;
+    }
+    return { status: 'processed' };
+  }
+
   private validCheckout(
     custom: CheckoutCustomData | undefined,
     plan: Plan,
@@ -395,8 +582,48 @@ export class BillingService {
   private planForVariant(variantId: string): Plan | null {
     const includes = (value?: string) =>
       value?.split(',').map((item) => item.trim()).includes(variantId) ?? false;
-    if (includes(process.env.LEMON_SQUEEZY_PLUS_VARIANT_IDS)) return 'PLUS';
-    if (includes(process.env.LEMON_SQUEEZY_PRO_VARIANT_IDS)) return 'PRO';
-    return null;
+    const matches: Plan[] = [];
+    if (includes(process.env.LEMON_SQUEEZY_PLUS_VARIANT_IDS)) matches.push('PLUS');
+    if (includes(process.env.LEMON_SQUEEZY_PRO_VARIANT_IDS)) matches.push('PRO');
+    if (this.addonForVariantUnchecked(variantId)) {
+      throw new ConflictException(`Lemon Squeezy variant ${variantId} is mapped more than once`);
+    }
+    if (matches.length > 1) {
+      throw new ConflictException(`Lemon Squeezy variant ${variantId} is mapped more than once`);
+    }
+    return matches[0] ?? null;
+  }
+
+  private variantForAddon(pack: LogoAddonPack): string {
+    const variants =
+      pack === 'LOGOS_10'
+        ? process.env.LEMON_SQUEEZY_LOGOS_10_VARIANT_IDS
+        : process.env.LEMON_SQUEEZY_LOGOS_25_VARIANT_IDS;
+    const variant = variants?.split(',').map((value) => value.trim()).find(Boolean);
+    if (!variant) throw new ConflictException(`No Lemon Squeezy variant configured for ${pack}`);
+    return variant;
+  }
+
+  private addonForVariant(variantId: string): LogoAddonPack | null {
+    const pack = this.addonForVariantUnchecked(variantId);
+    if (!pack) return null;
+    const inPlanVariants = [process.env.LEMON_SQUEEZY_PLUS_VARIANT_IDS, process.env.LEMON_SQUEEZY_PRO_VARIANT_IDS]
+      .some((value) => value?.split(',').map((item) => item.trim()).includes(variantId));
+    if (inPlanVariants) {
+      throw new ConflictException(`Lemon Squeezy variant ${variantId} is mapped more than once`);
+    }
+    return pack;
+  }
+
+  private addonForVariantUnchecked(variantId: string): LogoAddonPack | null {
+    const includes = (value?: string) =>
+      value?.split(',').map((item) => item.trim()).includes(variantId) ?? false;
+    const matches: LogoAddonPack[] = [];
+    if (includes(process.env.LEMON_SQUEEZY_LOGOS_10_VARIANT_IDS)) matches.push('LOGOS_10');
+    if (includes(process.env.LEMON_SQUEEZY_LOGOS_25_VARIANT_IDS)) matches.push('LOGOS_25');
+    if (matches.length > 1) {
+      throw new ConflictException(`Lemon Squeezy variant ${variantId} is mapped more than once`);
+    }
+    return matches[0] ?? null;
   }
 }

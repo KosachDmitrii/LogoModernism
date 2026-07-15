@@ -23,17 +23,21 @@ import { useToast } from './ToastProvider';
 
 const MAX_LOGOS = 3;
 
-const PROMPT_SCORE_FIELDS: Array<{ key: keyof PromptScores; labelKey: MessageKey }> = [
-  { key: 'promptQuality', labelKey: 'prompts.card.scoreOverall' },
-  { key: 'modernismScore', labelKey: 'prompts.card.scoreModernism' },
-  { key: 'swissScore', labelKey: 'prompts.card.scoreSwiss' },
-  { key: 'minimalismScore', labelKey: 'prompts.card.scoreMinimalism' },
-  { key: 'geometryScore', labelKey: 'prompts.card.scoreGeometry' },
-  { key: 'cohesionScore', labelKey: 'prompts.card.scoreCohesion' },
-  { key: 'identityScore', labelKey: 'prompts.card.scoreIdentity' },
-  { key: 'brandRecognitionScore', labelKey: 'prompts.card.scoreBrandRecognition' },
-  { key: 'readabilityScore', labelKey: 'prompts.card.scoreReadability' },
-  { key: 'scalabilityScore', labelKey: 'prompts.card.scoreScalability' },
+const PROMPT_SCORE_FIELDS: Array<{
+  key: keyof PromptScores;
+  labelKey: MessageKey;
+  hintKey: MessageKey;
+}> = [
+  { key: 'promptQuality', labelKey: 'prompts.card.scoreOverall', hintKey: 'prompts.card.scoreOverallHint' },
+  { key: 'modernismScore', labelKey: 'prompts.card.scoreModernism', hintKey: 'prompts.card.scoreModernismHint' },
+  { key: 'swissScore', labelKey: 'prompts.card.scoreSwiss', hintKey: 'prompts.card.scoreSwissHint' },
+  { key: 'minimalismScore', labelKey: 'prompts.card.scoreMinimalism', hintKey: 'prompts.card.scoreMinimalismHint' },
+  { key: 'geometryScore', labelKey: 'prompts.card.scoreGeometry', hintKey: 'prompts.card.scoreGeometryHint' },
+  { key: 'cohesionScore', labelKey: 'prompts.card.scoreCohesion', hintKey: 'prompts.card.scoreCohesionHint' },
+  { key: 'identityScore', labelKey: 'prompts.card.scoreIdentity', hintKey: 'prompts.card.scoreIdentityHint' },
+  { key: 'brandRecognitionScore', labelKey: 'prompts.card.scoreBrandRecognition', hintKey: 'prompts.card.scoreBrandRecognitionHint' },
+  { key: 'readabilityScore', labelKey: 'prompts.card.scoreReadability', hintKey: 'prompts.card.scoreReadabilityHint' },
+  { key: 'scalabilityScore', labelKey: 'prompts.card.scoreScalability', hintKey: 'prompts.card.scoreScalabilityHint' },
 ];
 
 interface PromptCardProps {
@@ -269,10 +273,11 @@ export function PromptCard({
           <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
             {t('prompts.card.scoresTitle')}
           </p>
-          {PROMPT_SCORE_FIELDS.map(({ key, labelKey }) => (
+          {PROMPT_SCORE_FIELDS.map(({ key, labelKey, hintKey }) => (
             <ScoreBar
               key={key}
               label={t(labelKey)}
+              hint={t(hintKey)}
               value={prompt.scores?.[key] ?? 0}
             />
           ))}
