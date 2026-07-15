@@ -25,7 +25,7 @@ function authContext(headers: Record<string, string>) {
 describe('scalability guardrails', () => {
   it('uses bounded provider-specific worker concurrency', () => {
     expect(getQueueConcurrency('pdf')).toBe(1);
-    expect(getQueueConcurrency('image')).toBe(2);
+    expect(getQueueConcurrency('image')).toBe(1);
     expect(getQueueConcurrency('prompt')).toBe(2);
     expect(getQueueConcurrency('feedback')).toBe(5);
   });

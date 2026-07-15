@@ -1,5 +1,7 @@
 const DEFAULT_PRODUCTION_CONNECTION_LIMIT = '2';
-const DEFAULT_DEVELOPMENT_CONNECTION_LIMIT = '10';
+// Local development runs both the API and worker, so this is a per-process
+// limit. Keep their combined pool within typical Supabase free-tier capacity.
+const DEFAULT_DEVELOPMENT_CONNECTION_LIMIT = '5';
 const DEFAULT_POOL_TIMEOUT_SECONDS = '5';
 
 export function isSupabasePoolerUrl(url: string): boolean {

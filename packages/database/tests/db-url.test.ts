@@ -12,7 +12,7 @@ test('adds bounded development Prisma pool defaults for runtime URLs', () => {
       'postgresql://postgres.example:secret@aws-0-eu.pooler.supabase.com:6543/postgres',
     ),
   );
-  assert.equal(result.searchParams.get('connection_limit'), '10');
+  assert.equal(result.searchParams.get('connection_limit'), '5');
   assert.equal(result.searchParams.get('pool_timeout'), '5');
   assert.equal(result.searchParams.get('pgbouncer'), 'true');
 });

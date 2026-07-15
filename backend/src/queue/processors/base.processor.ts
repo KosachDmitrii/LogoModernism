@@ -1,10 +1,11 @@
 import { Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
   JOB_PAYLOAD_VERSION,
+  QUEUE_NAMES,
   QueueName,
   VersionedJobPayload,
 } from '@logo-platform/shared';
-import { Job, Worker } from 'bullmq';
+import { Job, UnrecoverableError, Worker } from 'bullmq';
 import { QueueJobHandler } from '../queue.constants';
 import {
   getQueueRuntimeConfig,
@@ -12,6 +13,8 @@ import {
   getRedisConnectionOptions,
 } from '../queue.config';
 import { UsageService } from '../../usage/usage.service';
+import { QueueCancellationService } from '../queue-cancellation.service';
+import { prisma } from '@logo-platform/database';
 
 export abstract class BaseQueueProcessor<Payload extends VersionedJobPayload>
   implements OnModuleInit, OnModuleDestroy
@@ -24,6 +27,7 @@ export abstract class BaseQueueProcessor<Payload extends VersionedJobPayload>
   protected constructor(
     private readonly queueName: QueueName,
     private readonly handler?: QueueJobHandler<Payload>,
+    private readonly cancellation?: QueueCancellationService,
   ) {
     this.logger = new Logger(`${queueName} worker`);
   }
@@ -55,22 +59,55 @@ export abstract class BaseQueueProcessor<Payload extends VersionedJobPayload>
       throw new Error(`No handler is registered for the ${this.queueName} queue`);
     }
     const reservationId = job.data.usageReservationId;
+    const controller = new AbortController();
+    const stopWatching = this.cancellation?.watch(job.id ?? '', controller);
+    const throwIfCancellationRequested = () => {
+      if (controller.signal.aborted) {
+        throw new UnrecoverableError('Background job cancelled');
+      }
+    };
+    if (this.cancellation && await this.cancellation.isCancelled(job.id ?? '')) {
+      controller.abort(new Error('Background job cancelled'));
+    }
     if (reservationId) {
       await this.usage.markProcessing(reservationId, job.id);
     }
     try {
+      throwIfCancellationRequested();
       const result = await this.handler.process(job.data, {
         jobId: job.id ?? '',
         attempt: job.attemptsMade + 1,
+        signal: controller.signal,
+        throwIfCancellationRequested,
         updateProgress: async (progress) => {
           await job.updateProgress(progress);
         },
       });
+      throwIfCancellationRequested();
       if (reservationId) await this.usage.commit(reservationId);
       return result;
     } catch (error) {
       const attempts = job.opts.attempts ?? 1;
-      const finalAttempt = job.attemptsMade + 1 >= attempts;
+      const cancelled =
+        controller.signal.aborted || error instanceof UnrecoverableError;
+      const finalAttempt = cancelled || job.attemptsMade + 1 >= attempts;
+      if (cancelled && this.queueName === QUEUE_NAMES.image && 'imageId' in job.data) {
+        await prisma.logo
+          .deleteMany({
+            where: {
+              id: String(job.data.imageId),
+              ...(job.data.organizationId
+                ? { organizationId: job.data.organizationId }
+                : {}),
+              publicUrl: null,
+            },
+          })
+          .catch((cleanupError) => {
+            this.logger.error(
+              `Failed to remove cancelled logo placeholder: ${String(cleanupError)}`,
+            );
+          });
+      }
       if (reservationId && finalAttempt) {
         await this.usage.release(reservationId).catch((releaseError) => {
           this.logger.error(
@@ -78,7 +115,12 @@ export abstract class BaseQueueProcessor<Payload extends VersionedJobPayload>
           );
         });
       }
+      if (cancelled && !(error instanceof UnrecoverableError)) {
+        throw new UnrecoverableError('Background job cancelled');
+      }
       throw error;
+    } finally {
+      stopWatching?.();
     }
   }
 }

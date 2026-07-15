@@ -125,7 +125,7 @@ export function BriefWorkflowPanel({
               {t('brief.composePrompts')}
             </button>
             {onStartOver && (
-              <StartOverButton onClick={onStartOver} disabled={isComposing} />
+              <StartOverButton onClick={onStartOver} />
             )}
           </div>
 

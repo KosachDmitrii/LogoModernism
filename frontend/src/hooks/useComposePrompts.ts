@@ -22,6 +22,11 @@ export interface ComposePromptsOptions {
   intent?: PromptGenerateIntent;
 }
 
+export interface ComposeWorkControl {
+  getSignal(): AbortSignal;
+  onJobQueued(jobId: string): void;
+}
+
 function toBrainPartnerState(
   data: Awaited<ReturnType<typeof generatePrompts>>,
   options?: ComposePromptsOptions,
@@ -49,7 +54,7 @@ function toBrainPartnerState(
   };
 }
 
-export function useComposePrompts() {
+export function useComposePrompts(workControl?: ComposeWorkControl) {
   const {
     industry,
     companyName,
@@ -91,23 +96,31 @@ export function useComposePrompts() {
         return Object.keys(symbolOnlyContext).length > 0 ? symbolOnlyContext : undefined;
       })();
 
-      return generatePrompts({
-        industry: industry.trim(),
-        companyName: brandName,
-        variationCount,
-        inspirationMode: hasActiveBrief ? undefined : inspirationMode || undefined,
-        minimalismLevel,
-        preferredEra: era,
-        analysisPrincipleIds,
-        catalogReferenceIds,
-        autoCatalogReferences,
-        rebusWordmark,
-        markType: logoMarkType,
-        typographyStyle: brandName ? typographyStyle : parseTypographyStyle(activeBrief.typographyStyle),
-        briefContext,
-        preferredTerritoryId,
-        intent: options?.intent,
-      }).then((data) => ({ data, options }));
+      return generatePrompts(
+        {
+          industry: industry.trim(),
+          companyName: brandName,
+          variationCount,
+          inspirationMode: hasActiveBrief ? undefined : inspirationMode || undefined,
+          minimalismLevel,
+          preferredEra: era,
+          analysisPrincipleIds,
+          catalogReferenceIds,
+          autoCatalogReferences,
+          rebusWordmark,
+          markType: logoMarkType,
+          typographyStyle: brandName ? typographyStyle : parseTypographyStyle(activeBrief.typographyStyle),
+          briefContext,
+          preferredTerritoryId,
+          intent: options?.intent,
+        },
+        workControl
+          ? {
+              signal: workControl.getSignal(),
+              onJobQueued: workControl.onJobQueued,
+            }
+          : undefined,
+      ).then((data) => ({ data, options }));
     },
     onSuccess: ({ data, options }) => {
       if (options?.briefOverride) {

@@ -3,6 +3,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  Post,
 } from '@nestjs/common';
 import {
   QUEUE_NAMES,
@@ -45,6 +46,14 @@ export class QueueController {
     const status = await this.queueService.findStatus(jobId, tenant?.organizationId);
     if (!status) throw new NotFoundException('Job not found');
     return status;
+  }
+
+  @Post(':jobId/cancel')
+  @Roles(...CONTRIBUTORS)
+  async cancelJob(@Param('jobId') jobId: string, @Tenant() tenant?: TenantScope) {
+    const status = await this.queueService.cancel(jobId, tenant?.organizationId);
+    if (!status) throw new NotFoundException('Job not found');
+    return { jobId, cancellationRequested: true };
   }
 
   private parseQueueName(value: string): QueueName {

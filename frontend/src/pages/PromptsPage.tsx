@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { PromptCard } from '../components/PromptCard';
 import { BriefWorkflowPanel } from '../components/brief/BriefWorkflowPanel';
@@ -30,6 +30,7 @@ import { getBriefReadiness } from '../lib/brief-readiness';
 import { toPromptGenerateIntent } from '../lib/prompt-generate-intent';
 import { useAuth } from '../auth/AuthProvider';
 import { hasPermission } from '../auth/permissions';
+import { cancelBackgroundJob } from '../api';
 
 const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
   1: 'prompts.step.projectSubtitle',
@@ -85,7 +86,14 @@ export function PromptsPage() {
   } | null>(null);
   const [regeneratingAction, setRegeneratingAction] = useState<PartnerRegenerateAction | null>(null);
 
-  const compose = useComposePrompts();
+  const workControllerRef = useRef(new AbortController());
+  const activeJobIdsRef = useRef(new Set<string>());
+  const getWorkSignal = () => workControllerRef.current.signal;
+  const registerJob = (jobId: string) => activeJobIdsRef.current.add(jobId);
+  const compose = useComposePrompts({
+    getSignal: getWorkSignal,
+    onJobQueued: registerJob,
+  });
 
   const canGoToStep = (step: PromptWizardStep) => {
     if (step === 1) return true;
@@ -139,6 +147,12 @@ export function PromptsPage() {
   const handleStartOver = () => setStartOverOpen(true);
 
   const confirmStartOver = () => {
+    workControllerRef.current.abort();
+    const activeJobIds = [...activeJobIdsRef.current];
+    activeJobIdsRef.current.clear();
+    void Promise.allSettled(activeJobIds.map((jobId) => cancelBackgroundJob(jobId)));
+    workControllerRef.current = new AbortController();
+    compose.reset();
     resetWizard();
     clearPersistedPromptsWizardStep();
     setActiveStep(1);
@@ -231,6 +245,8 @@ export function PromptsPage() {
                     rank={i + 1}
                     selected={selectedPromptId === prompt.id}
                     onSelect={() => selectPrompt(prompt.id)}
+                    getWorkSignal={getWorkSignal}
+                    onJobQueued={registerJob}
                   />
                 ))}
               </div>
@@ -243,7 +259,7 @@ export function PromptsPage() {
                   <ArrowLeft size={16} />
                   {t('prompts.results.backToBrief')}
                 </button>
-                <StartOverButton onClick={handleStartOver} disabled={compose.isPending} variant="primary" />
+                <StartOverButton onClick={handleStartOver} variant="primary" />
               </div>
             </div>
           )}

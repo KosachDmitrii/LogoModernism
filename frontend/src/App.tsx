@@ -11,8 +11,21 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { PrinciplesPage } from './pages/PrinciplesPage';
 import { BrainRoutePage } from './pages/BrainRoutePage';
 import { PricingPage } from './pages/PricingPage';
+import { useAuth } from './auth/AuthProvider';
+import { useT } from './i18n';
 
 export default function App() {
+  const { loading } = useAuth();
+  const t = useT();
+
+  if (loading) {
+    return (
+      <main className="min-h-screen grid place-items-center bg-zinc-950 text-zinc-400">
+        {t('auth.loading')}
+      </main>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>

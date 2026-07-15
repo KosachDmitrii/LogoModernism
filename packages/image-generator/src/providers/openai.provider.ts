@@ -14,6 +14,7 @@ interface OpenAIImageResponse {
 
 const OPENAI_IMAGE_RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504, 520, 522, 524]);
 const OPENAI_IMAGE_MAX_ATTEMPTS = 3;
+const DEFAULT_OPENAI_IMAGE_TIMEOUT_MS = 15 * 60_000;
 
 function readEnv(name: string, fallback: string): string {
   const raw = process.env[name]?.trim();
@@ -27,6 +28,13 @@ function getImageModel(): string {
 
 function getImageQuality(): string {
   return readEnv('OPENAI_IMAGE_QUALITY', 'high');
+}
+
+function getImageTimeoutMs(): number {
+  const configured = Number(process.env.OPENAI_IMAGE_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_OPENAI_IMAGE_TIMEOUT_MS;
 }
 
 function mapQualityForGptImage(quality: string): string {
@@ -102,8 +110,18 @@ function toImageUrl(item: { url?: string; b64_json?: string }): string {
   throw new Error('OpenAI response contained no image data');
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason ?? new DOMException('Aborted', 'AbortError'));
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+  });
 }
 
 function compactErrorBody(body: string): string {
@@ -120,6 +138,7 @@ function compactErrorBody(body: string): string {
 async function postOpenAIImageRequest(
   apiKey: string,
   body: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<Response> {
   let lastError: Error | undefined;
   const idempotencyKey = randomUUID();
@@ -134,18 +153,19 @@ async function postOpenAIImageRequest(
           'Idempotency-Key': idempotencyKey,
         },
         body: JSON.stringify(body),
-      }, { timeoutMs: 120_000 });
+        signal,
+      }, { timeoutMs: getImageTimeoutMs() });
 
       if (!OPENAI_IMAGE_RETRY_STATUSES.has(response.status) || attempt === OPENAI_IMAGE_MAX_ATTEMPTS) {
         return response;
       }
 
       await response.text().catch(() => '');
-      await sleep(800 * attempt);
+      await sleep(800 * attempt, signal);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (attempt === OPENAI_IMAGE_MAX_ATTEMPTS) throw lastError;
-      await sleep(800 * attempt);
+      if (signal?.aborted || attempt === OPENAI_IMAGE_MAX_ATTEMPTS) throw lastError;
+      await sleep(800 * attempt, signal);
     }
   }
 
@@ -165,7 +185,7 @@ export async function generateWithOpenAI(request: ImageGenerationRequest): Promi
   const quality = getImageQuality();
   const body = buildRequestBody(model, enhancedPrompt, size, count, quality);
 
-  const response = await postOpenAIImageRequest(apiKey, body);
+  const response = await postOpenAIImageRequest(apiKey, body, request.signal);
 
   if (!response.ok) {
     const errorBody = await response.text();

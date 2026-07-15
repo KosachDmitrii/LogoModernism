@@ -15,6 +15,8 @@ export interface QueueJobHandler<Payload, Result = unknown> {
 export interface QueueJobContext {
   jobId: string;
   attempt: number;
+  signal: AbortSignal;
+  throwIfCancellationRequested(): void;
   updateProgress(progress: JobProgress): Promise<void>;
 }
 

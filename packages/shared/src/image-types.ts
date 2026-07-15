@@ -13,6 +13,7 @@ export interface ImageGenerationRequest extends StylePreferenceInput {
   companyName?: string;
   markType?: LogoMarkType;
   typographyStyle?: TypographyStyle;
+  signal?: AbortSignal;
 }
 
 export interface LogoFeedback {

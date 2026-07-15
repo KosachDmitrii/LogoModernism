@@ -44,7 +44,7 @@ export function getQueueConcurrency(queueName: QueueName): number {
   const defaults: Record<QueueName, number> = {
     feedback: 5,
     pdf: 1,
-    image: 2,
+    image: 1,
     research: 2,
     consolidation: 1,
     prompt: 2,

@@ -16,6 +16,11 @@ import type { TenantScope } from '../auth/tenant-context';
 
 const RESERVATION_TTL_MS = 30 * 60 * 1_000;
 const UNLIMITED_BUCKET_CREDITS = 1_000_000_000;
+const USAGE_TRANSACTION_OPTIONS = {
+  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  maxWait: 10_000,
+  timeout: 20_000,
+} as const;
 
 function billingPeriod(now = new Date()): { start: Date; end: Date } {
   return {
@@ -152,7 +157,7 @@ export class UsageService {
           },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      USAGE_TRANSACTION_OPTIONS,
     );
   }
 
@@ -205,7 +210,7 @@ export class UsageService {
           data: { status: 'COMMITTED', actualCredits: charged },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      USAGE_TRANSACTION_OPTIONS,
     );
   }
 
@@ -239,7 +244,7 @@ export class UsageService {
           data: { status: 'RELEASED', actualCredits: 0 },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      USAGE_TRANSACTION_OPTIONS,
     );
   }
 

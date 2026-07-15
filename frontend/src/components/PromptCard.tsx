@@ -18,6 +18,7 @@ import { hasPermission } from '../auth/permissions';
 import { useT } from '../i18n';
 import { formatError } from '../lib/api-error';
 import { imageProviderLabel } from '../lib/translate-labels';
+import { ApiAbortError } from '../lib/api-client';
 
 const MAX_LOGOS = 3;
 
@@ -42,6 +43,8 @@ interface PromptCardProps {
   standalone?: boolean;
   onStateChange?: () => void;
   onSavedChange?: (saved: boolean) => void;
+  getWorkSignal?: () => AbortSignal;
+  onJobQueued?: (jobId: string) => void;
 }
 
 export function PromptCard({
@@ -52,6 +55,8 @@ export function PromptCard({
   standalone = false,
   onStateChange,
   onSavedChange,
+  getWorkSignal,
+  onJobQueued,
 }: PromptCardProps) {
   const t = useT();
   const { activeMembership } = useAuth();
@@ -109,19 +114,29 @@ export function PromptCard({
       const rawTypographyStyle =
         designBrief.typographyStyle || prompt.metadata?.typographyStyle || undefined;
 
-      const result = await generatePromptLogo(prompt.id, {
-        companyName: brandName,
-        markType: parseLogoMarkType(rawMarkType, brandName),
-        typographyStyle: brandName
-          ? parseTypographyStyle(rawTypographyStyle)
-          : undefined,
-      });
+      const result = await generatePromptLogo(
+        prompt.id,
+        {
+          companyName: brandName,
+          markType: parseLogoMarkType(rawMarkType, brandName),
+          typographyStyle: brandName
+            ? parseTypographyStyle(rawTypographyStyle)
+            : undefined,
+        },
+        {
+          signal: getWorkSignal?.(),
+          onJobQueued,
+        },
+      );
       if (standalone) {
         onStateChange?.();
       } else {
         setPromptLogos(prompt.id, result.logos);
       }
     } catch (err) {
+      if (err instanceof ApiAbortError || (err instanceof Error && err.name === 'AbortError')) {
+        return;
+      }
       console.error(err);
       alert(formatError(err, t));
     } finally {

@@ -88,8 +88,13 @@ export class PromptsService {
     return { ...result, prompts, bestPrompt, constraintReport };
   }
 
-  async generateAndPersist(request: PromptGenerationRequest, tenant?: TenantScope) {
+  async generateAndPersist(
+    request: PromptGenerationRequest,
+    tenant?: TenantScope,
+    signal?: AbortSignal,
+  ) {
     const result = await this.generate(request, tenant);
+    signal?.throwIfAborted();
     if (!process.env.DATABASE_URL) {
       return {
         result,
@@ -102,8 +107,17 @@ export class PromptsService {
     return { result, promptsWithLogos };
   }
 
-  async generateResponse(request: PromptGenerationRequest, tenant?: TenantScope) {
-    const { result, promptsWithLogos } = await this.generateAndPersist(request, tenant);
+  async generateResponse(
+    request: PromptGenerationRequest,
+    tenant?: TenantScope,
+    signal?: AbortSignal,
+  ) {
+    const { result, promptsWithLogos } = await this.generateAndPersist(
+      request,
+      tenant,
+      signal,
+    );
+    signal?.throwIfAborted();
     const brainResult =
       'brainPowered' in result && result.brainPowered
         ? (result as BrainPipelineResult)

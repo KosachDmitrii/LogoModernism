@@ -48,6 +48,13 @@ export class ObjectStorageService implements OnModuleDestroy {
     });
   }
 
+  isConfigured(): boolean {
+    return Boolean(
+      this.bucket ||
+        (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+    );
+  }
+
   async put(
     key: string,
     body: Buffer,

@@ -40,6 +40,21 @@ type QueueJobStatus<Result = unknown> = {
   finishedAt?: string;
 };
 
+export type BackgroundJobOptions = {
+  signal?: AbortSignal;
+  onJobQueued?: (jobId: string) => void;
+};
+
+export async function cancelBackgroundJob(jobId: string): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/jobs/${encodeURIComponent(jobId)}/cancel`,
+    { method: 'POST' },
+  );
+  if (!res.ok && res.status !== 404) {
+    await parseApiError(res, 'errors.api.progressCheckFailed');
+  }
+}
+
 async function getJobStatus<Result>(
   jobId: string,
   signal?: AbortSignal,
@@ -52,11 +67,9 @@ async function getJobStatus<Result>(
 async function waitForJob<Result>(
   jobId: string,
   signal?: AbortSignal,
-  deadlineMs = 180_000,
 ): Promise<QueueJobStatus<Result>> {
-  const startedAt = Date.now();
   let delayMs = 1_000;
-  while (Date.now() - startedAt < deadlineMs) {
+  while (true) {
     const status = await getJobStatus<Result>(jobId, signal);
     if (status.state === 'completed') return status;
     if (status.state === 'failed') {
@@ -75,7 +88,6 @@ async function waitForJob<Result>(
     });
     delayMs = Math.min(3_000, delayMs + 500);
   }
-  throw new Error(`Background job exceeded ${deadlineMs}ms deadline`);
 }
 
 export async function generatePrompts(body: {
@@ -96,7 +108,7 @@ export async function generatePrompts(body: {
   useBrain?: boolean;
   preferredTerritoryId?: 'territory-primary' | 'territory-construction' | 'territory-typography';
   intent?: PromptGenerateIntent;
-}): Promise<GenerateResponse> {
+}, options: BackgroundJobOptions = {}): Promise<GenerateResponse> {
   const intent = body.intent ?? 'compose';
   const { intent: _intent, ...payload } = body;
   const url = `${API_BASE}/prompts/generate?intent=${encodeURIComponent(intent)}`;
@@ -108,6 +120,7 @@ export async function generatePrompts(body: {
       'Idempotency-Key': crypto.randomUUID(),
     },
     body: JSON.stringify({ ...payload, intent }),
+    signal: options.signal,
   });
   if (!res.ok) await parseApiError(res, 'common.generationFailed');
   const response = (await res.json()) as
@@ -116,7 +129,8 @@ export async function generatePrompts(body: {
   if (!('id' in response && response.status === 'queued')) {
     return response as GenerateResponse;
   }
-  const job = await waitForJob<GenerateResponse>(response.id, undefined, 5 * 60_000);
+  options.onJobQueued?.(response.id);
+  const job = await waitForJob<GenerateResponse>(response.id, options.signal);
   if (!job.result) throw new Error('Prompt generation job returned no result');
   return { ...job.result, meta: { intent } };
 }
@@ -380,6 +394,7 @@ export async function generatePromptLogo(
     markType?: 'wordmark' | 'lettermark' | 'combination';
     typographyStyle?: TypographyStyle;
   },
+  options: BackgroundJobOptions = {},
 ): Promise<{ image: GeneratedImage; logos: GeneratedImage[]; remaining: number }> {
   const payload: Record<string, string> = {};
   const brandName = body.companyName?.trim();
@@ -390,8 +405,12 @@ export async function generatePromptLogo(
 
   const res = await fetch(`${API_BASE}/prompts/${encodeURIComponent(promptId)}/logos/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': crypto.randomUUID(),
+    },
     body: JSON.stringify(payload),
+    signal: options.signal,
   });
   if (!res.ok) await parseApiError(res, 'common.imageGenerationFailed');
   const response = (await res.json()) as
@@ -399,9 +418,11 @@ export async function generatePromptLogo(
     | { status: 'queued'; jobId: string; imageId: string; remaining: number };
   if ('image' in response) return response;
 
-  await waitForJob(response.jobId);
+  options.onJobQueued?.(response.jobId);
+  await waitForJob(response.jobId, options.signal);
   const promptResponse = await fetch(
     `${API_BASE}/prompts/${encodeURIComponent(promptId)}`,
+    { signal: options.signal },
   );
   if (!promptResponse.ok) await parseApiError(promptResponse, 'common.imageGenerationFailed');
   const prompt = (await promptResponse.json()) as ComposedPrompt & { logos?: GeneratedImage[] };
@@ -586,11 +607,7 @@ export async function runBrainResearch(body: { query: string; maxSources?: numbe
   const submission = (await res.json()) as { id?: string } | BrainResearchRunResult;
   if ('candidates' in submission) return submission;
   if (!submission.id) throw new Error('Research job was not created');
-  const job = await waitForJob<{ result: BrainResearchRunResult }>(
-    submission.id,
-    undefined,
-    10 * 60_000,
-  );
+  const job = await waitForJob<{ result: BrainResearchRunResult }>(submission.id);
   if (!job.result?.result) throw new Error('Research job returned no result');
   return job.result.result;
 }

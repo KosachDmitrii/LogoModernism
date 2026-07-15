@@ -31,6 +31,7 @@ export class PromptJobHandlerService implements QueueJobHandler<PromptJobPayload
             projectId: payload.projectId,
           }
         : undefined,
+      context.signal,
     );
     await context.updateProgress(100);
     return result;
@@ -122,41 +123,57 @@ export class ImageJobHandlerService implements QueueJobHandler<ImageJobPayload> 
       prompt: payload.prompt,
       provider: payload.provider === 'mock' ? 'mock' : 'openai',
       count: 1,
+      signal: context.signal,
     });
+    context.throwIfCancellationRequested();
     const image = result.images[0];
     if (!image) throw new Error('Image provider returned no image');
     await context.updateProgress(60);
-    const { buffer, contentType } = await this.readImage(image.url);
-    await this.storage.put(payload.outputKey, buffer, {
-      contentType,
-      cacheControl: 'public, max-age=31536000, immutable',
-      metadata: payload.metadata,
-    });
-    const publicUrl = this.storage.publicUrl(payload.outputKey);
+    let publicUrl = image.url;
+    let storageKey: string | undefined;
+    let mimeType: string | undefined;
+    if (this.storage.isConfigured()) {
+      const { buffer, contentType } = await this.readImage(image.url, context.signal);
+      const stored = await this.storage.storeDataUrl(
+        payload.outputKey,
+        `data:${contentType};base64,${buffer.toString('base64')}`,
+      );
+      publicUrl = stored.publicUrl;
+      storageKey = stored.storageKey;
+      mimeType = stored.mimeType;
+    }
+    context.throwIfCancellationRequested();
     await prisma.logo.updateMany({
       where: {
         id: payload.imageId,
         ...(payload.organizationId ? { organizationId: payload.organizationId } : {}),
       },
       data: {
-        storageKey: payload.outputKey,
-        publicUrl: publicUrl ?? image.url,
+        storageKey,
+        publicUrl,
+        mimeType,
         provider: image.provider,
         model: image.model,
         width: image.width,
         height: image.height,
+        metadata: payload.metadata
+          ? { ...payload.metadata, queued: false }
+          : { queued: false },
       },
     });
     await context.updateProgress(100);
-    return { imageId: payload.imageId, storageKey: payload.outputKey, url: publicUrl };
+    return { imageId: payload.imageId, storageKey };
   }
 
-  private async readImage(url: string): Promise<{ buffer: Buffer; contentType: string }> {
+  private async readImage(
+    url: string,
+    signal?: AbortSignal,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
     const dataUrl = /^data:([^;,]+);base64,(.+)$/s.exec(url);
     if (dataUrl) {
       return { buffer: Buffer.from(dataUrl[2]!, 'base64'), contentType: dataUrl[1]! };
     }
-    const response = await fetchWithDeadline(url, {}, { timeoutMs: 60_000 });
+    const response = await fetchWithDeadline(url, { signal }, { timeoutMs: 60_000 });
     if (!response.ok) throw new Error(`Image download failed: ${response.status}`);
     return {
       buffer: Buffer.from(await response.arrayBuffer()),

@@ -7,15 +7,17 @@ import {
   CONSOLIDATION_JOB_HANDLER,
   ConsolidationJobHandler,
 } from '../queue.constants';
+import { QueueCancellationService } from '../queue-cancellation.service';
 import { BaseQueueProcessor } from './base.processor';
 
 @Injectable()
 export class ConsolidationProcessor extends BaseQueueProcessor<ConsolidationJobPayload> {
   constructor(
+    cancellation: QueueCancellationService,
     @Optional()
     @Inject(CONSOLIDATION_JOB_HANDLER)
     handler?: ConsolidationJobHandler,
   ) {
-    super(QUEUE_NAMES.consolidation, handler);
+    super(QUEUE_NAMES.consolidation, handler, cancellation);
   }
 }

@@ -21,6 +21,7 @@ import {
   getRedisConnectionOptions,
   isAsyncQueueEnabled,
 } from './queue.config';
+import { QueueCancellationService } from './queue-cancellation.service';
 
 type AnyJobPayload = QueueJobPayloadMap[QueueName];
 type AnyQueue = Queue<
@@ -37,7 +38,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private readonly config = getQueueRuntimeConfig();
   private readonly queues = new Map<QueueName, AnyQueue>();
 
-  constructor() {
+  constructor(private readonly cancellation: QueueCancellationService) {
     for (const name of Object.values(QUEUE_NAMES)) {
       this.queues.set(
         name,
@@ -121,6 +122,15 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       if (status) return status;
     }
     return null;
+  }
+
+  async cancel(jobId: string, organizationId?: string): Promise<JobStatus | null> {
+    const status = await this.findStatus(jobId, organizationId);
+    if (!status) return null;
+    if (status.state !== 'completed' && status.state !== 'failed') {
+      await this.cancellation.cancel(jobId);
+    }
+    return status;
   }
 
   async getMetrics() {
