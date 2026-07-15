@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Filter, Search, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -18,7 +18,7 @@ import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
 import { useT, type MessageKey } from '../i18n';
 import { industryLabel, markTypeLabel } from '../lib/translate-labels';
-import { sanitizeCatalogTagList, sanitizeBriefTagField } from '@logo-platform/shared';
+import { sanitizeBriefTagField, sanitizeCatalogTagList } from '@logo-platform/shared';
 import { useAuth } from '../auth/AuthProvider';
 
 interface CatalogEntry {
@@ -64,6 +64,7 @@ const ERA_LABEL_KEYS: Record<(typeof ERA_OPTIONS)[number], MessageKey> = {
 
 export function LogoCatalogPage() {
   const t = useT();
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const canApply = Boolean(profile);
   const updateDesignBrief = useAppStore((s) => s.updateDesignBrief);
@@ -77,6 +78,7 @@ export function LogoCatalogPage() {
   const [era, setEra] = useState('');
   const [entryKind, setEntryKind] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pendingShapeConflictId, setPendingShapeConflictId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -171,39 +173,54 @@ export function LogoCatalogPage() {
 
   const activeChapter = taxonomy?.find((c: { id: string }) => c.id === chapter);
 
-  const mergeTags = (current: string, incoming: string[]) => {
-    const merged = [...new Set([...current.split(',').map((s) => s.trim()).filter(Boolean), ...incoming])];
-    return merged.join(', ');
-  };
-
-  const applySelected = () => {
-    if (!selected) return;
+  const commitSelected = (shapeWinner: 'client' | 'reference' = 'client') => {
+    if (!selected) return false;
     const existing = designBrief.catalogReferenceIds ?? [];
     const next = [...new Set([...existing, selected.id])].slice(0, 8);
-    const principleIds = [...new Set([...(designBrief.principleIds ?? []), ...selected.principleIds])].slice(0, 24);
     const sources = designBrief.sources.includes('Logo Catalog')
       ? designBrief.sources
       : [...designBrief.sources, 'Logo Catalog'];
-    const cleanGeometry = sanitizeCatalogTagList(selected.geometry ?? []);
-    const cleanConstruction = sanitizeCatalogTagList(selected.construction ?? []);
+    const referenceShapes = sanitizeCatalogTagList(selected.geometry ?? []);
     updateDesignBrief({
       catalogReferenceIds: next,
-      principleIds,
-      era: selected.era.replace(/_/g, ' '),
-      // Do not copy catalog significance into narrative — it leaks as Design brief note
-      // and can instruct trademark likeness (e.g. interlocking Cs). Structure comes via refs.
-      geometry: cleanGeometry.length
-        ? sanitizeBriefTagField(mergeTags(designBrief.geometry, cleanGeometry))
-        : designBrief.geometry,
-      construction: cleanConstruction.length
-        ? sanitizeBriefTagField(mergeTags(designBrief.construction, cleanConstruction))
-        : designBrief.construction,
-      preferredShapes: cleanGeometry.length
-        ? sanitizeBriefTagField(mergeTags(designBrief.preferredShapes, cleanGeometry))
-        : designBrief.preferredShapes,
+      ...(shapeWinner === 'reference' && referenceShapes.length > 0
+        ? {
+            selectedShapes: referenceShapes,
+            preferredShapes: sanitizeBriefTagField(referenceShapes.join(', ')),
+            geometry: sanitizeBriefTagField(referenceShapes.join(', ')),
+          }
+        : {}),
       sources,
     });
+    setPendingShapeConflictId(null);
     returnToBriefBuildSection('references', projectIndustry ?? '');
+    return true;
+  };
+
+  const applySelected = () => {
+    if (!selected) return false;
+    const clientShapes = designBrief.selectedShapes ?? [];
+    const referenceShapes = sanitizeCatalogTagList(selected.geometry ?? []);
+    const normalizedClient = clientShapes.map((shape) => shape.toLowerCase());
+    const overlaps = referenceShapes.some((referenceShape) =>
+      normalizedClient.some(
+        (clientShape) =>
+          clientShape.includes(referenceShape.toLowerCase()) ||
+          referenceShape.toLowerCase().includes(clientShape),
+      ),
+    );
+
+    if (clientShapes.length > 0 && referenceShapes.length > 0 && !overlaps) {
+      setPendingShapeConflictId(selected.id);
+      return false;
+    }
+    return commitSelected();
+  };
+
+  const resolveShapeConflict = (shapeWinner: 'client' | 'reference') => {
+    if (commitSelected(shapeWinner)) {
+      navigate('/prompts');
+    }
   };
 
   const removeApplied = (id: string) => {
@@ -504,6 +521,38 @@ export function LogoCatalogPage() {
                   ))}
                 </div>
               </div>
+
+              {pendingShapeConflictId === selected.id && (
+                <div className="rounded-xl border border-amber-700/60 bg-amber-950/25 p-3 space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-amber-200">
+                      {t('catalog.shapeConflictTitle')}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-amber-100/70">
+                      {t('catalog.shapeConflictDescription', {
+                        client: designBrief.selectedShapes.join(', '),
+                        reference: sanitizeCatalogTagList(selected.geometry ?? []).join(', '),
+                      })}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => resolveShapeConflict('client')}
+                      className="rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-2 text-xs font-medium text-emerald-200 hover:bg-emerald-900/40"
+                    >
+                      {t('catalog.keepClientShapes')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resolveShapeConflict('reference')}
+                      className="rounded-lg border border-amber-700/60 bg-amber-950/40 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-900/40"
+                    >
+                      {t('catalog.useReferenceShapes')}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {selectedIsApplied && canApply ? (
                 <button

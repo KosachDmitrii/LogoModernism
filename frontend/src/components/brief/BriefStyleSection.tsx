@@ -74,6 +74,7 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
       updateDesignBrief({
         ...brief,
         colorSelections: resolveColorSelections(designBrief.colorPalette, designBrief.colorSelections),
+        styleApplied: true,
       });
       onStepComplete?.();
     },
@@ -124,6 +125,7 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
               colorSelections: paletteNeedsColorSelections(colorPalette as DesignBrief['colorPalette'])
                 ? defaultColorSelections(colorPalette as DesignBrief['colorPalette'])
                 : [],
+              styleApplied: true,
             });
           }}
           options={colorPaletteOptions}
@@ -134,7 +136,7 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
       <BriefColorSelections
         palette={designBrief.colorPalette}
         selections={colorSelections}
-        onChange={(next) => updateDesignBrief({ colorSelections: next })}
+        onChange={(next) => updateDesignBrief({ colorSelections: next, styleApplied: true })}
       />
 
       <div className="space-y-2 pt-1">
@@ -145,7 +147,7 @@ export function BriefStyleSection({ onStepComplete }: { onStepComplete?: () => v
             name="brief-render-effect"
             value={option.value}
             checked={renderEffect === option.value}
-            onChange={() => updateDesignBrief(renderEffectFlags(option.value))}
+            onChange={() => updateDesignBrief({ ...renderEffectFlags(option.value), styleApplied: true })}
           >
             <span className="font-medium text-zinc-200">{t(option.labelKey)}</span>
             <span className="block mt-0.5 text-zinc-500">{t(option.hintKey)}</span>

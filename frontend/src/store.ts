@@ -52,6 +52,7 @@ function projectSnapshot(state: AppState): Omit<SavedProject, 'id' | 'name' | 'u
 }
 
 interface AppState {
+  ownerUserId: string | null;
   industry: string;
   companyName: string;
   variationCount: PromptCountOption;
@@ -66,6 +67,7 @@ interface AppState {
   brainPartner: BrainPartnerState | null;
   projects: SavedProject[];
   activeProjectId: string | null;
+  activateUser: (userId: string | null) => boolean;
   setIndustry: (v: string) => void;
   setCompanyName: (v: string) => void;
   setVariationCount: (v: PromptCountOption) => void;
@@ -100,6 +102,7 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
+      ownerUserId: null,
       industry: '',
       companyName: '',
       variationCount: 3,
@@ -114,6 +117,24 @@ export const useAppStore = create<AppState>()(
       brainPartner: null,
       projects: [],
       activeProjectId: null,
+      activateUser: (userId) => {
+        const currentOwner = get().ownerUserId as string | null | undefined;
+        if (currentOwner === userId) return false;
+        set({
+          ownerUserId: userId,
+          industry: '',
+          companyName: '',
+          variationCount: 3,
+          inspirationMode: '',
+          preferredEra: '',
+          minimalismLevel: 8,
+          designBrief: { ...EMPTY_DESIGN_BRIEF },
+          projects: [],
+          activeProjectId: null,
+          ...clearPromptResults(),
+        });
+        return true;
+      },
       setIndustry: (industry) =>
         set((state) =>
           state.industry === industry ? { industry } : { industry, ...clearPromptResults() },
@@ -372,6 +393,7 @@ export const useAppStore = create<AppState>()(
         return {
           ...current,
           ...saved,
+          ownerUserId: saved.ownerUserId ?? null,
           preferredEra: saved.preferredEra ?? '',
           variationCount: normalizePromptCount(saved.variationCount ?? current.variationCount),
           designBrief: { ...EMPTY_DESIGN_BRIEF, ...saved.designBrief },
@@ -383,6 +405,7 @@ export const useAppStore = create<AppState>()(
         };
       },
       partialize: (state) => ({
+        ownerUserId: state.ownerUserId,
         industry: state.industry,
         companyName: state.companyName,
         variationCount: state.variationCount,

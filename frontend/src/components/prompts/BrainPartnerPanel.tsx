@@ -29,6 +29,8 @@ export type PartnerRegenerateAction = 'new-variations' | 're-pick' | 'apply' | '
 
 interface BrainPartnerPanelProps {
   partner: BrainPartnerState;
+  isExpanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
   regeneratingAction?: PartnerRegenerateAction | null;
   onApplyTerritory: (territoryId: CreativeTerritoryId) => void;
   onRegenerateAuto: () => void;
@@ -123,6 +125,8 @@ function TerritoryCard({
 
 export function BrainPartnerPanel({
   partner,
+  isExpanded,
+  onExpandedChange,
   regeneratingAction = null,
   onApplyTerritory,
   onRegenerateAuto,
@@ -130,7 +134,6 @@ export function BrainPartnerPanel({
   onResolveConflicts,
 }: BrainPartnerPanelProps) {
   const t = useT();
-  const [isExpanded, setIsExpanded] = useState(false);
   const [viewTerritoryId, setViewTerritoryId] = useState(partner.selectedTerritoryId);
   const [selectedResolutionByViolation, setSelectedResolutionByViolation] = useState<
     Record<string, string>
@@ -187,7 +190,7 @@ export function BrainPartnerPanel({
       <button
         type="button"
         aria-expanded={isExpanded}
-        onClick={() => setIsExpanded((current) => !current)}
+        onClick={() => onExpandedChange(!isExpanded)}
         className={clsx(
           'w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:cursor-pointer',
           isExpanded && 'border-b border-zinc-800',

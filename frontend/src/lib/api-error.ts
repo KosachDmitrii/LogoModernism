@@ -34,6 +34,20 @@ function apiErrorPayload(error: ApiError): { code?: string; quotaKey?: string } 
   }
 }
 
+function readableApiDetail(detail: string): string {
+  try {
+    const payload = JSON.parse(detail) as { message?: unknown };
+    if (typeof payload.message === 'string') return payload.message;
+    if (Array.isArray(payload.message)) {
+      const messages = payload.message.filter((item): item is string => typeof item === 'string');
+      if (messages.length > 0) return messages.join('; ');
+    }
+  } catch {
+    // The backend may legitimately return plain text.
+  }
+  return detail;
+}
+
 export function isQuotaExceededError(error: unknown): boolean {
   return error instanceof ApiError && apiErrorPayload(error).code === 'QUOTA_EXCEEDED';
 }
@@ -51,7 +65,7 @@ export function formatError(error: unknown, t: TranslateFn): string {
       return t('errors.api.withDetail', {
         message: base,
         status: error.status ?? 0,
-        detail: error.detail.slice(0, 300),
+        detail: readableApiDetail(error.detail).slice(0, 300),
       });
     }
     if (error.status) {

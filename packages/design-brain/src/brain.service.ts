@@ -69,7 +69,7 @@ export class DesignBrainService {
   private readonly tasteProfileInFlight = new Map<string, Promise<TasteProfile>>();
 
   private static readonly TASTE_PROFILE_CACHE_MS = 60_000;
-  private static readonly TASTE_PROFILE_TIMEOUT_MS = 15_000;
+  private static readonly TASTE_PROFILE_TIMEOUT_MS = 5_000;
 
   constructor() {
     ensureBrainStorageLayout();
@@ -358,7 +358,8 @@ export class DesignBrainService {
 
   async generate(request: BrainGenerateRequest): Promise<BrainPipelineResult> {
     const client = await this.getClient();
-    return runBriefCompilerPipeline(client, request);
+    const tasteProfile = await this.getTasteProfile(request);
+    return runBriefCompilerPipeline(client, request, tasteProfile);
   }
 
   async interviewBrief(input: {

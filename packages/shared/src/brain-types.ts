@@ -175,6 +175,8 @@ export interface BriefContext {
   geometry?: string;
   construction?: string;
   preferredShapes?: string;
+  /** Exact shape names explicitly selected by the client, before text normalization. */
+  selectedShapes?: string[];
   colorPalette?:
     | 'auto'
     | 'black_white'
@@ -188,6 +190,8 @@ export interface BriefContext {
   colorSelections?: string[];
   allowShadows?: boolean;
   allowPhotoreal?: boolean;
+  /** Explicit rendering choice; unlike booleans this preserves an intentional flat choice. */
+  renderEffectMode?: 'flat' | 'shadow' | '3d' | 'shadow_3d';
   clientNotes?: string;
   knowledgeInsights?: string;
   bestPromptHint?: string;

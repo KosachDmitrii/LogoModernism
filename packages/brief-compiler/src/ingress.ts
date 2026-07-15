@@ -37,8 +37,21 @@ export function buildCanonicalBrief(request: BrainGenerateRequest): CanonicalBri
   const brief = request.briefContext;
   const rebusWordmark = deriveRebusWordmark(request.typographyStyle, request.rebusWordmark === true);
   const typographyStyle = resolveTypographyStyle(request, rebusWordmark);
-  const referenceId = request.catalogReferenceIds?.[0];
-  const entry = referenceId ? getCatalogEntry(referenceId) : undefined;
+  const references = (request.catalogReferenceIds ?? [])
+    .map((referenceId) => getCatalogEntry(referenceId))
+    .filter(Boolean)
+    .map((entry) => extractReferenceProfile(entry!));
+  const selectedShapes = brief?.selectedShapes?.map(sanitizeIngressText).filter(Boolean) ?? [];
+  const shapes = normalizeShapes(
+    selectedShapes.length > 0 ? selectedShapes.join(', ') : brief?.preferredShapes,
+    selectedShapes.length > 0 ? undefined : brief?.geometry,
+  );
+  const clientContext = [
+    brief?.personality ? `Brand personality: ${sanitizeIngressText(brief.personality)}` : '',
+    brief?.primaryEmotion ? `Desired emotion: ${sanitizeIngressText(brief.primaryEmotion)}` : '',
+    brief?.narrative ? `Brand narrative: ${sanitizeIngressText(brief.narrative)}` : '',
+    brief?.constraints ? `Additional design guidance: ${sanitizeIngressText(brief.constraints)}` : '',
+  ].filter(Boolean);
 
   return {
     industry: sanitizeIngressText(request.industry),
@@ -48,16 +61,31 @@ export function buildCanonicalBrief(request: BrainGenerateRequest): CanonicalBri
     minimalism: minimalismFromLevel(request.minimalismLevel, brief?.complexity),
     markType: resolveMarkType(request, rebusWordmark),
     typographyStyle,
-    shapes: normalizeShapes(brief?.preferredShapes, brief?.geometry),
+    typographyDetails: sanitizeIngressText(brief?.typography ?? ''),
+    shapes,
+    shapeRequirement:
+      selectedShapes.length === 1
+        ? 'required'
+        : selectedShapes.length > 1
+          ? 'at_least_one'
+          : 'automatic',
     construction: normalizeConstruction(brief?.construction),
     composition: resolveComposition(brief, rebusWordmark),
     colorPalette: brief?.colorPalette ?? 'black_white',
     colorSelections: brief?.colorSelections ?? [],
     clientNotes: sanitizeIngressText(brief?.clientNotes ?? ''),
+    clientContext,
     forbiddenMotifs: extractForbiddenMotifs(brief?.clientNotes, brief?.constraints),
-    allowShadows: brief?.allowShadows ?? false,
-    allowPhotoreal: brief?.allowPhotoreal ?? false,
+    allowShadows:
+      brief?.renderEffectMode === 'shadow' || brief?.renderEffectMode === 'shadow_3d'
+        ? true
+        : brief?.allowShadows ?? false,
+    allowPhotoreal:
+      brief?.renderEffectMode === '3d' || brief?.renderEffectMode === 'shadow_3d'
+        ? true
+        : brief?.allowPhotoreal ?? false,
     rebusWordmark,
-    reference: entry ? extractReferenceProfile(entry) : undefined,
+    styleIsExplicit: Boolean(brief?.colorPalette || brief?.renderEffectMode),
+    references,
   };
 }

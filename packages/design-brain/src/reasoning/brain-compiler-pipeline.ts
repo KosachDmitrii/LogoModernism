@@ -130,6 +130,7 @@ function buildConstraintReport(
 export async function runBriefCompilerPipeline(
   client: DatabaseClient,
   request: BrainGenerateRequest,
+  tasteProfileOverride?: TasteProfile,
 ): Promise<BrainPipelineResult> {
   if (!request.organizationId) {
     throw new Error('Organization scope is required for Brain prompt generation');
@@ -152,7 +153,9 @@ export async function runBriefCompilerPipeline(
         organizationId: request.organizationId,
         projectId: request.projectId,
       }),
-      computeTasteProfile(client, request),
+      tasteProfileOverride
+        ? Promise.resolve(tasteProfileOverride)
+        : computeTasteProfile(client, request),
       searchProjectMemory(client, {
         companyName: request.companyName,
         industry: request.industry,
@@ -215,7 +218,7 @@ export async function runBriefCompilerPipeline(
         .filter((p): p is NonNullable<typeof p> => Boolean(p))
         .slice(0, 6),
       antiPatterns: [],
-      catalogReferences: compile.resolved.reference ? [compile.resolved.reference.catalogId] : [],
+      catalogReferences: compile.resolved.references.map((reference) => reference.catalogId),
       reasoning: 'Compiled deterministically from canonical brief',
       promptText: bestPrompt.text,
       confidence: bestPrompt.scores.promptQuality / 10,

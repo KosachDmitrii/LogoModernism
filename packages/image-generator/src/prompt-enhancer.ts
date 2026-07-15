@@ -31,10 +31,11 @@ const COMPACT_RENDER_SUFFIX =
 function depthRenderTail(request: ImageGenerationRequest): string {
   const parts: string[] = [];
   if (request.allowShadows) parts.push('include subtle controlled shadows');
+  else parts.push('no shadows');
   if (request.allowPhotoreal) parts.push('include controlled 3D dimensional depth');
-  if (parts.length === 0) return 'no gradients, no shadows, no photorealism';
+  else parts.push('no 3D dimensional depth', 'no photorealism');
   const tail = [...parts];
-  if (!request.allowPhotoreal) tail.push('no gradients', 'no photorealism');
+  if (!request.allowPhotoreal) tail.push('no gradients');
   return tail.join(', ');
 }
 
@@ -137,8 +138,10 @@ function renderSuffixForPrompt(
   const colorDirective = buildImageColorDirective(request, base);
   const depthParts: string[] = [];
   if (request.allowShadows) depthParts.push('include subtle controlled shadows');
+  else depthParts.push('no shadows');
   if (request.allowPhotoreal) depthParts.push('include controlled 3D dimensional depth');
-  const depthHint = depthParts.length > 0 ? depthParts.join(', ') : 'no shadows';
+  else depthParts.push('no 3D dimensional depth');
+  const depthHint = depthParts.join(', ');
   const renderLead = request.allowPhotoreal
     ? 'Vector logo with controlled 3D dimensional depth'
     : 'Flat vector illustration';

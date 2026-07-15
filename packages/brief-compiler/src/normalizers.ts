@@ -69,6 +69,7 @@ export function normalizeShapes(...sources: Array<string | undefined>): string[]
 
   const map: Array<[RegExp, string]> = [
     [/\bcircle|circular|round|radial\b/, 'circle'],
+    [/\bdiamond|rhombus\b/, 'diamond'],
     [/\bsquare|angular\b/, 'square'],
     [/\btriangle|triangular|chevron\b/, 'triangle'],
     [/\barch|arc\b/, 'arch'],

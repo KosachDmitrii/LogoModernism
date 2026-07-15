@@ -49,6 +49,7 @@ interface PromptCardProps {
   onStateChange?: () => void;
   onSavedChange?: (saved: boolean) => void;
   getWorkSignal?: () => AbortSignal;
+  onLogoGenerationStart?: () => void;
 }
 
 export function PromptCard({
@@ -60,6 +61,7 @@ export function PromptCard({
   onStateChange,
   onSavedChange,
   getWorkSignal,
+  onLogoGenerationStart,
 }: PromptCardProps) {
   const t = useT();
   const toast = useToast();
@@ -115,6 +117,7 @@ export function PromptCard({
   const generateImage = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (atLogoLimit || isGenerating) return;
+    onLogoGenerationStart?.();
     startGenerating(prompt.id);
     try {
       const rawMarkType =

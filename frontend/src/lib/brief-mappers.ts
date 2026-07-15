@@ -187,6 +187,7 @@ export function buildEffectiveIndustry(industry: string, extras: {
   construction?: string;
   narrative?: string;
   preferredShapes?: string;
+  selectedShapes?: string[];
   typographyStyle?: TypographyStyle;
 }): string {
   /** @deprecated Use base industry + briefContext API fields instead */
@@ -221,10 +222,12 @@ export function designBriefToBriefContext(brief: {
   geometry?: string;
   construction?: string;
   preferredShapes?: string;
+  selectedShapes?: string[];
   colorPalette?: string;
   colorSelections?: string[];
   allowShadows?: boolean;
   allowPhotoreal?: boolean;
+  styleApplied?: boolean;
   clientNotes?: string;
   knowledgeInsights?: string;
   bestPromptHint?: string;
@@ -243,9 +246,13 @@ export function designBriefToBriefContext(brief: {
   set('typography', brief.typography);
   set('composition', sanitizeCompositionField(brief.composition) || 'symmetry');
   set('constraints', brief.constraints);
-  set('geometry', sanitizeBriefTagField(brief.geometry));
   set('construction', sanitizeBriefTagField(brief.construction));
-  set('preferredShapes', sanitizeBriefTagField(brief.preferredShapes));
+  if (brief.selectedShapes?.length) {
+    ctx.selectedShapes = dedupeTags(brief.selectedShapes);
+  } else {
+    set('geometry', sanitizeBriefTagField(brief.geometry));
+    set('preferredShapes', sanitizeBriefTagField(brief.preferredShapes));
+  }
 
   if (brief.colorPalette && brief.colorPalette !== '' && brief.colorPalette !== 'auto') {
     ctx.colorPalette = brief.colorPalette as BriefContextPayload['colorPalette'];
@@ -254,11 +261,16 @@ export function designBriefToBriefContext(brief: {
       ctx.colorSelections = colors;
     }
   }
-  if (brief.allowShadows) {
-    ctx.allowShadows = true;
-  }
-  if (brief.allowPhotoreal) {
-    ctx.allowPhotoreal = true;
+  if (brief.styleApplied) {
+    ctx.allowShadows = brief.allowShadows === true;
+    ctx.allowPhotoreal = brief.allowPhotoreal === true;
+    ctx.renderEffectMode = brief.allowShadows
+      ? brief.allowPhotoreal
+        ? 'shadow_3d'
+        : 'shadow'
+      : brief.allowPhotoreal
+        ? '3d'
+        : 'flat';
   }
   set('clientNotes', brief.clientNotes);
   // Omit knowledgeInsights / bestPromptHint / critiqueNote — diagnostic ID dumps pollute LLM brief.

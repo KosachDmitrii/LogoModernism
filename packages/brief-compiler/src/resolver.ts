@@ -19,9 +19,9 @@ export function resolveConflicts(brief: CanonicalBrief): ResolvedBrief {
   const blocks: ConflictBlock[] = [];
   const resolved: ResolvedBrief = { ...brief, overrides, blocks };
 
-  if (!brief.reference) return resolved;
+  if (brief.references.length === 0) return resolved;
 
-  const ref = brief.reference;
+  const ref = brief.references[0]!;
 
   if (ref.confidence < 0.45) {
     blocks.push({
@@ -32,7 +32,10 @@ export function resolveConflicts(brief: CanonicalBrief): ResolvedBrief {
     });
   }
 
-  const mergeShapes = [...new Set([...ref.geometry, ...brief.shapes])];
+  const mergeShapes =
+    brief.shapeRequirement === 'automatic'
+      ? [...new Set([...ref.geometry, ...brief.shapes])]
+      : brief.shapes;
   if (mergeShapes.join(',') !== brief.shapes.join(',')) {
     overrides.push({
       field: 'shapes',
@@ -40,7 +43,7 @@ export function resolveConflicts(brief: CanonicalBrief): ResolvedBrief {
       to: mergeShapes.join(', '),
       severity: 'merge',
       winner: 'reference',
-      summary: 'Reference geometry merged with client shapes',
+      summary: 'Reference geometry used because the client did not explicitly select shapes',
     });
     resolved.shapes = mergeShapes;
   }

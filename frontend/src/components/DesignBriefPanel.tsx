@@ -27,8 +27,6 @@ type TextBriefField = {
 const EDITABLE_BRIEF_FIELDS: Array<{ key: TextBriefField; labelKey: MessageKey; multiline?: boolean }> = [
   { key: 'personality', labelKey: 'brief.panel.field.personality', multiline: true },
   { key: 'composition', labelKey: 'brief.panel.field.composition', multiline: true },
-  { key: 'preferredShapes', labelKey: 'brief.panel.field.preferredShapes' },
-  { key: 'geometry', labelKey: 'brief.panel.field.geometry' },
   { key: 'construction', labelKey: 'brief.panel.field.construction' },
   { key: 'constraints', labelKey: 'brief.panel.field.constraints', multiline: true },
   { key: 'complexity', labelKey: 'brief.panel.field.complexity' },
@@ -140,13 +138,21 @@ export function DesignBriefPanel() {
   const hasStyleExtras =
     designBrief.colorSelections.length > 0 || designBrief.allowShadows || designBrief.allowPhotoreal;
   const hasCatalogRefs = (designBrief.catalogReferenceIds?.length ?? 0) > 0;
+  const selectedShapes =
+    designBrief.selectedShapes.length > 0
+      ? designBrief.selectedShapes
+      : (designBrief.preferredShapes || designBrief.geometry)
+          .split(',')
+          .map((shape) => shape.trim())
+          .filter(Boolean);
   const hasReadonlyMeta =
     Boolean(designBrief.era.trim()) ||
     Boolean(designBrief.markType) ||
     Boolean(designBrief.typographyStyle) ||
     hasColorPalette ||
     hasStyleExtras ||
-    hasCatalogRefs;
+    hasCatalogRefs ||
+    selectedShapes.length > 0;
   const hasFieldContent =
     hasReadonlyMeta ||
     filledEditableFields.length > 0 ||
@@ -213,6 +219,14 @@ export function DesignBriefPanel() {
             <ReadonlyField
               label={t('brief.panel.typographyStyle').replace(/:$/, '')}
               value={typographyStyleLabel(designBrief.typographyStyle, t)}
+              hint={buildHint}
+            />
+          )}
+
+          {selectedShapes.length > 0 && (
+            <ReadonlyField
+              label={t('brief.panel.field.selectedShapes')}
+              value={selectedShapes.join(', ')}
               hint={buildHint}
             />
           )}

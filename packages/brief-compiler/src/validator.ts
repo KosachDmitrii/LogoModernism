@@ -61,6 +61,20 @@ export function validateCompiled(
     if (expectedMark === 'combination' && /\bwordmark only\b/i.test(lower)) {
       warnings.push('Prompt language skews wordmark-only for combination brief');
     }
+
+    if (
+      brief.shapeRequirement === 'required' &&
+      !brief.shapes.every((shape) => lower.includes(shape.toLowerCase()))
+    ) {
+      violations.push(`Missing mandatory client shape: ${brief.shapes.join(', ')}`);
+    }
+
+    if (
+      brief.shapeRequirement === 'at_least_one' &&
+      !brief.shapes.some((shape) => lower.includes(shape.toLowerCase()))
+    ) {
+      violations.push(`Missing all client-preferred shapes: ${brief.shapes.join(', ')}`);
+    }
   }
 
   return {

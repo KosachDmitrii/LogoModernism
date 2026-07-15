@@ -44,7 +44,7 @@ export async function computeTasteProfile(
     score: number;
     metadata: unknown;
   }>(
-    `SELECT signal_type, score, metadata
+    `SELECT signal_type, score, metadata - 'imageUrl' AS metadata
      FROM design_brain_taste_signals
      ${filters.length ? `WHERE ${filters.join(' AND ')}` : ''}
      ORDER BY created_at DESC

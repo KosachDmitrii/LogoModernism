@@ -4,7 +4,7 @@ import { useT } from '../i18n';
 
 interface ApplyToPromptsButtonProps {
   disabled?: boolean;
-  onApply: () => void;
+  onApply: () => boolean | void;
 }
 
 export function ApplyToPromptsButton({ disabled, onApply }: ApplyToPromptsButtonProps) {
@@ -12,8 +12,10 @@ export function ApplyToPromptsButton({ disabled, onApply }: ApplyToPromptsButton
   const navigate = useNavigate();
 
   const handleClick = () => {
-    onApply();
-    navigate('/prompts');
+    const applied = onApply();
+    if (applied !== false) {
+      navigate('/prompts');
+    }
   };
 
   return (

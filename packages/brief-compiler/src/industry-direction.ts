@@ -11,10 +11,14 @@ const ANGULAR_STYLIZED = [
 ];
 
 function prefersAngularGeometry(brief: ResolvedBrief): boolean {
-  const shapeHay = [...brief.shapes, ...(brief.reference?.geometry ?? [])]
+  const referenceGeometry =
+    brief.shapeRequirement === 'automatic'
+      ? brief.references.flatMap((reference) => reference.geometry)
+      : [];
+  const shapeHay = [...brief.shapes, ...referenceGeometry]
     .join(' ')
     .toLowerCase();
-  const angular = /\b(?:square|angular|triangle|line|hexagon)\b/.test(shapeHay);
+  const angular = /\b(?:square|diamond|rhombus|angular|triangle|line|hexagon)\b/.test(shapeHay);
   const round = /\bcircle\b/.test(shapeHay);
   return angular && !round;
 }

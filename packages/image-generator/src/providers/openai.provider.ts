@@ -58,6 +58,18 @@ function isGptImageModel(model: string): boolean {
   return model.startsWith('gpt-image');
 }
 
+function fitPromptToModel(prompt: string, model: string): string {
+  const limit = isGptImageModel(model) ? 32_000 : 4_000;
+  if (prompt.length <= limit) return prompt;
+
+  const avoidIndex = prompt.lastIndexOf('Avoid:');
+  if (avoidIndex < 0) return prompt.slice(0, limit);
+
+  const avoid = prompt.slice(avoidIndex);
+  const bodyLimit = Math.max(0, limit - avoid.length - 2);
+  return `${prompt.slice(0, bodyLimit).trimEnd()} ${avoid}`.slice(0, limit);
+}
+
 function mapSizeForGptImage(size: ImageSize): string {
   const map: Record<ImageSize, string> = {
     '1024x1024': '1024x1024',
@@ -76,7 +88,7 @@ function buildRequestBody(
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {
     model,
-    prompt: prompt.slice(0, 4000),
+    prompt: fitPromptToModel(prompt, model),
   };
 
   if (isGptImageModel(model)) {

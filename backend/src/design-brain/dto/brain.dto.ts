@@ -43,6 +43,11 @@ export class BriefContextDto {
   preferredShapes?: string;
 
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  selectedShapes?: string[];
+
+  @IsOptional()
   @IsIn(['auto', 'black_white', 'monochrome', 'two_color', 'multi_color', 'corporate_blue', 'red_accent', 'limited', 'custom'])
   colorPalette?:
     | 'auto'
@@ -67,6 +72,10 @@ export class BriefContextDto {
   @IsOptional()
   @IsBoolean()
   allowPhotoreal?: boolean;
+
+  @IsOptional()
+  @IsIn(['flat', 'shadow', '3d', 'shadow_3d'])
+  renderEffectMode?: 'flat' | 'shadow' | '3d' | 'shadow_3d';
 
   @IsOptional()
   @IsString()

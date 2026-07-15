@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { PromptCard } from '../components/PromptCard';
 import { BriefWorkflowPanel } from '../components/brief/BriefWorkflowPanel';
 import { ProjectStep } from '../components/prompts/ProjectStep';
@@ -19,7 +18,7 @@ import { BrainPartnerPanel, type PartnerRegenerateAction } from '../components/p
 import { applyConstraintResolutions } from '../lib/apply-constraint-resolution';
 import type { ConstraintResolution } from '../types';
 import { useT, type MessageKey } from '../i18n';
-import { formatError, isQuotaExceededError } from '../lib/api-error';
+import { formatError } from '../lib/api-error';
 import {
   clearPersistedPromptsWizardStep,
   readPersistedPromptsWizardStep,
@@ -31,6 +30,7 @@ import { getBriefReadiness } from '../lib/brief-readiness';
 import { toPromptGenerateIntent } from '../lib/prompt-generate-intent';
 import { useAuth } from '../auth/AuthProvider';
 import { hasPermission } from '../auth/permissions';
+import { useToast } from '../components/ToastProvider';
 
 const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
   1: 'prompts.step.projectSubtitle',
@@ -38,42 +38,9 @@ const STEP_SUBTITLE_KEYS: Record<PromptWizardStep, MessageKey> = {
   3: 'prompts.step.resultsSubtitle',
 };
 
-function ComposeErrorNotice({ error }: { error: unknown }) {
-  const t = useT();
-  const quotaExceeded = isQuotaExceededError(error);
-
-  return (
-    <div
-      className={`mt-4 flex items-start gap-3 rounded-xl border p-4 ${
-        quotaExceeded
-          ? 'border-amber-500/25 bg-amber-950/20'
-          : 'border-red-900/40 bg-red-950/20'
-      }`}
-    >
-      <AlertTriangle
-        size={18}
-        className={`mt-0.5 shrink-0 ${quotaExceeded ? 'text-amber-400' : 'text-red-400'}`}
-      />
-      <div className="min-w-0">
-        <p className={`text-sm font-medium ${quotaExceeded ? 'text-amber-300' : 'text-red-300'}`}>
-          {quotaExceeded ? t('errors.quotaExceededTitle') : t('common.generationFailed')}
-        </p>
-        <p className="mt-1 text-sm leading-6 text-zinc-500">{formatError(error, t)}</p>
-        {quotaExceeded && (
-          <Link
-            to="/pricing"
-            className="mt-3 inline-flex rounded-lg bg-violet-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-violet-500"
-          >
-            {t('errors.quotaExceededAction')}
-          </Link>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function PromptsPage() {
   const t = useT();
+  const toast = useToast();
   const { profile } = useAuth();
   const canUseProduct = hasPermission(profile?.accessRole, 'product.use');
   const prompts = useAppStore((s) => s.prompts);
@@ -119,12 +86,32 @@ export function PromptsPage() {
     action?: PartnerRegenerateAction;
   } | null>(null);
   const [regeneratingAction, setRegeneratingAction] = useState<PartnerRegenerateAction | null>(null);
+  const [partnerExpanded, setPartnerExpanded] = useState(true);
+
+  useEffect(() => {
+    if (activeStep === 3) {
+      setPartnerExpanded(true);
+    }
+  }, [activeStep]);
 
   const workControllerRef = useRef(new AbortController());
   const getWorkSignal = () => workControllerRef.current.signal;
   const compose = useComposePrompts({
     getSignal: getWorkSignal,
   });
+  const shownComposeErrorRef = useRef<unknown>(null);
+
+  useEffect(() => {
+    if (!compose.isError) {
+      shownComposeErrorRef.current = null;
+      return;
+    }
+    if (shownComposeErrorRef.current === compose.error) return;
+    shownComposeErrorRef.current = compose.error;
+    toast.error(formatError(compose.error, t), {
+      title: t('common.generationFailed'),
+    });
+  }, [compose.error, compose.isError, t, toast]);
 
   const canGoToStep = (step: PromptWizardStep) => {
     if (step === 1) return true;
@@ -245,6 +232,8 @@ export function PromptsPage() {
               {brainPartner && (
                 <BrainPartnerPanel
                   partner={brainPartner}
+                  isExpanded={partnerExpanded}
+                  onExpandedChange={setPartnerExpanded}
                   regeneratingAction={compose.isPending ? regeneratingAction : null}
                   onApplyTerritory={(territoryId) =>
                     handleCompose({ preferredTerritoryId: territoryId }, 'apply')
@@ -274,6 +263,7 @@ export function PromptsPage() {
                     selected={selectedPromptId === prompt.id}
                     onSelect={() => selectPrompt(prompt.id)}
                     getWorkSignal={getWorkSignal}
+                    onLogoGenerationStart={() => setPartnerExpanded(false)}
                   />
                 ))}
               </div>
@@ -291,9 +281,6 @@ export function PromptsPage() {
             </div>
           )}
 
-          {compose.isError && (
-            <ComposeErrorNotice error={compose.error} />
-          )}
         </div>
       ) : (
         <div className="max-w-2xl mx-auto w-full">
@@ -309,9 +296,6 @@ export function PromptsPage() {
             />
           )}
 
-          {compose.isError && activeStep === 2 && (
-            <ComposeErrorNotice error={compose.error} />
-          )}
         </div>
       )}
       </PageContainer>

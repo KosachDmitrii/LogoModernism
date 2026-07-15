@@ -76,17 +76,14 @@ function creativeDirectionLine(
 }
 
 function inspiredByLine(brief: ResolvedBrief): string | undefined {
-  if (!brief.reference) return undefined;
-  const ref = brief.reference;
-  if (ref.likenessRisk === 'high') {
-    return (
-      `Inspired by ${ref.structureCue} from ${ref.attributionLabel} — structure and construction principles only, not a visual copy`
-    );
-  }
-  return (
-    `Inspired by ${ref.structureCue} associated with ${ref.attributionLabel}, ` +
-    'while remaining fully original and not a copy'
+  if (brief.references.length === 0) return undefined;
+  const cues = brief.references.map(
+    (ref) =>
+      `${ref.structureCue} from ${ref.attributionLabel}${
+        ref.likenessRisk === 'high' ? ' (structure and construction principles only)' : ''
+      }`,
   );
+  return `Prefer structural inspiration from ${cues.join('; ')}, while remaining fully original and not a visual copy`;
 }
 
 function complexityLine(minimalism: ResolvedBrief['minimalism']): string {
@@ -102,6 +99,17 @@ function complexityLine(minimalism: ResolvedBrief['minimalism']): string {
 
 function industryLine(brief: ResolvedBrief): string | undefined {
   return buildIndustryLineForBrief(brief);
+}
+
+function shapeDirective(brief: ResolvedBrief): string {
+  const vocabulary = geometryVocabulary(brief.shapes);
+  if (brief.shapeRequirement === 'required') {
+    return `MUST use ${brief.shapes[0]} as the primary visible logo geometry; ${vocabulary}`;
+  }
+  if (brief.shapeRequirement === 'at_least_one') {
+    return `MUST visibly use at least one of these client-preferred shapes: ${brief.shapes.join(', ')}; ${vocabulary}`;
+  }
+  return `Geometry vocabulary: ${vocabulary}`;
 }
 
 export function buildPromptSchema(
@@ -127,20 +135,32 @@ export function buildPromptSchema(
     );
   }
 
-  push('mark_type', markTypeLine(brief, integration), brief.reference ? 'reference' : 'client');
+  push('mark_type', `MUST be a ${markTypeLine(brief, integration)}`, 'client');
 
   const inspired = inspiredByLine(brief);
   if (inspired) push('inspired_by', inspired, 'reference');
 
-  push('geometry', `Geometry vocabulary: ${geometryVocabulary(brief.shapes)}`, 'client');
-  push('construction', `Construction: ${brief.construction}`, brief.reference ? 'reference' : 'client');
+  push('geometry', shapeDirective(brief), 'client');
+  push(
+    'construction',
+    `Construction: ${brief.construction}`,
+    brief.overrides.some((override) => override.field === 'construction') ? 'reference' : 'client',
+  );
   push(
     'composition',
     `Composition: ${integration ? 'negative space figure-ground letterform integration' : brief.composition}`,
-    integration ? 'client' : brief.reference ? 'reference' : 'client',
+    integration || !brief.overrides.some((override) => override.field === 'composition')
+      ? 'client'
+      : 'reference',
   );
 
-  push('typography', `Typography: ${typographyLine(brief.typographyStyle, integration)}`, 'client');
+  push(
+    'typography',
+    `Typography MUST follow: ${typographyLine(brief.typographyStyle, integration)}${
+      brief.typographyDetails ? `; client-selected typography details: ${brief.typographyDetails}` : ''
+    }`,
+    'client',
+  );
 
   if (integration) {
     push('typographic_integration', `Typographic integration: ${integration.promptLine}`, 'client');
@@ -155,14 +175,22 @@ export function buildPromptSchema(
 
   push('balance', 'Balance: optically balanced, balance through reduction', 'system');
   push('complexity', `Complexity: ${complexityLine(brief.minimalism)}`, 'client');
-  push('era', `Era: ${eraLabel(brief.era)}`, brief.reference ? 'reference' : 'client');
-  push('color', `Color: ${colorLine(brief.colorPalette, brief.colorSelections)}`, 'client');
+  push('era', `Era: ${eraLabel(brief.era)}`, 'client');
+  push(
+    'color',
+    `Color: ${brief.styleIsExplicit ? 'MUST follow — ' : ''}${colorLine(brief.colorPalette, brief.colorSelections)}`,
+    'client',
+  );
 
   const rendering = renderingLine({
     allowShadows: brief.allowShadows,
     allowPhotoreal: brief.allowPhotoreal,
   });
-  push('rendering', `Rendering: ${rendering}`, 'system');
+  push(
+    'rendering',
+    `Rendering: ${brief.styleIsExplicit ? 'MUST follow — ' : ''}${rendering}`,
+    brief.styleIsExplicit ? 'client' : 'system',
+  );
 
   push(
     'creative_direction',
@@ -178,6 +206,15 @@ export function buildPromptSchema(
     );
   }
 
+  if (brief.clientContext.length > 0) {
+    push('client_context', `Prefer: ${brief.clientContext.join('; ')}`, 'client');
+  }
+
+  const clientPreferences = buildClientNotesFragment(brief.clientNotes);
+  if (clientPreferences) {
+    push('client_preferences', `Prefer: ${clientPreferences}`, 'client');
+  }
+
   const avoidBase = filterAvoidForRenderEffects(
     [
       'generic circular bracket templates',
@@ -190,11 +227,6 @@ export function buildPromptSchema(
     { allowShadows: brief.allowShadows, allowPhotoreal: brief.allowPhotoreal },
   );
   push('avoid', `Avoid: ${[...new Set(avoidBase)].join(', ')}`, 'client');
-
-  const clientPreferences = buildClientNotesFragment(brief.clientNotes);
-  if (clientPreferences) {
-    push('client_preferences', clientPreferences, 'client');
-  }
 
   return {
     version: SCHEMA_VERSION,

@@ -12,6 +12,8 @@ function mergePrincipleIds(current: string[], incoming: string[]): string[] {
 const SHAPE_NAME_TO_PRINCIPLE: Record<string, string[]> = {
   circle: ['geo-circle', 'comp-negative-space'],
   square: ['geo-square'],
+  diamond: ['geo-square', 'geo-angular'],
+  rhombus: ['geo-square', 'geo-angular'],
   triangle: ['geo-triangle', 'geo-angular'],
   hexagon: ['geo-angular'],
   cross: ['geo-angular'],
@@ -148,6 +150,7 @@ export function applyGeometryToBrief(
     current,
     {
       preferredShapes: shapeNames,
+      selectedShapes: selected.map((recommendation) => recommendation.name.trim()).filter(Boolean),
       geometry: shapeNames,
       construction: [
         result.constructionGrid,

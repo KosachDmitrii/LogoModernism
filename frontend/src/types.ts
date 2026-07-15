@@ -233,10 +233,12 @@ export type BriefContextPayload = {
   geometry?: string;
   construction?: string;
   preferredShapes?: string;
+  selectedShapes?: string[];
   colorPalette?: 'auto' | 'black_white' | 'monochrome' | 'two_color' | 'multi_color' | 'corporate_blue' | 'red_accent' | 'limited' | 'custom';
   colorSelections?: string[];
   allowShadows?: boolean;
   allowPhotoreal?: boolean;
+  renderEffectMode?: 'flat' | 'shadow' | '3d' | 'shadow_3d';
   clientNotes?: string;
   knowledgeInsights?: string;
   bestPromptHint?: string;
@@ -325,6 +327,8 @@ export interface DesignBrief {
   typography: string;
   constraints: string;
   preferredShapes: string;
+  /** Exact client selections. One item is mandatory; multiple items mean at least one. */
+  selectedShapes: string[];
   knowledgeInsights: string;
   bestPromptHint: string;
   critiqueNote: string;
@@ -336,6 +340,8 @@ export interface DesignBrief {
   autoCatalogReferences: boolean;
   /** Explicit rebus wordmark — letter integrates image via negative space */
   rebusWordmark: boolean;
+  /** Set only after the client applies section 3. */
+  styleApplied: boolean;
   sources: string[];
 }
 
@@ -375,6 +381,7 @@ export const EMPTY_DESIGN_BRIEF: DesignBrief = {
   typography: '',
   constraints: '',
   preferredShapes: '',
+  selectedShapes: [],
   knowledgeInsights: '',
   bestPromptHint: '',
   critiqueNote: '',
@@ -382,6 +389,7 @@ export const EMPTY_DESIGN_BRIEF: DesignBrief = {
   catalogReferenceIds: [],
   autoCatalogReferences: false,
   rebusWordmark: false,
+  styleApplied: false,
   sources: [],
 };
 

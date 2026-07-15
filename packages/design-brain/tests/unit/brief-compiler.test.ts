@@ -28,7 +28,7 @@ describe('Brief Compiler', () => {
     const text = result.prompts[0]!.positive.toLowerCase();
     expect(text).toContain('burger company');
     expect(text).toContain('combination mark');
-    expect(text).toContain('color: strict black and white only');
+    expect(text).toContain('color: must follow — strict black and white only');
     expect(text).not.toContain('the logo employs');
     expect(text).not.toMatch(/\(6\/10\)/);
   });
@@ -162,7 +162,7 @@ describe('Brief Compiler', () => {
     expect(text).not.toContain('by e.');
     expect(text).not.toContain('balanced visual weight');
     expect(text).not.toContain('utilizing');
-    expect(text).toContain('color: strict black and white only');
+    expect(text).toContain('color: must follow — strict black and white only');
     expect(text).toContain('avito');
   });
 
@@ -289,7 +289,7 @@ describe('Brief Compiler', () => {
     expect(text).not.toContain('tracking -20');
     expect(text).not.toContain('medium to bold');
     expect(text).not.toContain('tagline: regular');
-    expect(text).toContain('color: two-color palette (#000000 and #e63946)');
+    expect(text).toContain('color: must follow — two-color palette (#000000 and #e63946)');
     expect(text).toMatch(/composition:.*lockup|symmetry|negative space/);
   });
 
@@ -312,7 +312,7 @@ describe('Brief Compiler', () => {
     });
 
     expect(result.prompts[0]!.positive.toLowerCase()).toContain(
-      'color: limited palette (#000000, #f5c518)',
+      'color: must follow — limited palette (#000000, #f5c518)',
     );
   });
 
@@ -528,5 +528,117 @@ describe('Brief Compiler', () => {
     expect(negative).not.toContain('3d render');
     expect(negative).not.toContain('shadows and depth effects');
     expect(negative).not.toContain('3d effects');
+  });
+
+  it('allows only 3D when selected and continues to forbid shadows', () => {
+    const result = compileBrief({
+      ...baseRequest,
+      briefContext: {
+        ...baseRequest.briefContext,
+        renderEffectMode: '3d',
+      },
+      compileKnowledge: {
+        tasteAvoidPatterns: ['shadows and depth effects', '3d effects'],
+        principleFragments: [],
+        projectWorkedCues: [],
+        projectAvoidCues: [],
+      },
+    });
+
+    const positive = result.prompts[0]!.positive.toLowerCase();
+    const negative = result.prompts[0]!.negative.toLowerCase();
+    expect(positive).toContain('include controlled 3d dimensional depth');
+    expect(positive).toContain('no shadows');
+    expect(positive).not.toContain('shadows and depth effects');
+    expect(negative).toContain('shadows');
+    expect(negative).not.toContain('3d render');
+  });
+
+  it('allows only shadows when selected and continues to forbid 3D', () => {
+    const result = compileBrief({
+      ...baseRequest,
+      briefContext: {
+        ...baseRequest.briefContext,
+        renderEffectMode: 'shadow',
+      },
+      compileKnowledge: {
+        tasteAvoidPatterns: ['shadows and depth effects', '3d effects'],
+        principleFragments: [],
+        projectWorkedCues: [],
+        projectAvoidCues: [],
+      },
+    });
+
+    const positive = result.prompts[0]!.positive.toLowerCase();
+    const negative = result.prompts[0]!.negative.toLowerCase();
+    expect(positive).toContain('include subtle controlled shadows');
+    expect(positive).toContain('no 3d dimensional depth');
+    expect(positive).not.toContain('shadows and depth effects');
+    expect(negative).not.toContain('shadows');
+    expect(negative).toContain('3d render');
+  });
+
+  it('treats one selected Diamond as a mandatory angular shape', () => {
+    const result = compileBrief({
+      ...baseRequest,
+      briefContext: {
+        ...baseRequest.briefContext,
+        selectedShapes: ['Diamond'],
+        preferredShapes: 'Diamond',
+        geometry: 'Diamond',
+      },
+    });
+
+    const text = result.prompts[0]!.positive.toLowerCase();
+    expect(result.resolved.shapeRequirement).toBe('required');
+    expect(result.resolved.shapes).toEqual(['diamond']);
+    expect(text).toContain('must use diamond as the primary visible logo geometry');
+    expect(text).not.toContain('communal circular');
+    expect(text).not.toContain('quarter-circle');
+    expect(text).not.toContain('warm radial');
+  });
+
+  it('requires at least one shape when the client selects several', () => {
+    const result = compileBrief({
+      ...baseRequest,
+      briefContext: {
+        ...baseRequest.briefContext,
+        selectedShapes: ['Diamond', 'Triangle'],
+      },
+    });
+
+    const text = result.prompts[0]!.positive.toLowerCase();
+    expect(result.resolved.shapeRequirement).toBe('at_least_one');
+    expect(text).toContain('must visibly use at least one');
+    expect(text).toContain('diamond, triangle');
+  });
+
+  it('keeps all selected references as preferences without overriding client shapes', () => {
+    const result = compileBrief({
+      ...baseRequest,
+      catalogReferenceIds: ['ref-ikea', 'ref-starbucks'],
+      briefContext: {
+        ...baseRequest.briefContext,
+        selectedShapes: ['Diamond'],
+      },
+    });
+
+    expect(result.resolved.references).toHaveLength(2);
+    expect(result.resolved.shapes).toEqual(['diamond']);
+    expect(result.prompts[0]!.positive).toContain('MUST use diamond');
+  });
+
+  it('places client preferences before the final Avoid section', () => {
+    const result = compileBrief({
+      ...baseRequest,
+      briefContext: {
+        ...baseRequest.briefContext,
+        clientNotes: 'Friendly and approachable',
+      },
+    });
+    const text = result.prompts[0]!.positive;
+    expect(text.indexOf('Client preferences')).toBeLessThan(text.indexOf('Avoid:'));
+    expect(text.trim().endsWith('.')).toBe(true);
+    expect(result.prompts[0]!.schema.sections.at(-1)?.key).toBe('avoid');
   });
 });

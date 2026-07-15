@@ -30,7 +30,7 @@ export function RegisterPage() {
     try {
       const result = await signUp(email.trim(), password, {
         name: name.trim(),
-        organizationName: organizationName.trim(),
+        organizationName: organizationName.trim() || undefined,
       });
       if (result.confirmationRequired) {
         setConfirmationRequired(true);

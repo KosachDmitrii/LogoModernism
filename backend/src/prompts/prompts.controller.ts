@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Get,
   Headers,
@@ -36,6 +37,7 @@ type PipelineOutput = Awaited<ReturnType<PromptsService['generate']>>;
 export class PromptsController {
   private readonly logger = new Logger(PromptsController.name);
   private lastResult: PipelineOutput | null = null;
+  private readonly activeGenerationScopes = new Set<string>();
 
   constructor(
     private readonly promptsService: PromptsService,
@@ -77,6 +79,12 @@ export class PromptsController {
     const operationIdempotencyKey =
       idempotencyKey ??
       `prompt:${tenant?.organizationId ?? 'unscoped'}:${randomUUID()}`;
+    const generationScope =
+      tenant?.userId ?? tenant?.organizationId ?? operationIdempotencyKey;
+    if (this.activeGenerationScopes.has(generationScope)) {
+      throw new ConflictException('Prompt generation is already in progress');
+    }
+    this.activeGenerationScopes.add(generationScope);
     this.logger.log(
       JSON.stringify({
         event: 'prompt.generate.start',
@@ -132,6 +140,8 @@ export class PromptsController {
         }),
       );
       throw error;
+    } finally {
+      this.activeGenerationScopes.delete(generationScope);
     }
   }
 

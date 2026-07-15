@@ -3,7 +3,7 @@ import type { ComposedPrompt, LogoDNA, PromptGenerationRequest } from '@logo-pla
 import { normalizeBrandName, isConstructedTypographyStyle } from '@logo-platform/shared';
 import { compileBrief } from '@logo-platform/brief-compiler';
 import { randomUUID } from 'node:crypto';
-import { evolvePrompt, critiqueDesign } from './prompt-evolution';
+import { critiqueDesign } from './prompt-evolution';
 import { scorePrompt } from './prompt-scorer';
 
 export interface PipelineResult {
@@ -73,6 +73,7 @@ function toComposedPrompt(
       variationIndex: index,
       markType: request.markType,
       typographyStyle: request.typographyStyle,
+      stylePreferences: request.briefContext,
       brainPowered: true,
       reasoning: 'Brief compiler v1',
       confidence: scores.promptQuality / 10,
@@ -102,18 +103,10 @@ export function runPromptPipeline(request: PromptGenerationRequest): PipelineRes
     throw new Error(`Brief compiler validation failed: ${compile.validation.violations.join('; ')}`);
   }
 
-  let prompts = compile.prompts.map((p: { positive: string }, index: number) =>
+  const prompts = compile.prompts.map((p: { positive: string }, index: number) =>
     toComposedPrompt(request, p.positive, index, compile),
   );
-  let bestPrompt = prompts[0]!;
-
-  if (bestPrompt.scores.promptQuality < 7) {
-    const evolved = evolvePrompt(bestPrompt, 2);
-    if (evolved[0]?.scores.promptQuality > bestPrompt.scores.promptQuality) {
-      bestPrompt = evolved[0];
-      prompts = [bestPrompt, ...evolved.filter((p) => p.id !== bestPrompt.id)];
-    }
-  }
+  const bestPrompt = prompts[0]!;
 
   const variationCount = Math.min(request.variationCount ?? 5, prompts.length);
   return {

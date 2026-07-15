@@ -14,6 +14,14 @@ import {
   structuredFeedbackMetadata,
 } from '../learning/structured-feedback';
 
+const MAX_FEEDBACK_CONTEXT_LENGTH = 4_000;
+
+export function sanitizeFeedbackContext(context: string): string {
+  const imageStart = context.search(/data:image\//i);
+  const withoutImage = imageStart >= 0 ? context.slice(0, imageStart) : context;
+  return withoutImage.trim().slice(0, MAX_FEEDBACK_CONTEXT_LENGTH);
+}
+
 function scoreDelta(signalType: BrainFeedbackInput['signalType'], score: number): number {
   switch (signalType) {
     case 'LIKE':
@@ -54,7 +62,8 @@ export async function ingestFeedback(
     throw new Error('Experience not found in the active organization');
   }
 
-  const structured = normalizeStructuredFeedback(input);
+  const context = sanitizeFeedbackContext(input.context);
+  const structured = normalizeStructuredFeedback({ ...input, context });
   const normalizedMetadata = structuredFeedbackMetadata(
     structured,
     (input.metadata ?? {}) as Record<string, unknown>,
@@ -70,7 +79,7 @@ export async function ingestFeedback(
       input.experienceId ?? null,
       input.signalType,
       input.score,
-      input.context,
+      context,
       JSON.stringify(normalizedMetadata),
       input.organizationId,
       input.projectId ?? null,
@@ -80,7 +89,7 @@ export async function ingestFeedback(
   const experience = await createExperience(client, {
     sourceType: 'FEEDBACK',
     title: `Feedback: ${input.signalType}`,
-    content: input.context,
+    content: context,
     summary: `Taste signal ${input.signalType} (${input.score})`,
     metadata: {
       tasteSignalId: tasteSignal.id,
@@ -93,7 +102,7 @@ export async function ingestFeedback(
     projectId: input.projectId,
   });
 
-  const embedding = await embedText(`${input.signalType}: ${input.context}`);
+  const embedding = await embedText(`${input.signalType}: ${context}`);
   await upsertExperienceEmbedding(client, experience.id, embedding);
 
   if (linked) {
@@ -137,6 +146,6 @@ export async function ingestFeedback(
     title: `Feedback: ${input.signalType}`,
     chunksStored: 1,
     principlesExtracted: 0,
-    summary: input.context.slice(0, 200),
+    summary: context.slice(0, 200),
   };
 }

@@ -12,6 +12,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { Session, User } from '@supabase/supabase-js';
 import { getApiBase } from '../lib/api-base';
 import { getSupabaseClient } from '../lib/supabase';
+import { useAppStore } from '../store';
+import { useBrainIngestStore } from '../stores/brain-ingest-store';
+import {
+  BRIEF_BUILD_ADVANCE_KEY,
+  BRIEF_BUILD_SECTION_KEY,
+  clearPersistedPromptsWizardStep,
+} from '../lib/brief-navigation';
 
 const PENDING_REGISTRATION_KEY = 'logo-platform.pending-registration';
 
@@ -101,6 +108,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionWorkRef = useRef<{ token: string; promise: Promise<void> } | null>(null);
 
   const establishSession = useCallback(async (nextSession: Session | null) => {
+    const userChanged = useAppStore
+      .getState()
+      .activateUser(nextSession?.user.id ?? null);
+    if (userChanged) {
+      queryClient.clear();
+      clearPersistedPromptsWizardStep();
+      sessionStorage.removeItem(BRIEF_BUILD_SECTION_KEY);
+      sessionStorage.removeItem(BRIEF_BUILD_ADVANCE_KEY);
+      useBrainIngestStore.setState({ jobs: [], activeJobId: null });
+    }
     setSession(nextSession);
     setError(null);
     if (!nextSession) {
@@ -135,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     sessionWorkRef.current = { token: nextSession.access_token, promise };
     return promise;
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     let mounted = true;
@@ -218,9 +235,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('logo-platform.access-token');
     localStorage.removeItem('logo-platform.user-id');
     queryClient.clear();
-    setSession(null);
-    setProfile(null);
-  }, [queryClient]);
+    await establishSession(null);
+  }, [establishSession, queryClient]);
 
   useEffect(() => {
     const handleUnauthorized = () => void signOut();

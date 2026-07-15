@@ -30,17 +30,21 @@ export interface CanonicalBrief {
   minimalism: MinimalismLevel;
   markType: LogoMarkType;
   typographyStyle: TypographyStyle;
+  typographyDetails: string;
   shapes: string[];
+  shapeRequirement: 'required' | 'at_least_one' | 'automatic';
   construction: string;
   composition: string;
   colorPalette: string;
   colorSelections: string[];
   clientNotes: string;
+  clientContext: string[];
   forbiddenMotifs: string[];
   allowShadows: boolean;
   allowPhotoreal: boolean;
   rebusWordmark: boolean;
-  reference?: ReferenceProfile;
+  styleIsExplicit: boolean;
+  references: ReferenceProfile[];
 }
 
 export interface ConflictOverride {
