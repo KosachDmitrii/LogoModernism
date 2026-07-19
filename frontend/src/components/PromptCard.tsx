@@ -53,6 +53,7 @@ interface PromptCardProps {
   onSavedChange?: (saved: boolean) => void;
   getWorkSignal?: () => AbortSignal;
   onLogoGenerationStart?: () => void;
+  onLogoGenerationEnd?: () => void;
 }
 
 export function PromptCard({
@@ -65,6 +66,7 @@ export function PromptCard({
   onSavedChange,
   getWorkSignal,
   onLogoGenerationStart,
+  onLogoGenerationEnd,
 }: PromptCardProps) {
   const t = useT();
   const toast = useToast();
@@ -154,6 +156,7 @@ export function PromptCard({
       toast.error(formatError(err, t));
     } finally {
       stopGenerating(prompt.id);
+      onLogoGenerationEnd?.();
     }
   };
 

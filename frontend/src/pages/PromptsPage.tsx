@@ -88,6 +88,7 @@ export function PromptsPage() {
   } | null>(null);
   const [regeneratingAction, setRegeneratingAction] = useState<PartnerRegenerateAction | null>(null);
   const [partnerExpanded, setPartnerExpanded] = useState(true);
+  const [logoGenerationCount, setLogoGenerationCount] = useState(0);
 
   useEffect(() => {
     if (activeStep === 3) {
@@ -100,6 +101,7 @@ export function PromptsPage() {
   const compose = useComposePrompts({
     getSignal: getWorkSignal,
   });
+  const hideResultsActions = compose.isPending || logoGenerationCount > 0;
   const shownComposeErrorRef = useRef<unknown>(null);
 
   useEffect(() => {
@@ -264,21 +266,29 @@ export function PromptsPage() {
                     selected={selectedPromptId === prompt.id}
                     onSelect={() => selectPrompt(prompt.id)}
                     getWorkSignal={getWorkSignal}
-                    onLogoGenerationStart={() => setPartnerExpanded(false)}
+                    onLogoGenerationStart={() => {
+                      setPartnerExpanded(false);
+                      setLogoGenerationCount((count) => count + 1);
+                    }}
+                    onLogoGenerationEnd={() => {
+                      setLogoGenerationCount((count) => Math.max(0, count - 1));
+                    }}
                   />
                 ))}
               </div>
-              <div className="pt-4 flex items-center gap-3">
-                <Button
-                  type="button"
-                  onClick={() => setActiveStep(2)}
-                  className="flex items-center gap-1.5 px-3 py-3.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-zinc-800 transition-colors"
-                >
-                  <ArrowLeft size={16} />
-                  {t('prompts.results.backToBrief')}
-                </Button>
-                <StartOverButton onClick={handleStartOver} variant="primary" />
-              </div>
+              {!hideResultsActions && (
+                <div className="pt-4 flex items-center gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => setActiveStep(2)}
+                    className="flex items-center gap-1.5 px-3 py-3.5 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-zinc-800 transition-colors"
+                  >
+                    <ArrowLeft size={16} />
+                    {t('prompts.results.backToBrief')}
+                  </Button>
+                  <StartOverButton onClick={handleStartOver} variant="primary" />
+                </div>
+              )}
             </div>
           )}
 
