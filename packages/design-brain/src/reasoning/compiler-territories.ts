@@ -1,6 +1,7 @@
 import type { BrainGenerateRequest, CreativeTerritory, TypographyStyle } from '@logo-platform/shared';
 import type { CompileResult } from '@logo-platform/brief-compiler';
 import { buildIndustryDirection, typographyStyleLabelFragment } from '@logo-platform/shared';
+import { ensureSentence, joinSentences } from './prose';
 
 function colorApproachFromPalette(palette: string, selections: string[]): string {
   if (palette === 'black_white' || palette === 'monochrome') {
@@ -26,21 +27,47 @@ function markArchitecture(markType: string): string {
   return 'Combination mark — unified symbol and wordmark lockup sharing one geometric system';
 }
 
+function industryBaseLine(
+  industry: string,
+  resolved: CompileResult['resolved'],
+  axis: 'balanced' | 'construction_led' | 'typography_led',
+): string {
+  const industryLine = buildIndustryDirection(
+    industry,
+    'stylized',
+    [],
+    resolved.forbiddenMotifs,
+    { variantAxis: axis, count: 2 },
+  );
+  // Strip tone / interpret footer for compact thesis; restore sentence end.
+  return ensureSentence(
+    industryLine
+      .replace(/\.\s*Tone:.*$/i, '')
+      .replace(/\.\s*Interpret cues as.*$/i, '')
+      .trim(),
+  );
+}
+
 function thesisForAxis(
   axis: 'balanced' | 'construction_led' | 'typography_led',
   industry: string,
   resolved: CompileResult['resolved'],
 ): string {
-  const industryLine = buildIndustryDirection(industry, 'stylized', [], resolved.forbiddenMotifs);
-  const base = industryLine.replace(/\.\s*Tone:.*$/i, '').trim();
+  const base = industryBaseLine(industry, resolved, axis);
 
   switch (axis) {
     case 'construction_led':
-      return `Emphasize ${resolved.construction} as the hero system — form language before decoration. ${base}`;
+      return joinSentences(
+        `Emphasize ${resolved.construction} as the hero system — form language before decoration`,
+        base,
+      );
     case 'typography_led':
-      return `Lead with ${typographyFocus(resolved.typographyStyle)} as the primary recognition anchor. ${base}`;
+      return joinSentences(
+        `Lead with ${typographyFocus(resolved.typographyStyle)} as the primary recognition anchor`,
+        base,
+      );
     default:
-      return `${base} Lead with ${markArchitecture(resolved.markType)}.`;
+      return joinSentences(base, `Lead with ${markArchitecture(resolved.markType)}`);
   }
 }
 

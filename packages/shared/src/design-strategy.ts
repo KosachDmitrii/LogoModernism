@@ -28,6 +28,7 @@ export function buildDesignStrategy(
     intent.abstractionLevel,
     intent.desiredMotifs,
     intent.forbiddenMotifs,
+    { seed: `${intent.industryDomain}:strategy`, count: 2 },
   );
 
   const constructionSystem =

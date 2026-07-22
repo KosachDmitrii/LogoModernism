@@ -1,21 +1,21 @@
-# Logo Modernism — AI BIOS Enterprise Platform
+# Logo Modernism
 
-Professional logo design platform built on structured modernist design principles and 12 AI engines.
+Professional logo design platform for principle-backed modernist logo directions. Design Brain is the reasoning engine inside the product.
 
 **Key design decision:** The platform does NOT use copyrighted book PDFs at runtime. Design principles are extracted once into a structured knowledge base (1000+ rules, knowledge graph) that powers all generation.
 
 ## Architecture
 
 ```
-Knowledge Base (1050+ principles, graph, templates)
+Knowledge Base + Catalog intelligence
         ↓
-12 AI Engines (Brand DNA, Geometry, Typography, …)
+Design Brain (brief-compiler) → territories → ranked directions + rationale
         ↓
-Design Rules Engine → Prompt Composer → Optimizer → Scorer
+Optional image generation (OpenAI / mock)
         ↓
-Evolution Engine → SVG Blueprint → Logo Critic
+Brand pack export (guidelines, Construction Solver + SVG Blueprint, usage, critique)
         ↓
-[Future] AI Image Generator
+AI Engines API (Brand DNA, SVG Blueprint, Critic, …) — power tools / AutoBrief
 ```
 
 ## Stack

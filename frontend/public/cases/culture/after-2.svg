@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="Letter as object">
+  <rect width="320" height="200" fill="#fafafa"/>
+  <path d="M120 50 H160 L200 150 H155 L148 130 H132 L125 150 H80 Z M136 108 H144 L140 88 Z" fill="#18181b"/>
+  <text x="56" y="184" font-family="IBM Plex Mono, monospace" font-size="10" fill="#71717a">DIR 2 · letter as object</text>
+</svg>

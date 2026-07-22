@@ -1,4 +1,5 @@
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
+import { isDatabaseConnectionError } from './connection';
 import { resolveDatabaseUrl } from './db-url';
 
 export type IsolationLevel =
@@ -91,13 +92,17 @@ function poolConfiguration() {
       connectionString: undefined,
       max: 5,
       connectionTimeoutMillis: 30_000,
-      idleTimeoutMillis: 30_000,
+      // Recycle before remote poolers drop idle sockets (~minutes).
+      idleTimeoutMillis: 10_000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
+      maxUses: 75,
     };
   }
   const parsed = new URL(rawUrl);
   const max = Number(parsed.searchParams.get('connection_limit') ?? 5);
   const poolTimeoutSeconds = Number(
-    parsed.searchParams.get('pool_timeout') ?? 15,
+    parsed.searchParams.get('pool_timeout') ?? 30,
   );
   const sslMode = parsed.searchParams.get('sslmode');
   const statementTimeoutMs = Number(
@@ -114,11 +119,16 @@ function poolConfiguration() {
         ? { rejectUnauthorized: sslMode === 'verify-full' }
         : undefined,
     max: Number.isInteger(max) && max > 0 ? max : 5,
+    // Remote Supabase/TLS handshakes regularly exceed 15s after idle gaps.
     connectionTimeoutMillis:
       Number.isFinite(poolTimeoutSeconds) && poolTimeoutSeconds > 0
         ? poolTimeoutSeconds * 1_000
-        : 15_000,
-    idleTimeoutMillis: 30_000,
+        : 30_000,
+    idleTimeoutMillis: 10_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+    // Avoid indefinitely reusing sockets that remote poolers later reset.
+    maxUses: 75,
     statement_timeout:
       Number.isFinite(statementTimeoutMs) && statementTimeoutMs > 0
         ? statementTimeoutMs
@@ -130,12 +140,25 @@ function poolConfiguration() {
 
 const globalDatabase = globalThis as unknown as { databasePool?: Pool };
 
+function logClientError(scope: string, error: Error): void {
+  console.error(`[database] ${scope} PostgreSQL client error`, error);
+}
+
 export function getPool(): Pool {
   if (!globalDatabase.databasePool) {
-    globalDatabase.databasePool = new Pool(poolConfiguration());
-    globalDatabase.databasePool.on('error', (error) => {
-      console.error('[database] Idle PostgreSQL client error', error);
+    const pool = new Pool(poolConfiguration());
+    // Idle clients in the pool emit here — must listen or Node crashes the process.
+    pool.on('error', (error) => {
+      logClientError('Idle', error);
     });
+    // Checked-out clients are the caller's responsibility; keep a baseline listener
+    // so unexpected disconnects while a client is borrowed cannot take down the process.
+    pool.on('connect', (client) => {
+      client.on('error', (error) => {
+        logClientError('Connected', error);
+      });
+    });
+    globalDatabase.databasePool = pool;
   }
   return globalDatabase.databasePool;
 }
@@ -185,29 +208,107 @@ function clientApi(
       if (!(executor instanceof Pool)) {
         throw new Error('Root database executor is not a PostgreSQL pool');
       }
-      const client: PoolClient = await executor.connect();
-      try {
-        await client.query('BEGIN');
-        if (options.isolationLevel) {
-          await client.query(
-            `SET TRANSACTION ISOLATION LEVEL ${options.isolationLevel}`,
-          );
+
+      // SERIALIZABLE/deadlocks and dropped connections are retryable.
+      const isolationRetries =
+        options.isolationLevel === 'SERIALIZABLE' ||
+        options.isolationLevel === 'REPEATABLE READ'
+          ? 5
+          : 1;
+      // Connect timeouts after long image-gen idle gaps need several fresh attempts.
+      const maxAttempts = Math.max(isolationRetries, 5);
+
+      let lastError: unknown;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        let client: PoolClient | undefined;
+        let clientFailed = false;
+        const onCheckoutError = (error: Error) => {
+          clientFailed = true;
+          logClientError('Checked-out', error);
+        };
+        try {
+          // connect() itself can throw (pool wait / TLS timeout) — must be inside retry.
+          client = await executor.connect();
+          client.on('error', onCheckoutError);
+          await client.query('BEGIN');
+          if (options.isolationLevel) {
+            await client.query(
+              `SET TRANSACTION ISOLATION LEVEL ${options.isolationLevel}`,
+            );
+          }
+          const result = await fn(clientApi(() => client!, false));
+          await client.query('COMMIT');
+          return result;
+        } catch (error) {
+          clientFailed = clientFailed || isDatabaseConnectionError(error);
+          if (client) {
+            await client.query('ROLLBACK').catch(() => undefined);
+          }
+          lastError = error;
+          if (attempt < maxAttempts && isRetryableTxError(error)) {
+            await delay(serializationBackoffMs(attempt));
+            continue;
+          }
+          throw error;
+        } finally {
+          if (client) {
+            client.removeListener('error', onCheckoutError);
+            // Destroy broken clients instead of returning them to the pool.
+            client.release(clientFailed || undefined);
+          }
         }
-        const result = await fn(clientApi(() => client, false));
-        await client.query('COMMIT');
-        return result;
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
-        throw error;
-      } finally {
-        client.release();
       }
+      throw lastError;
     },
   };
   return api;
 }
 
+function isRetryableTxError(error: unknown): boolean {
+  if (isDatabaseConnectionError(error)) return true;
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code?: unknown }).code)
+      : '';
+  // 40001 serialization_failure · 40P01 deadlock_detected
+  return code === '40001' || code === '40P01';
+}
+
+function serializationBackoffMs(attempt: number): number {
+  // Connection timeouts to remote poolers need longer gaps than SERIALIZABLE conflicts.
+  const base = 75 * 2 ** (attempt - 1);
+  const jitter = Math.floor(Math.random() * 80);
+  return Math.min(2_000, base + jitter);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export const db = clientApi(getPool, true);
+
+/** Retry a DB call after connect/reset errors (e.g. save after long image generation). */
+export async function withDatabaseRetry<T>(
+  fn: () => Promise<T>,
+  options: { attempts?: number } = {},
+): Promise<T> {
+  const attempts = options.attempts ?? 5;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts && isDatabaseConnectionError(error)) {
+        await delay(serializationBackoffMs(attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
 export async function disconnect(): Promise<void> {
   const current = globalDatabase.databasePool;
   if (!current) return;

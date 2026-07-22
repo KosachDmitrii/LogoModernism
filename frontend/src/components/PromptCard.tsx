@@ -9,6 +9,7 @@ import type { MessageKey } from '../i18n/en';
 import { ScoreBar } from './ScoreBar';
 import { BriefCoverageMap } from './brief/BriefCoverageMap';
 import { BrainExplainability } from './prompts/BrainExplainability';
+import { DirectionRationale } from './prompts/DirectionRationale';
 import { LogoFeedbackBar } from './LogoFeedbackBar';
 import { useAppStore, useIsGenerating, usePromptImages } from '../store';
 import { generatePromptLogo, togglePromptSave } from '../api';
@@ -272,6 +273,8 @@ export function PromptCard({
           ))}
         </div>
       )}
+
+      <DirectionRationale prompt={prompt} />
 
       <p className="font-mono text-sm leading-relaxed text-zinc-300 mb-4 whitespace-pre-wrap break-words">
         {prompt.text}

@@ -2,6 +2,7 @@ import {
   Brain,
   BookOpen,
   Heart,
+  Info,
   LayoutDashboard,
   LibraryBig,
   Settings,
@@ -18,6 +19,7 @@ export type AppNavId =
   | 'brain'
   | 'catalog'
   | 'principles'
+  | 'references'
   | 'pricing'
   | 'settings';
 
@@ -52,6 +54,13 @@ export const APP_NAV: AppNavItem[] = [
     to: '/principles',
     labelKey: 'nav.principles',
     icon: LibraryBig,
+    guestVisible: true,
+  },
+  {
+    id: 'references',
+    to: '/references',
+    labelKey: 'nav.references',
+    icon: Info,
     guestVisible: true,
   },
   { id: 'saved', to: '/saved', labelKey: 'nav.saved', icon: Heart },

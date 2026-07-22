@@ -1,8 +1,8 @@
-import { motifsForAbstraction, resolveIndustryNode } from '@logo-platform/shared';
-import type { ResolvedBrief } from './types';
+import { resolveIndustryNode, selectIndustryMotifs } from '@logo-platform/shared';
+import type { ResolvedBrief, VariantAxis } from './types';
 
 const ROUND_MOTIF =
-  /\b(?:round|circular|quarter[- ]?circle|communal circular|arc geometry|radial construction|warm radial)\b/i;
+  /\b(?:round|circular|quarter[- ]?circle|communal circular|arc geometry|radial construction|warm radial|bowl-curve|arcs?)\b/i;
 
 const ANGULAR_STYLIZED = [
   'angular focal geometry',
@@ -23,28 +23,58 @@ function prefersAngularGeometry(brief: ResolvedBrief): boolean {
   return angular && !round;
 }
 
-export function buildIndustryLineForBrief(brief: ResolvedBrief): string | undefined {
+function rotatePool(pool: string[], seed: string): string[] {
+  if (pool.length === 0) return [];
+  const start =
+    Math.abs([...seed].reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0)) %
+    pool.length;
+  return [...pool.slice(start), ...pool.slice(0, start)];
+}
+
+export function buildIndustryLineForBrief(
+  brief: ResolvedBrief,
+  variantAxis?: VariantAxis,
+): string | undefined {
   const node = resolveIndustryNode(brief.industry);
   if (!node) return undefined;
 
   const angular = prefersAngularGeometry(brief);
-  let motifs = motifsForAbstraction(node, 'stylized', []).filter(
-    (motif) =>
-      !brief.forbiddenMotifs.some((forbidden) =>
-        motif.toLowerCase().includes(forbidden.toLowerCase()),
-      ),
-  );
+  const seed = `${brief.industry.toLowerCase()}:${variantAxis ?? 'balanced'}:${brief.companyName ?? ''}`;
+
+  let motifs: string[];
 
   if (angular) {
-    motifs = motifs.filter((motif) => !ROUND_MOTIF.test(motif));
+    // Angular briefs: prioritize square/angular cues over the industry's round defaults.
     const constructionBias = node.constructionBias.filter((bias) => !/\bradial\b/i.test(bias));
-    motifs = [...new Set([...motifs, ...ANGULAR_STYLIZED, ...constructionBias])].slice(0, 3);
+    const angularPool = rotatePool([...ANGULAR_STYLIZED, ...constructionBias], seed);
+    const soft = selectIndustryMotifs(node, 'stylized', {
+      seed,
+      count: 4,
+      desiredFromClient: brief.desiredMotifs,
+      forbiddenMotifs: brief.forbiddenMotifs,
+    }).filter((motif) => !ROUND_MOTIF.test(motif));
+    // Client-desired cues still win over angular defaults when present.
+    motifs = [...new Set([...brief.desiredMotifs, ...angularPool, ...soft])].slice(0, 2);
   } else {
-    motifs = motifs.slice(0, 3);
+    motifs = selectIndustryMotifs(node, 'stylized', {
+      seed,
+      count: 2,
+      desiredFromClient: brief.desiredMotifs,
+      forbiddenMotifs: brief.forbiddenMotifs,
+    });
   }
 
   if (motifs.length === 0) return undefined;
 
   const label = brief.industry.trim() || 'the category';
-  return `Industry direction for ${label} (stylized): ${motifs.join(', ')}. Tone: ${node.tone.join(', ')}`;
+  const primary = motifs[0]!;
+  const supporting = motifs[1];
+  const tone = node.tone.slice(0, 3).join(', ');
+
+  return (
+    `Industry form language for ${label} (stylized): ` +
+    `primary cue — ${primary}` +
+    (supporting ? `; supporting — ${supporting}` : '') +
+    `. Tone: ${tone}. Interpret cues as geometry/silhouette, not literal product icons`
+  );
 }

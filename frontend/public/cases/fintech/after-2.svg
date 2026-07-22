@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="Geometric lettermark">
+  <rect width="320" height="200" fill="#fafafa"/>
+  <circle cx="160" cy="92" r="52" fill="none" stroke="#18181b" stroke-width="10"/>
+  <path d="M142 68 V116 H178" fill="none" stroke="#18181b" stroke-width="10" stroke-linecap="square" stroke-linejoin="miter"/>
+  <text x="108" y="172" font-family="DM Sans, sans-serif" font-size="18" font-weight="600" letter-spacing="0.12em" fill="#18181b">NOVAPAY</text>
+  <text x="56" y="184" font-family="IBM Plex Mono, monospace" font-size="10" fill="#71717a">DIR 2 · open-counter lettermark</text>
+</svg>

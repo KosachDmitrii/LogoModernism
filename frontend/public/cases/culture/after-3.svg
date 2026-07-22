@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="Reduced pictogram">
+  <rect width="320" height="200" fill="#fafafa"/>
+  <rect x="130" y="40" width="60" height="100" fill="none" stroke="#18181b" stroke-width="8"/>
+  <line x1="130" y1="70" x2="190" y2="70" stroke="#18181b" stroke-width="8"/>
+  <text x="118" y="168" font-family="DM Sans, sans-serif" font-size="14" font-weight="600" letter-spacing="0.24em" fill="#18181b">FORUM</text>
+  <text x="56" y="184" font-family="IBM Plex Mono, monospace" font-size="10" fill="#71717a">DIR 3 · reduced pictogram</text>
+</svg>

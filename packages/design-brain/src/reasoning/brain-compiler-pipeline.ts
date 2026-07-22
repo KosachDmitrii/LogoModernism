@@ -13,6 +13,7 @@ import type {
   Recommendation,
   TasteProfile,
 } from '@logo-platform/shared';
+import { critiqueLogo } from '@logo-platform/ai-engines';
 import type { DatabaseClient } from '../storage/database-types';
 import { compileBrief } from '@logo-platform/brief-compiler';
 import { getPrincipleById } from '@logo-platform/knowledge-base';
@@ -25,6 +26,12 @@ import { computeTasteProfile } from '../learning/taste-profile';
 import { semanticSearch } from '../retrieval/semantic-search';
 import { searchProjectMemory } from '../retrieval/project-memory';
 import { resolveCatalogIntelligence } from '../retrieval/catalog-intelligence';
+import {
+  buildDirectionReasoning,
+  enrichDecision,
+  slimArchitectureForPrompt,
+  territoryForAxis,
+} from './prompt-explainability';
 
 export interface BrainPipelineResult {
   prompts: ComposedPrompt[];
@@ -44,20 +51,44 @@ export interface BrainPipelineResult {
   partnerAttempts?: number;
 }
 
-function toComposedPrompt(
-  request: BrainGenerateRequest,
-  positive: string,
-  negative: string,
-  index: number,
-  compile: ReturnType<typeof compileBrief>,
-  constraintReport?: ConstraintReport,
-): ComposedPrompt {
+function toComposedPrompt(input: {
+  request: BrainGenerateRequest;
+  positive: string;
+  negative: string;
+  index: number;
+  compile: ReturnType<typeof compileBrief>;
+  axis: ReturnType<typeof compileBrief>['prompts'][number]['schema']['variantAxis'];
+  constraintReport?: ConstraintReport;
+  territory?: CreativeTerritory;
+  architecture: BrainArchitecture;
+  critique?: DesignCriticResult;
+}): ComposedPrompt {
+  const {
+    request,
+    positive,
+    negative,
+    index,
+    compile,
+    axis,
+    constraintReport,
+    territory,
+    architecture,
+    critique,
+  } = input;
   const scores = scoreCompiledPrompt(positive, compile, request);
   const dna = dnaFromCompile(compile, request);
   const selectedPrinciples = (request.analysisPrincipleIds ?? [])
     .map((id) => getPrincipleById(id))
     .filter((p): p is NonNullable<typeof p> => Boolean(p))
     .slice(0, 6);
+
+  const reasoning = buildDirectionReasoning({
+    territory,
+    architecture,
+    compile,
+    axis,
+    principles: selectedPrinciples,
+  });
 
   return {
     id: randomUUID(),
@@ -80,9 +111,12 @@ function toComposedPrompt(
       },
       brainPowered: true,
       constraintReport,
-      reasoning: 'Brief compiler v1',
+      reasoning,
       confidence: scores.promptQuality / 10,
       negativePrompt: negative,
+      creativeTerritory: territory,
+      brainArchitecture: slimArchitectureForPrompt(architecture),
+      partnerCritique: critique,
     },
   };
 }
@@ -193,36 +227,61 @@ export async function runBriefCompilerPipeline(
   const territories = buildTerritoriesFromCompile(compile, catalogRequest);
   const selectedTerritory = selectCreativeTerritory(territories, catalogRequest);
 
-  const prompts = compile.prompts.map((p, index) =>
-    toComposedPrompt(catalogRequest, p.positive, p.negative, index, compile, constraintReport),
+  const draftPrompts = compile.prompts.map((p, index) =>
+    toComposedPrompt({
+      request: catalogRequest,
+      positive: p.positive,
+      negative: p.negative,
+      index,
+      compile,
+      axis: p.schema.variantAxis,
+      constraintReport,
+      territory: territoryForAxis(territories, p.schema.variantAxis, selectedTerritory.id),
+      architecture,
+    }),
   );
 
-  const bestPrompt = [...prompts].sort(
+  const ranked = [...draftPrompts].sort(
     (a, b) => (b.scores?.promptQuality ?? 0) - (a.scores?.promptQuality ?? 0),
-  )[0]!;
+  );
+  const bestPromptDraft = ranked[0]!;
+  const critique = critiqueLogo({ prompt: bestPromptDraft });
+
+  const prompts = draftPrompts.map((prompt) => ({
+    ...prompt,
+    metadata: {
+      ...prompt.metadata,
+      partnerCritique: critique,
+    },
+  }));
+
+  const bestPrompt =
+    prompts.find((p) => p.id === bestPromptDraft.id) ?? prompts[0]!;
+
+  const decisionBase: DesignDecision = {
+    markType: compile.resolved.markType,
+    typographyStyle: compile.resolved.typographyStyle,
+    geometry: compile.resolved.shapes,
+    construction: [compile.resolved.construction],
+    composition: [compile.resolved.composition],
+    typography: [],
+    era: compile.resolved.era,
+    principles: (catalogRequest.analysisPrincipleIds ?? [])
+      .map((id) => getPrincipleById(id))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p))
+      .slice(0, 6),
+    antiPatterns: [],
+    catalogReferences: compile.resolved.references.map((reference) => reference.catalogId),
+    reasoning: '',
+    promptText: bestPrompt.text,
+    confidence: bestPrompt.scores.promptQuality / 10,
+  };
 
   return {
     prompts,
     recommendations: [],
     bestPrompt,
-    decision: {
-      markType: compile.resolved.markType,
-      typographyStyle: compile.resolved.typographyStyle,
-      geometry: compile.resolved.shapes,
-      construction: [compile.resolved.construction],
-      composition: [compile.resolved.composition],
-      typography: [],
-      era: compile.resolved.era,
-      principles: (catalogRequest.analysisPrincipleIds ?? [])
-        .map((id) => getPrincipleById(id))
-        .filter((p): p is NonNullable<typeof p> => Boolean(p))
-        .slice(0, 6),
-      antiPatterns: [],
-      catalogReferences: compile.resolved.references.map((reference) => reference.catalogId),
-      reasoning: 'Compiled deterministically from canonical brief',
-      promptText: bestPrompt.text,
-      confidence: bestPrompt.scores.promptQuality / 10,
-    },
+    decision: enrichDecision(decisionBase, selectedTerritory, architecture, bestPrompt),
     retrievedExperiences: searchResult.results,
     tasteProfile,
     brainArchitecture: architecture,
@@ -231,6 +290,7 @@ export async function runBriefCompilerPipeline(
     creativeTerritories: territories,
     selectedTerritoryId: selectedTerritory.id,
     constraintReport,
+    critique,
     catalogIntelligence: intelligence,
     partnerAttempts: 1,
   };

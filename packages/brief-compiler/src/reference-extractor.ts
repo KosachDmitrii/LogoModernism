@@ -30,11 +30,18 @@ function significanceAsStructureCue(significance: string): string | undefined {
   return undefined;
 }
 
+/** True when designer is only initials / punctuation — not a usable attribution. */
+function isEmptyDesignerCrumb(designer: string): boolean {
+  const cleaned = designer.replace(/[.&,\s]/g, '');
+  return cleaned.length === 0 || /^[A-Za-z]$/.test(cleaned);
+}
+
 function attributionLabel(entry: LogoReference, likenessRisk: 'low' | 'high'): string {
   const designer = entry.designer?.trim();
+  const usableDesigner = designer && !isEmptyDesignerCrumb(designer) ? designer : undefined;
   const year = entry.year ? ` (${entry.year})` : '';
   if (likenessRisk === 'high') {
-    if (designer) return `${designer}${year}`;
+    if (usableDesigner) return `${usableDesigner}${year}`;
     const eraMap: Record<string, string> = {
       swiss: 'International Typographic Style',
       bauhaus: 'Bauhaus geometric tradition',
@@ -46,7 +53,12 @@ function attributionLabel(entry: LogoReference, likenessRisk: 'low' | 'high'): s
     return entry.era ? (eraMap[entry.era] ?? 'modernist corporate identity') : 'modernist corporate identity';
   }
   const name = softenTrademarkLikenessLanguage(entry.name);
-  if (designer) return `${name} by ${designer}${year}`;
+  if (
+    usableDesigner &&
+    usableDesigner.toLowerCase() !== name.toLowerCase()
+  ) {
+    return `${name} by ${usableDesigner}${year}`;
+  }
   return `${name}${year}`;
 }
 

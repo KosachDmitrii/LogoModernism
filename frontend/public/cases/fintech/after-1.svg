@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="Modular wordmark on grid">
+  <rect width="320" height="200" fill="#fafafa"/>
+  <g stroke="#e4e4e7" stroke-width="1">
+    <path d="M40 40 H280 M40 80 H280 M40 120 H280 M40 160 H280"/>
+    <path d="M40 40 V160 M80 40 V160 M120 40 V160 M160 40 V160 M200 40 V160 M240 40 V160 M280 40 V160"/>
+  </g>
+  <rect x="56" y="72" width="16" height="56" fill="#18181b"/>
+  <rect x="80" y="72" width="40" height="16" fill="#18181b"/>
+  <rect x="80" y="112" width="40" height="16" fill="#18181b"/>
+  <rect x="136" y="72" width="16" height="56" fill="#18181b"/>
+  <rect x="168" y="72" width="48" height="16" fill="#18181b"/>
+  <rect x="168" y="92" width="16" height="36" fill="#18181b"/>
+  <rect x="200" y="112" width="16" height="16" fill="#18181b"/>
+  <rect x="232" y="72" width="16" height="56" fill="#18181b"/>
+  <rect x="256" y="72" width="32" height="16" fill="#18181b"/>
+  <text x="56" y="184" font-family="IBM Plex Mono, monospace" font-size="10" fill="#71717a">DIR 1 · modular grid wordmark</text>
+</svg>

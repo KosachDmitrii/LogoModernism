@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { db, type DatabaseClient } from '@logo-platform/database';
+import { db, withDatabaseRetry, type DatabaseClient } from '@logo-platform/database';
 import type {
   ComposedPrompt,
   GeneratedImage,
@@ -184,50 +184,53 @@ export class PromptRecordsService {
     tenant?: TenantScope,
     storage?: { storageKey: string; mimeType: string },
   ) {
-    await db.transaction(async (tx) => {
-      const record = await findPrompt(tx, id, tenant?.userId, true);
-      if (!record) throw new NotFoundException(`Prompt not found: ${id}`);
-      const count = await tx.one<{ count: number }>(
-        'SELECT COUNT(*)::int AS count FROM generated_logos WHERE prompt_id = $1',
-        [id],
-      );
-      if (count.count >= MAX_LOGOS_PER_PROMPT) {
-        throw new BadRequestException(`Maximum ${MAX_LOGOS_PER_PROMPT} logos per prompt`);
-      }
-      await tx.query(
-        `INSERT INTO generated_logos (
-           id, name, prompt_id, user_id, organization_id, public_url, storage_key, mime_type,
-           prompt_text, provider, model, width, height, metadata, updated_at
-         ) VALUES (
-           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, NOW()
-         )
-         ON CONFLICT (id) DO UPDATE SET
-           prompt_id = EXCLUDED.prompt_id, organization_id = EXCLUDED.organization_id,
-           user_id = EXCLUDED.user_id,
-           public_url = EXCLUDED.public_url, storage_key = EXCLUDED.storage_key,
-           mime_type = EXCLUDED.mime_type, prompt_text = EXCLUDED.prompt_text,
-           provider = EXCLUDED.provider, model = EXCLUDED.model,
-           width = EXCLUDED.width, height = EXCLUDED.height,
-           metadata = EXCLUDED.metadata, updated_at = NOW()`,
-        [
-          image.id,
-          record.companyName ?? 'Generated logo',
-          id,
-          tenant?.userId ?? null,
-          tenant?.organizationId ?? null,
-          image.url,
-          storage?.storageKey ?? null,
-          storage?.mimeType ?? null,
-          image.prompt,
-          image.provider,
-          image.model ?? null,
-          image.width,
-          image.height,
-          JSON.stringify(image.feedback ? { feedback: image.feedback } : null),
-        ],
-      );
-    }, { isolationLevel: 'READ COMMITTED' });
-    return this.getById(id, tenant);
+    // Image gen can idle the pool for many minutes; reconnect/retry on save.
+    return withDatabaseRetry(async () => {
+      await db.transaction(async (tx) => {
+        const record = await findPrompt(tx, id, tenant?.userId, true);
+        if (!record) throw new NotFoundException(`Prompt not found: ${id}`);
+        const count = await tx.one<{ count: number }>(
+          'SELECT COUNT(*)::int AS count FROM generated_logos WHERE prompt_id = $1',
+          [id],
+        );
+        if (count.count >= MAX_LOGOS_PER_PROMPT) {
+          throw new BadRequestException(`Maximum ${MAX_LOGOS_PER_PROMPT} logos per prompt`);
+        }
+        await tx.query(
+          `INSERT INTO generated_logos (
+             id, name, prompt_id, user_id, organization_id, public_url, storage_key, mime_type,
+             prompt_text, provider, model, width, height, metadata, updated_at
+           ) VALUES (
+             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, NOW()
+           )
+           ON CONFLICT (id) DO UPDATE SET
+             prompt_id = EXCLUDED.prompt_id, organization_id = EXCLUDED.organization_id,
+             user_id = EXCLUDED.user_id,
+             public_url = EXCLUDED.public_url, storage_key = EXCLUDED.storage_key,
+             mime_type = EXCLUDED.mime_type, prompt_text = EXCLUDED.prompt_text,
+             provider = EXCLUDED.provider, model = EXCLUDED.model,
+             width = EXCLUDED.width, height = EXCLUDED.height,
+             metadata = EXCLUDED.metadata, updated_at = NOW()`,
+          [
+            image.id,
+            record.companyName ?? 'Generated logo',
+            id,
+            tenant?.userId ?? null,
+            tenant?.organizationId ?? null,
+            image.url,
+            storage?.storageKey ?? null,
+            storage?.mimeType ?? null,
+            image.prompt,
+            image.provider,
+            image.model ?? null,
+            image.width,
+            image.height,
+            JSON.stringify(image.feedback ? { feedback: image.feedback } : null),
+          ],
+        );
+      }, { isolationLevel: 'READ COMMITTED' });
+      return this.getById(id, tenant);
+    });
   }
 
   async reserveLogo(

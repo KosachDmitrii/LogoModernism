@@ -20,10 +20,12 @@ export default defineConfig({
     // Prefer TypeScript sources so new shared exports work without stale CJS dist cache.
     alias: {
       '@logo-platform/shared': path.resolve(repoRoot, 'packages/shared/src/index.ts'),
+      // Browser-safe subset (no prompt-engine / node:crypto).
+      '@logo-platform/ai-engines': path.resolve(repoRoot, 'packages/ai-engines/src/browser.ts'),
     },
   },
   optimizeDeps: {
-    exclude: ['@logo-platform/shared'],
+    exclude: ['@logo-platform/shared', '@logo-platform/ai-engines'],
     esbuildOptions: {
       supported: {
         destructuring: true,

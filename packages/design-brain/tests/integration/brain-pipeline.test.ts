@@ -48,7 +48,10 @@ describeIntegration('brain prompt pipeline (integration)', () => {
     expect(result.bestPrompt.metadata?.brainPowered).toBe(true);
     expect(result.recommendations).toHaveLength(0);
     expect(result.decision.promptText.length).toBeGreaterThan(20);
-    expect(result.decision.reasoning).toContain('Compiled deterministically');
+    expect(result.decision.reasoning.length).toBeGreaterThan(20);
+    expect(result.bestPrompt.metadata?.reasoning?.length ?? 0).toBeGreaterThan(20);
+    expect(result.bestPrompt.metadata?.creativeTerritory).toBeTruthy();
+    expect(result.critique?.overallScore).toBeGreaterThan(0);
   });
 
   it('uses taste profile avoided patterns in fallback decision', async () => {

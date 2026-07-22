@@ -1,5 +1,5 @@
 import type { BrainGenerateRequest, LogoMarkType } from '@logo-platform/shared';
-import { deriveRebusWordmark } from '@logo-platform/shared';
+import { deriveRebusWordmark, extractDesiredMotifsFromText } from '@logo-platform/shared';
 import { getCatalogEntry } from '@logo-platform/knowledge-base';
 import type { CanonicalBrief } from './types';
 import {
@@ -75,6 +75,9 @@ export function buildCanonicalBrief(request: BrainGenerateRequest): CanonicalBri
     colorSelections: brief?.colorSelections ?? [],
     clientNotes: sanitizeIngressText(brief?.clientNotes ?? ''),
     clientContext,
+    desiredMotifs: extractDesiredMotifsFromText(
+      [brief?.clientNotes, brief?.constraints, brief?.narrative].filter(Boolean).join('. '),
+    ),
     forbiddenMotifs: extractForbiddenMotifs(brief?.clientNotes, brief?.constraints),
     allowShadows:
       brief?.renderEffectMode === 'shadow' || brief?.renderEffectMode === 'shadow_3d'

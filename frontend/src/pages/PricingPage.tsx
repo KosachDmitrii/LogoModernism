@@ -60,6 +60,7 @@ export function PricingPage() {
           price="$0"
           description={t('pricing.freeDescription')}
           features={[
+            t('pricing.freePacks'),
             t('pricing.freePrompts'),
             t('pricing.freeLogos'),
             t('pricing.publicCatalog'),
@@ -78,9 +79,11 @@ export function PricingPage() {
           suffix={t('pricing.perMonth')}
           description={t('pricing.plusDescription')}
           features={[
+            t('pricing.plusPacks'),
             t('pricing.plusPrompts'),
             t('pricing.plusLogos'),
             t('pricing.advancedBrain'),
+            t('pricing.clientNotesExport'),
           ]}
           current={currentPlan === 'PLUS'}
           featured
@@ -108,9 +111,11 @@ export function PricingPage() {
           suffix={t('pricing.perMonth')}
           description={t('pricing.proDescription')}
           features={[
+            t('pricing.proPacks'),
             t('pricing.proPrompts'),
             t('pricing.proLogos'),
             t('pricing.priorityGeneration'),
+            t('pricing.clientNotesExport'),
           ]}
           current={currentPlan === 'PRO'}
         >

@@ -1,4 +1,4 @@
-# AI BIOS Logo Platform
+# Logo Modernism
 
 Enterprise SaaS platform for AI-powered modernist logo design.
 

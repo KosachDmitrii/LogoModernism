@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="Flat monochrome mark">
+  <rect width="320" height="200" fill="#fafafa"/>
+  <rect x="118" y="48" width="84" height="84" fill="#18181b"/>
+  <rect x="136" y="66" width="48" height="48" fill="#fafafa"/>
+  <rect x="154" y="84" width="12" height="30" fill="#18181b"/>
+  <text x="108" y="164" font-family="DM Sans, sans-serif" font-size="16" font-weight="600" letter-spacing="0.18em" fill="#18181b">NOVAPAY</text>
+  <text x="56" y="184" font-family="IBM Plex Mono, monospace" font-size="10" fill="#71717a">DIR 3 · flat mono, scalable</text>
+</svg>

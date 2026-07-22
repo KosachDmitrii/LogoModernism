@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="Primary form symbol">
+  <rect width="320" height="200" fill="#fafafa"/>
+  <rect x="88" y="48" width="56" height="56" fill="#18181b"/>
+  <circle cx="200" cy="76" r="28" fill="#18181b"/>
+  <text x="88" y="140" font-family="DM Sans, sans-serif" font-size="20" font-weight="600" letter-spacing="0.16em" fill="#18181b">FORUM</text>
+  <text x="56" y="184" font-family="IBM Plex Mono, monospace" font-size="10" fill="#71717a">DIR 1 · primary forms + sans</text>
+</svg>

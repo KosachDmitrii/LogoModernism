@@ -97,8 +97,8 @@ function complexityLine(minimalism: ResolvedBrief['minimalism']): string {
   }
 }
 
-function industryLine(brief: ResolvedBrief): string | undefined {
-  return buildIndustryLineForBrief(brief);
+function industryLine(brief: ResolvedBrief, axis: VariantPlan['axis']): string | undefined {
+  return buildIndustryLineForBrief(brief, axis);
 }
 
 function shapeDirective(brief: ResolvedBrief): string {
@@ -166,7 +166,7 @@ export function buildPromptSchema(
     push('typographic_integration', `Typographic integration: ${integration.promptLine}`, 'client');
   }
 
-  const industry = industryLine(brief);
+  const industry = industryLine(brief, plan.axis);
   if (industry) push('industry', industry, 'system');
 
   if (brief.inspiration) {

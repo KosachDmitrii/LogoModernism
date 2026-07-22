@@ -1,5 +1,6 @@
 import type { BrainGenerateRequest, CreativeTerritory } from '@logo-platform/shared';
 import type { BrainArchitecture } from '@logo-platform/shared';
+import { joinSentences } from './prose';
 
 function territoryFromStrategy(
   id: string,
@@ -34,7 +35,10 @@ export function buildCreativeTerritories(
   const primary = territoryFromStrategy(
     'territory-primary',
     'Primary direction',
-    `${designStrategy.industryDirection} Lead with ${designStrategy.markArchitecture} for ${industry}, aligned to ${clientIntent.abstractionLevel} abstraction.`,
+    joinSentences(
+      designStrategy.industryDirection,
+      `Lead with ${designStrategy.markArchitecture} for ${industry}, aligned to ${clientIntent.abstractionLevel} abstraction`,
+    ),
     architecture,
     0,
     ['Most aligned with brief and taste profile'],
@@ -43,7 +47,10 @@ export function buildCreativeTerritories(
   const constructionLed = territoryFromStrategy(
     'territory-construction',
     'Construction-led',
-    `Emphasize ${designStrategy.constructionSystem} as the hero system — form language before decoration.`,
+    joinSentences(
+      `Emphasize ${designStrategy.constructionSystem} as the hero system — form language before decoration`,
+      designStrategy.industryDirection,
+    ),
     architecture,
     -0.05,
     ['Stronger geometric rigor', 'Less expressive typography play'],
@@ -54,7 +61,10 @@ export function buildCreativeTerritories(
   const typographyLed = territoryFromStrategy(
     'territory-typography',
     'Typography-led',
-    `Lead with ${designStrategy.typographyLogic} — custom letterforms as the primary recognition anchor.`,
+    joinSentences(
+      `Lead with ${designStrategy.typographyLogic} — custom letterforms as the primary recognition anchor`,
+      designStrategy.industryDirection,
+    ),
     architecture,
     mark === 'wordmark' || mark === 'lettermark' ? 0.02 : -0.08,
     ['Best for wordmark/lettermark briefs', 'Weaker when symbol-only is required'],

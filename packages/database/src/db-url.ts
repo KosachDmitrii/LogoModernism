@@ -1,7 +1,7 @@
 // One API process owns interactive requests and a low-concurrency DB task runner.
 const DEFAULT_PRODUCTION_CONNECTION_LIMIT = '5';
 const DEFAULT_DEVELOPMENT_CONNECTION_LIMIT = '5';
-const DEFAULT_POOL_TIMEOUT_SECONDS = '15';
+const DEFAULT_POOL_TIMEOUT_SECONDS = '30';
 
 export function isSupabasePoolerUrl(url: string): boolean {
   try {

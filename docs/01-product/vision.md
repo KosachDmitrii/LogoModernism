@@ -2,7 +2,7 @@
 
 ## Mission
 
-AI BIOS is an enterprise logo design platform that replaces random prompt guessing with structured modernist design intelligence. The platform encodes decades of Swiss, Bauhaus, and corporate identity principles into a machine-readable knowledge base that powers deterministic, high-quality logo generation.
+Logo Modernism is a logo design platform that replaces random prompt guessing with structured modernist design intelligence. Design Brain encodes Swiss, Bauhaus, and corporate identity principles into a machine-readable knowledge base that powers ranked, high-quality logo directions for designers.
 
 ## Problem
 

@@ -107,15 +107,53 @@ function extractForbidden(text: string): string[] {
   return unique(found);
 }
 
+/** Known form-language cues clients can request by name in notes. */
+const NAMED_FORM_CUES = [
+  'pixel cluster mark',
+  'pixel cluster',
+  'chip grid silhouette',
+  'chip grid',
+  'data stream curves',
+  'data stream',
+  'shield grid silhouette',
+  'shield grid',
+  'ledger-line rhythm',
+  'secure aperture mark',
+  'growth chevron',
+  'exchange-path curves',
+  'pillar negative space',
+  'coin ring geometry',
+  'modular tile rhythm',
+  'linked node constellation',
+  'signal path curves',
+  'nested frame mark',
+  'bracket aperture silhouette',
+  'modular node network',
+  'quarter-circle negative space',
+  'round focal arc geometry',
+];
+
 function extractDesiredFromNotes(notes: string): string[] {
   const motifs: string[] = [];
-  const wantPattern = /\b(?:want|like|prefer|need|should (?:have|include|show)|looking for)\s+([^.,;]+)/gi;
+  const wantPattern =
+    /\b(?:want|like|prefer|need|use|include|with|should (?:have|include|show)|looking for|primary cue)\s+([^.,;]+)/gi;
   let match: RegExpExecArray | null;
   while ((match = wantPattern.exec(notes)) !== null) {
     const chunk = match[1]?.trim();
     if (chunk && chunk.length >= 3) motifs.push(chunk);
   }
+
+  const lower = notes.toLowerCase();
+  for (const cue of NAMED_FORM_CUES) {
+    if (lower.includes(cue)) motifs.push(cue);
+  }
+
   return unique(motifs);
+}
+
+/** Public helper for brief-compiler / UI — desired form cues from free text. */
+export function extractDesiredMotifsFromText(text: string): string[] {
+  return filterInterviewMotifs(extractDesiredFromNotes(text));
 }
 
 function detectAbstractionLevel(text: string, industry?: string): AbstractionLevel {

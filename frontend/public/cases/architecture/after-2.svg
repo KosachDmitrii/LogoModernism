@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="Constructed typography">
+  <rect width="320" height="200" fill="#fafafa"/>
+  <text x="48" y="108" font-family="DM Sans, sans-serif" font-size="56" font-weight="700" letter-spacing="-0.04em" fill="#18181b">ATELIER</text>
+  <line x1="48" y1="122" x2="272" y2="122" stroke="#18181b" stroke-width="2"/>
+  <line x1="48" y1="70" x2="272" y2="70" stroke="#d4d4d8" stroke-width="1"/>
+  <text x="56" y="184" font-family="IBM Plex Mono, monospace" font-size="10" fill="#71717a">DIR 2 · axial constructed type</text>
+</svg>

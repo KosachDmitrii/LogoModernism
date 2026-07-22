@@ -49,7 +49,9 @@ export function validateCompiled(
       violations.push('Broken inspired-by grammar');
     }
 
-    if (/\bby\s+[A-Z]\.(?=\s|,|\.|$)/.test(prompt.positive)) {
+    // Flag true crumbs like "by A." / "by E." with nothing after the initial.
+    // Do NOT flag real names that start with an initial: "by M. Moser", "by A. Corde".
+    if (/\bby\s+[A-Z]\.(?!\s*[A-Za-z])/.test(prompt.positive)) {
       violations.push('Empty designer attribution crumb');
     }
 

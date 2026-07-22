@@ -39,6 +39,8 @@ export interface CanonicalBrief {
   colorSelections: string[];
   clientNotes: string;
   clientContext: string[];
+  /** Explicit form-language cues from client notes (e.g. "pixel cluster"). */
+  desiredMotifs: string[];
   forbiddenMotifs: string[];
   allowShadows: boolean;
   allowPhotoreal: boolean;

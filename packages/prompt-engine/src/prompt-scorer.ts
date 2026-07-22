@@ -194,7 +194,7 @@ function scoreCompilerPenalties(text: string): CompilerPenalties {
     const fragmentCount = (positive.match(/design principles:\s*([^.]+)/i)?.[1]?.split(',') ?? []).length;
     bloat += Math.min(1.5, 0.5 + Math.max(0, fragmentCount - 2) * 0.35);
   }
-  if (/industry direction for/i.test(positive)) bloat += 0.35;
+  if (/industry (?:direction|form language) for/i.test(positive)) bloat += 0.35;
 
   if (
     /\bwordmark\b/i.test(positive) &&
@@ -203,10 +203,21 @@ function scoreCompilerPenalties(text: string): CompilerPenalties {
     contradiction += 1.5;
   }
 
-  if (/industry direction for/i.test(positive)) {
-    if (countMatches(positive, ['pixel', 'chip', 'data stream', 'stream curves', 'cluster mark']) > 0) {
-      literalIndustry += 0.75;
-    }
+  if (/industry (?:direction|form language) for/i.test(positive)) {
+    // Penalize dumping many literal/iconic industry cues into one prompt.
+    const cueHits = countMatches(positive, [
+      'pixel',
+      'chip',
+      'data stream',
+      'stream curves',
+      'cluster mark',
+      'coin stack',
+      'server rack',
+      'medical cross',
+      'heart symbol',
+    ]);
+    if (cueHits >= 2) literalIndustry += 0.75;
+    else if (cueHits === 1) literalIndustry += 0.25;
   }
 
   if (countMatches(positive, ['generated logo', 'successful generation', 'prompt:']) > 0) {

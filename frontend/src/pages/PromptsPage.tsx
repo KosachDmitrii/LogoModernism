@@ -14,6 +14,7 @@ import { useAppStore } from '../store';
 import { StartOverButton } from '../components/prompts/StartOverButton';
 import { StartOverDialog } from '../components/prompts/StartOverDialog';
 import { LowReadinessDialog } from '../components/prompts/LowReadinessDialog';
+import { DownloadPackButton } from '../components/prompts/DownloadPackButton';
 import { BrainPartnerPanel, type PartnerRegenerateAction } from '../components/prompts/BrainPartnerPanel';
 import { applyConstraintResolutions } from '../lib/apply-constraint-resolution';
 import type { ConstraintResolution } from '../types';
@@ -88,7 +89,7 @@ export function PromptsPage() {
   } | null>(null);
   const [regeneratingAction, setRegeneratingAction] = useState<PartnerRegenerateAction | null>(null);
   const [partnerExpanded, setPartnerExpanded] = useState(true);
-  const [logoGenerationCount, setLogoGenerationCount] = useState(0);
+  const isAnyPromptGenerating = useAppStore((s) => s.generatingPromptIds.size > 0);
 
   useEffect(() => {
     if (activeStep === 3) {
@@ -101,7 +102,8 @@ export function PromptsPage() {
   const compose = useComposePrompts({
     getSignal: getWorkSignal,
   });
-  const hideResultsActions = compose.isPending || logoGenerationCount > 0;
+  // Hide pack / back / start-over while composing or any prompt logo is still generating.
+  const hideResultsActions = compose.isPending || isAnyPromptGenerating;
   const shownComposeErrorRef = useRef<unknown>(null);
 
   useEffect(() => {
@@ -268,16 +270,13 @@ export function PromptsPage() {
                     getWorkSignal={getWorkSignal}
                     onLogoGenerationStart={() => {
                       setPartnerExpanded(false);
-                      setLogoGenerationCount((count) => count + 1);
-                    }}
-                    onLogoGenerationEnd={() => {
-                      setLogoGenerationCount((count) => Math.max(0, count - 1));
                     }}
                   />
                 ))}
               </div>
               {!hideResultsActions && (
-                <div className="pt-4 flex items-center gap-3">
+                <div className="pt-4 flex flex-wrap items-center gap-3">
+                  <DownloadPackButton />
                   <Button
                     type="button"
                     onClick={() => setActiveStep(2)}

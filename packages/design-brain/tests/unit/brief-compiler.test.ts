@@ -166,6 +166,24 @@ describe('Brief Compiler', () => {
     expect(text).toContain('avito');
   });
 
+  it('allows imported refs whose designer starts with an initial (M. Moser)', () => {
+    const result = compileBrief({
+      industry: 'Architecture',
+      companyName: 'ATELIER',
+      markType: 'combination',
+      variationCount: 3,
+      catalogReferenceIds: ['ref-import-p86-0-m-moser-associates'],
+      briefContext: {
+        colorPalette: 'black_white',
+      },
+    });
+    expect(result.validation.passed).toBe(true);
+    expect(result.validation.violations).not.toContain('Empty designer attribution crumb');
+    const text = result.prompts[0]!.positive;
+    expect(text).toMatch(/M\.?\s*Moser/i);
+    expect(text).not.toMatch(/\bby\s+[A-Z]\.(?!\s*[A-Za-z])/);
+  });
+
   it('plans 3 variants with different territory axes', () => {
     const result = compileBrief({ ...baseRequest, variationCount: 3 });
     expect(result.prompts).toHaveLength(3);

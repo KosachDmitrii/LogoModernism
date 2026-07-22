@@ -11,6 +11,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { PrinciplesPage } from './pages/PrinciplesPage';
 import { BrainRoutePage } from './pages/BrainRoutePage';
 import { PricingPage } from './pages/PricingPage';
+import { ReferencesPage } from './pages/ReferencesPage';
 import { useAuth } from './auth/AuthProvider';
 import { useT } from './i18n';
 
@@ -35,6 +36,7 @@ export default function App() {
           <Route index element={<HomePage />} />
           <Route path="logo-catalog" element={<LogoCatalogPage />} />
           <Route path="principles" element={<PrinciplesPage />} />
+          <Route path="references" element={<ReferencesPage />} />
           <Route path="brain" element={<BrainRoutePage />} />
           <Route path="pricing" element={<PricingPage />} />
           <Route element={<ProtectedRoute />}>

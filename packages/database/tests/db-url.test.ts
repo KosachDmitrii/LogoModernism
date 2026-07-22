@@ -13,7 +13,7 @@ test('adds bounded development pool defaults for runtime URLs', () => {
     ),
   );
   assert.equal(result.searchParams.get('connection_limit'), '5');
-  assert.equal(result.searchParams.get('pool_timeout'), '15');
+  assert.equal(result.searchParams.get('pool_timeout'), '30');
   assert.equal(result.searchParams.get('pgbouncer'), 'true');
 });
 

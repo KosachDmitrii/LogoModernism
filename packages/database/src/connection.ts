@@ -16,7 +16,7 @@ const CONNECTION_ERROR_CODES = new Set([
 ]);
 
 const CONNECTION_ERROR_PATTERN =
-  /closed|connection|ECONNRESET|ETIMEDOUT|timeout expired|remaining connection slots|too many clients|terminating connection/i;
+  /closed|connection|ECONNRESET|ETIMEDOUT|timeout exceeded when trying to connect|timeout expired|remaining connection slots|too many clients|terminating connection/i;
 
 export interface PostgresErrorLike {
   code?: string;

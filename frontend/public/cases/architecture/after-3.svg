@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="Structural combination mark">
+  <rect width="320" height="200" fill="#fafafa"/>
+  <path d="M70 130 L100 60 L130 130 Z" fill="none" stroke="#18181b" stroke-width="6"/>
+  <line x1="85" y1="100" x2="115" y2="100" stroke="#18181b" stroke-width="6"/>
+  <text x="150" y="105" font-family="DM Sans, sans-serif" font-size="28" font-weight="600" letter-spacing="0.08em" fill="#18181b">ATELIER</text>
+  <text x="56" y="184" font-family="IBM Plex Mono, monospace" font-size="10" fill="#71717a">DIR 3 · structural combination</text>
+</svg>

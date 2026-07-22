@@ -262,6 +262,13 @@ export function LogoCatalogPage() {
     <PageContainer>
       <PageHeader page="catalog" subtitle={statsSubtitle} />
 
+      <p className="mb-6 max-w-3xl text-sm leading-6 text-zinc-500">
+        {t('catalog.disclaimer')}{' '}
+        <Link to="/references" className="text-violet-400 hover:text-violet-300">
+          {t('nav.references')}
+        </Link>
+      </p>
+
       <div className="grid lg:grid-cols-[220px_1fr_320px] gap-6">
         <aside className="space-y-4">
           <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{t('catalog.chapters')}</p>
